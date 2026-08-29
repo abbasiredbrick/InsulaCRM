@@ -1,38 +1,64 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-08-29
+
+First maintenance release. Unblocks new installations, closes a data
+retention gap in team management, and removes the need to reinstall in
+order to change business mode.
 
 ### Fixed
 
-- Admins can now be assigned leads, deals and tasks. On a fresh install the admin
-  was the only user but was excluded from every agent list, leaving the "Assigned
-  Agent" dropdown with zero options and making it impossible to create a first
-  lead (#3).
-- The assigned-agent dropdown now renders a placeholder option and an explanatory
-  message when no one is assignable, instead of an empty required select that can
-  never be satisfied.
-- Editing a lead keeps its current owner selectable even after that user has been
-  deactivated, so saving no longer silently reassigns the lead.
-- Custom tenant-defined roles are now included in agent lists, matching what the
-  team invite form already allowed.
-- Dashboards, reports, the activity inbox and PDF exports use the same assignable
-  user list, so work owned by an admin no longer disappears from team performance.
+- Admins can be assigned leads, deals and tasks. On a fresh install the admin
+  was the only user but was excluded from every agent list, so the required
+  "Assigned Agent" dropdown rendered with no options at all and the first lead
+  could never be saved. Lead validation had always accepted the admin; only the
+  dropdown query excluded them. (#3)
+- The assigned agent dropdown now shows a placeholder option, plus a message
+  explaining what to do when nobody is assignable, instead of an empty required
+  select that cannot be satisfied.
+- Editing a lead keeps its current owner selectable after that user has been
+  deactivated, so saving the form no longer silently reassigns the lead.
+- Custom roles defined by a tenant are now recognised in agent lists. The team
+  invite form already allowed them, but no agent list matched them, so anyone
+  holding a custom role was invisible.
+- Dashboards, reports, the activity inbox and PDF exports all resolve agents
+  the same way, so leads and deals owned by an admin no longer disappear from
+  team performance figures.
 
 ### Added
 
-- Team members can be deleted, not only deactivated (#3). Deletion requires
-  choosing who inherits their leads, deals, tasks, activities, showings and open
-  houses — every `agent_id` foreign key cascades, so the records are reassigned in
-  the same transaction as the delete. Deleting a member frees their email address
-  for reuse; deactivation alone held it forever.
-- Guards against deleting your own account or the last remaining admin.
-- Business mode can be changed after installation from Settings → General (#4).
-  The switch deliberately does not migrate data: the screen shows how many deals
-  and leads currently hold a stage or status that does not exist in the target
-  mode, and requires typing SWITCH to confirm. The change is written to the audit
-  log.
-- README section documenting the wholesale/real-estate mode split, so modules
-  hidden by the other mode are no longer mistaken for missing files (#4).
+- Team members can be deleted, not only deactivated. (#3)
+  Deletion asks who inherits the member's records: leads, deals, tasks,
+  activities, showings and open houses are reassigned inside the same
+  transaction as the delete. Every agent_id foreign key cascades, so removing
+  the row without reassigning first would have destroyed that member's entire
+  book of business.
+- Deleting a member frees their email address for reuse. Addresses are globally
+  unique and the users table has no soft deletes, so a deactivated member held
+  their address permanently and it could never be recovered through the UI.
+- Deleting your own account, or the last remaining admin, is refused.
+- Business mode can be changed after installation, under Settings > General.
+  Previously the mode was fixed at install time and only a reinstall or a
+  direct database edit could change it. (#4)
+- The mode switch reports its own blast radius before you commit to it: the
+  screen counts how many deals and leads currently hold a stage or status that
+  does not exist in the target mode, and requires typing SWITCH to confirm.
+  The change is written to the audit log.
+
+### Changed
+
+- Switching business mode deliberately does not migrate existing records.
+  Stages and statuses are stored as raw values and the two modes use different
+  vocabularies, so remapping is a judgement call that belongs to the operator.
+  Affected records keep working and display their original value until remapped.
+
+### Documentation
+
+- README now documents the wholesale and real estate mode split, including
+  which modules belong to each mode. Modules hidden by the opposite mode were
+  being reported as files missing from the release. (#4)
+- README notes that the Disposition Room has no top level navigation entry and
+  is opened per deal from the deal detail page.
 
 ## 1.0.0 - 2026-03-28
 
