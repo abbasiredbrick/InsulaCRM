@@ -22,6 +22,12 @@
 
 - The WhatsApp button uses a `.btn-whatsapp` class instead of inline styles.
 
+### Documentation
+
+- Added `ROADMAP.md` recording the current state, the release policy, work that
+  is deferred by decision, and known gaps that are not yet tracked as issues.
+- README lists the lead quick actions and links to the roadmap.
+
 ## 1.1.0 - 2026-08-29
 
 First maintenance release. Unblocks new installations, closes a data

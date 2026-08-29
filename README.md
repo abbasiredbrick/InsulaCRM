@@ -2,6 +2,8 @@
 
 A self-hosted, multi-tenant real estate wholesaler CRM built with Laravel 12 and the Tabler admin template. Designed for wholesaling teams, investors, and agencies who need a dedicated tool for managing motivated seller leads, property pipelines, deal tracking, and buyer disposition.
 
+See [ROADMAP.md](ROADMAP.md) for current state, known gaps, and what is deliberately deferred.
+
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/insulacrm)
 
 ---
@@ -51,6 +53,7 @@ opened per deal from the deal detail page, via the **Disposition Room** button.
 - Inline activity editing and deletion via three-dot menu
 - Task deletion and AI task suggestions with one-click add
 - DNC (Do Not Contact) flag with system-wide enforcement
+- Quick actions on the lead detail page: call, email, and open a WhatsApp conversation. The WhatsApp number is normalised to international format using the dialing code of the workspace country set in Settings > General, and every quick action is hidden for leads flagged Do Not Contact
 
 ### Property Tracking
 - Linked to leads: address, type, bedrooms, bathrooms, sq ft, year built, lot size, condition
