@@ -26,7 +26,12 @@
 
 - Added `ROADMAP.md` recording the current state, the release policy, work that
   is deferred by decision, and known gaps that are not yet tracked as issues.
-- README lists the lead quick actions and links to the roadmap.
+- Added `CONTRIBUTING.md` covering setup, the test commands, and the domain
+  rules that changes most often trip over: do not assume a country, respect the
+  business mode, scope queries by tenant, honour Do Not Contact, and check
+  cascading foreign keys before deleting.
+- README lists the lead quick actions and links to the roadmap and contributing
+  guide.
 
 ## 1.1.0 - 2026-08-29
 

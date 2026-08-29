@@ -105,10 +105,6 @@ follow up if operators actually switch modes in practice.
   `'version' => '1.0.0'` rather than reading `config('app.version')`. Arguably
   correct if it is meant to describe the API contract rather than the app, but it
   is currently ambiguous and undocumented.
-* **No `CONTRIBUTING.md`.** The first external pull request received a review
-  and then stalled for three months. Contribution expectations, the test command,
-  and the fact that phone and locale behaviour must not assume a single country
-  are all worth writing down.
 
 ## Testing notes
 
