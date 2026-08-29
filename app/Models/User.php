@@ -74,6 +74,27 @@ class User extends Authenticatable
     }
 
     /**
+     * Users who may be assigned ownership of a tenant's leads, deals and tasks.
+     *
+     * Covers every system role valid for the tenant's business mode - admin
+     * included - plus any custom role the tenant defined itself. Restricting
+     * this to non-admin system roles previously left single-user tenants with
+     * nobody to assign work to.
+     */
+    public function scopeAssignable($query, Tenant $tenant)
+    {
+        $roleNames = \App\Services\BusinessModeService::getAssignableRoleNames($tenant);
+
+        $roleIds = Role::where(function ($q) use ($tenant, $roleNames) {
+            $q->where(function ($q2) use ($roleNames) {
+                $q2->where('is_system', true)->whereIn('name', $roleNames);
+            })->orWhere('tenant_id', $tenant->id);
+        })->pluck('id');
+
+        return $query->where('tenant_id', $tenant->id)->whereIn('role_id', $roleIds);
+    }
+
+    /**
      * Check if user has a specific permission via their role.
      */
     public function hasPermission(string $key): bool

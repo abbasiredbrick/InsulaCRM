@@ -6,6 +6,15 @@ use App\Models\Tenant;
 
 class BusinessModeService
 {
+    /**
+     * Selectable business modes. The mode decides which modules, pipeline
+     * stages, lead statuses and roles a tenant sees.
+     */
+    public const MODES = [
+        'wholesale'  => 'Wholesaling',
+        'realestate' => 'Real Estate Agent / Broker',
+    ];
+
     // ── Wholesale pipeline stages (current default) ──
 
     public const WHOLESALE_STAGES = [
@@ -357,6 +366,45 @@ class BusinessModeService
     public static function getAgentRoleNames(?Tenant $tenant = null): array
     {
         return array_values(array_filter(self::getRoles($tenant), fn($r) => $r !== 'admin'));
+    }
+
+    /**
+     * Role names that may own leads, deals, tasks and activities.
+     *
+     * Unlike getAgentRoleNames() this deliberately includes 'admin'. On a fresh
+     * install the admin is the only user in the tenant, so excluding them left
+     * the "Assigned Agent" dropdown with zero options and made it impossible to
+     * create the first lead.
+     */
+    public static function getAssignableRoleNames(?Tenant $tenant = null): array
+    {
+        return self::getRoles($tenant);
+    }
+
+    /**
+     * Pipeline stage keys valid for an explicit mode, independent of the
+     * currently authenticated tenant. Used to preview the impact of a switch.
+     */
+    public static function getStagesForMode(string $mode): array
+    {
+        return $mode === 'realestate' ? self::REALESTATE_STAGES : self::WHOLESALE_STAGES;
+    }
+
+    /**
+     * Lead status keys valid for an explicit mode, independent of the
+     * currently authenticated tenant.
+     */
+    public static function getLeadStatusesForMode(string $mode): array
+    {
+        return $mode === 'realestate' ? self::REALESTATE_LEAD_STATUSES : self::WHOLESALE_LEAD_STATUSES;
+    }
+
+    /**
+     * The mode a tenant would move to if it switched. Only two modes exist.
+     */
+    public static function oppositeMode(string $mode): string
+    {
+        return $mode === 'realestate' ? 'wholesale' : 'realestate';
     }
 
     public static function getRoleLabels(?Tenant $tenant = null): array

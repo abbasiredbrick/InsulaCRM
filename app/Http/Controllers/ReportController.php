@@ -53,10 +53,8 @@ class ReportController extends Controller
                 ->get();
         }
 
-        $agentRoleNames = \App\Services\BusinessModeService::getAgentRoleNames();
-        $agentRoleIds = \App\Models\Role::whereIn('name', $agentRoleNames)->pluck('id');
         $agents = auth()->user()->isAdmin()
-            ? User::where('tenant_id', auth()->user()->tenant_id)->whereIn('role_id', $agentRoleIds)->get()
+            ? User::assignable(auth()->user()->tenant)->orderBy('name')->get()
             : collect();
 
         // Pipeline bottleneck: avg days per stage
@@ -120,8 +118,7 @@ class ReportController extends Controller
         $teamPerformance = [];
         if (auth()->user()->isAdmin()) {
             $tenantId = auth()->user()->tenant_id;
-            $agentRoleIdsAll = \App\Models\Role::whereIn('name', $agentRoleNames)->pluck('id');
-            $agentIds = User::where('tenant_id', $tenantId)->whereIn('role_id', $agentRoleIdsAll)->pluck('id');
+            $agentIds = User::assignable(auth()->user()->tenant)->pluck('id');
 
             $leadsContactedMap = Lead::whereIn('agent_id', $agentIds)
                 ->where('status', '!=', 'new')
@@ -144,8 +141,7 @@ class ReportController extends Controller
                 ->selectRaw('agent_id, count(*) as cnt, sum(' . \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'] . ') as fees')
                 ->groupBy('agent_id')->get()->keyBy('agent_id');
 
-            $teamPerformance = User::where('tenant_id', $tenantId)
-                ->whereIn('role_id', $agentRoleIdsAll)
+            $teamPerformance = User::assignable(auth()->user()->tenant)
                 ->get()
                 ->map(function ($agent) use ($leadsContactedMap, $offersMadeMap, $dealsClosedMap) {
                     $closedRow = $dealsClosedMap->get($agent->id);
@@ -448,9 +444,7 @@ class ReportController extends Controller
         $from = $request->get('from', now()->subMonths(6)->format('Y-m-d'));
         $to = $request->get('to', now()->format('Y-m-d'));
 
-        $agentRoleIds = \App\Models\Role::whereIn('name', \App\Services\BusinessModeService::getAgentRoleNames())->pluck('id');
-        $teamPerformance = User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereIn('role_id', $agentRoleIds)
+        $teamPerformance = User::assignable(auth()->user()->tenant)
             ->get()
             ->map(function ($agent) use ($from, $to) {
                 $leadsContacted = Lead::where('agent_id', $agent->id)->where('status', '!=', 'new')->whereBetween('created_at', [$from, $to . ' 23:59:59'])->count();

@@ -184,6 +184,85 @@
                     </div>
                     <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>
                 </form>
+
+                <hr class="my-4">
+
+                <h4 class="mb-1">{{ __('Business Mode') }}</h4>
+                <p class="text-secondary">
+                    {{ __('InsulaCRM ships two products in one. The mode decides which modules, pipeline stages, lead statuses and team roles exist for this workspace.') }}
+                </p>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <strong>{{ __('Wholesaling') }}</strong><br>
+                                    <span class="text-secondary">{{ __('ARV/MAO worksheet, distress markers, assignment fees, buyer matching and the Disposition Room.') }}</span>
+                                </div>
+                                <div>
+                                    <strong>{{ __('Real Estate Agent / Broker') }}</strong><br>
+                                    <span class="text-secondary">{{ __('Listings, showings, open houses, offer tracking and commissions.') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="text-secondary">{{ __('Current mode') }}</div>
+                                <div class="h3 mb-0">
+                                    {{ __(\App\Services\BusinessModeService::MODES[$businessModeImpact['current']] ?? $businessModeImpact['current']) }}
+                                </div>
+                                <small class="text-secondary">
+                                    {{ __('Modules belonging to the other mode are hidden, not missing.') }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger">
+                    <h4 class="alert-title">{{ __('Switching mode does not migrate your data') }}</h4>
+                    <p class="mb-2">
+                        {{ __('Pipeline stages and lead statuses are stored as raw values, and the two modes use different vocabularies. Nothing is converted for you, and there is no automatic way back.') }}
+                    </p>
+                    <p class="mb-2">
+                        {{ __('Switching to :mode right now would leave these records holding a stage or status that does not exist in the new mode:', [
+                            'mode' => __(\App\Services\BusinessModeService::MODES[$businessModeImpact['target']] ?? $businessModeImpact['target']),
+                        ]) }}
+                    </p>
+                    <ul class="mb-2">
+                        <li>{{ trans_choice('{0} No deals affected|{1} :count deal|[2,*] :count deals', $businessModeImpact['deals'], ['count' => $businessModeImpact['deals']]) }}</li>
+                        <li>{{ trans_choice('{0} No leads affected|{1} :count lead|[2,*] :count leads', $businessModeImpact['leads'], ['count' => $businessModeImpact['leads']]) }}</li>
+                    </ul>
+                    <p class="mb-0">
+                        {{ __('Those records keep working but will show an unrecognised stage until you remap them yourself, either in bulk from the pipeline or directly in the database. Take a backup first.') }}
+                    </p>
+                </div>
+
+                <form action="{{ route('settings.updateBusinessMode') }}" method="POST" class="row g-2 align-items-end">
+                    @csrf
+                    @method('PUT')
+                    <div class="col-md-4">
+                        <label class="form-label">{{ __('Switch to') }}</label>
+                        <select name="business_mode" class="form-select">
+                            @foreach(\App\Services\BusinessModeService::MODES as $value => $label)
+                                <option value="{{ $value }}" {{ $businessModeImpact['current'] === $value ? '' : 'selected' }}>{{ __($label) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ __('Type SWITCH to confirm') }}</label>
+                        <input type="text" name="confirmation" class="form-control" placeholder="SWITCH" autocomplete="off">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-danger w-100"
+                                onclick="return confirm('{{ __('Switch business mode? Existing stages and statuses will not be migrated.') }}')">
+                            {{ __('Change business mode') }}
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <!-- Team Tab -->
@@ -284,6 +363,44 @@
                                             </button>
                                         </form>
                                     @endif
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteMemberModal{{ $agent->id }}">
+                                        {{ __('Delete') }}
+                                    </button>
+                                    <div class="modal fade" id="deleteMemberModal{{ $agent->id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="POST" action="{{ route('settings.destroyAgent', $agent) }}">
+                                                @csrf
+                                                @method('DELETE')
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">{{ __('Delete :name', ['name' => $agent->name]) }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="text-secondary">
+                                                            {{ __('This permanently removes the account and frees :email for reuse.', ['email' => $agent->email]) }}
+                                                        </p>
+                                                        <label class="form-label required">{{ __('Reassign their leads, deals, tasks and activities to') }}</label>
+                                                        <select name="reassign_to" class="form-select" required>
+                                                            <option value="">{{ __('Select a team member...') }}</option>
+                                                            @foreach($reassignTargets->where('id', '!=', $agent->id) as $target)
+                                                                <option value="{{ $target->id }}" {{ $target->id === auth()->id() ? 'selected' : '' }}>
+                                                                    {{ $target->name }}{{ $target->id === auth()->id() ? ' (' . __('you') . ')' : '' }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                        <small class="form-hint">
+                                                            {{ __('Nothing is deleted along with the account - every record they own is handed to the person you pick here.') }}
+                                                        </small>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                                                        <button type="submit" class="btn btn-danger">{{ __('Delete permanently') }}</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach

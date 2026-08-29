@@ -59,11 +59,7 @@ class ActivityInboxController extends Controller
         // Agent list for admin filter
         $agents = collect();
         if ($user->isAdmin()) {
-            $agentRoleNames = \App\Services\BusinessModeService::getAgentRoleNames();
-            $agentRoleIds = Role::whereIn('name', $agentRoleNames)->pluck('id');
-            $agents = User::where('tenant_id', $user->tenant_id)
-                ->whereIn('role_id', $agentRoleIds)
-                ->get();
+            $agents = User::assignable($user->tenant)->orderBy('name')->get();
         }
 
         // Activity types for filter

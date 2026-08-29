@@ -6,6 +6,40 @@ A self-hosted, multi-tenant real estate wholesaler CRM built with Laravel 12 and
 
 ---
 
+## Business Modes
+
+InsulaCRM ships **two products in one**. The business mode is chosen during
+installation and decides which modules, pipeline stages, lead statuses and team
+roles the workspace uses. Modules belonging to the other mode are **hidden, not
+missing** — every file is present in every release.
+
+| | Wholesaling (default) | Real Estate Agent / Broker |
+|---|---|---|
+| Pipeline stages | Prospecting → Dispositions → Assigned → Closing | Listing Agreement → Active Listing → Showing → Closing |
+| Money field | Assignment fee | Commission |
+| Property tools | ARV/MAO worksheet, distress markers, repair costs | List price, listing status, days on market |
+| Modules | Disposition Room, buyer matching, list stacking | Listings, Showings, Open Houses |
+| Roles | Acquisition Agent, Disposition Agent, Field Scout | Listing Agent, Buyers Agent |
+
+If a feature from the table above is not visible in your install, you are almost
+certainly in the other mode — check **Settings → General → Business Mode**.
+
+### Changing mode after installation
+
+The mode can be switched from **Settings → General → Business Mode**, but the
+switch **does not migrate your data**. Pipeline stages and lead statuses are
+stored as raw values and the two modes use different vocabularies, so records
+created in the old mode keep their old stage or status until you remap them
+yourself. The settings screen shows exactly how many deals and leads would be
+affected before you confirm. Take a database backup first.
+
+### The Disposition Room
+
+The Disposition Room (wholesale mode) has no top-level navigation entry — it is
+opened per deal from the deal detail page, via the **Disposition Room** button.
+
+---
+
 ## Features
 
 ### Lead Management

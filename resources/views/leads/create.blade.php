@@ -98,11 +98,17 @@
                 <div class="col-md-4">
                     <label class="form-label required">{{ __('Assigned Agent') }}</label>
                     <select name="agent_id" class="form-select @error('agent_id') is-invalid @enderror" required>
+                        <option value="">{{ __('Select an agent...') }}</option>
                         @foreach($agents as $agent)
                             <option value="{{ $agent->id }}" {{ old('agent_id') == $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
                         @endforeach
                     </select>
                     @error('agent_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    @if($agents->isEmpty())
+                        <small class="form-hint text-danger">
+                            {{ __('No one in your team can be assigned leads yet. Add a team member under Settings > Team.') }}
+                        </small>
+                    @endif
                 </div>
                 <div class="col-md-4 d-flex align-items-end">
                     <label class="form-check mb-0">

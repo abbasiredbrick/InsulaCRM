@@ -218,7 +218,7 @@ class LeadController extends Controller
     public function edit(Lead $lead)
     {
         $this->authorize('update', $lead);
-        $agents = $this->getAgents();
+        $agents = $this->getAgents($lead);
         return view('leads.edit', compact('lead', 'agents'));
     }
 
@@ -443,16 +443,34 @@ class LeadController extends Controller
         ]);
     }
 
-    private function getAgents()
+    /**
+     * Users selectable in the "Assigned Agent" dropdown.
+     *
+     * Pass the lead being edited so its current owner stays selectable even
+     * after being deactivated - otherwise saving the form would silently
+     * reassign the lead to somebody else.
+     */
+    private function getAgents(?Lead $lead = null)
     {
-        if (auth()->user()->isAgent()) {
-            return collect([auth()->user()]);
+        $user = auth()->user();
+
+        if ($user->isAgent()) {
+            return collect([$user]);
         }
 
-        $agentRoleNames = \App\Services\BusinessModeService::getAgentRoleNames();
-        $agentRoleIds = Role::whereIn('name', $agentRoleNames)->pluck('id');
-        return User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereIn('role_id', $agentRoleIds)
+        $agents = User::assignable($user->tenant)
+            ->where('is_active', true)
+            ->orderBy('name')
             ->get();
+
+        if ($lead?->agent_id && ! $agents->contains('id', $lead->agent_id)) {
+            $current = User::where('tenant_id', $user->tenant_id)->find($lead->agent_id);
+
+            if ($current) {
+                $agents = $agents->push($current)->sortBy('name')->values();
+            }
+        }
+
+        return $agents;
     }
 }

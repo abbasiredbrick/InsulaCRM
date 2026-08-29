@@ -437,6 +437,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/invite-agent', [SettingsController::class, 'inviteAgent'])->name('settings.inviteAgent');
         Route::patch('/settings/agents/{user}/toggle', [SettingsController::class, 'toggleAgent'])->name('settings.toggleAgent');
         Route::delete('/settings/agents/{user}/reset-2fa', [SettingsController::class, 'reset2fa'])->name('settings.reset2fa');
+        Route::delete('/settings/agents/{user}', [SettingsController::class, 'destroyAgent'])->name('settings.destroyAgent');
+        Route::put('/settings/business-mode', [SettingsController::class, 'updateBusinessMode'])->name('settings.updateBusinessMode');
         Route::put('/settings/distribution', [SettingsController::class, 'updateDistribution'])->name('settings.updateDistribution');
 
         // DNC Management

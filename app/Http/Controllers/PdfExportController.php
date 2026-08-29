@@ -134,10 +134,7 @@ class PdfExportController extends Controller
         $to = $request->get('to', now()->format('Y-m-d'));
 
         $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
-        $agentRoleIds = Role::whereIn('name', \App\Services\BusinessModeService::getAgentRoleNames())->pluck('id');
-
-        $teamPerformance = User::where('tenant_id', $tenantId)
-            ->whereIn('role_id', $agentRoleIds)
+        $teamPerformance = User::assignable($tenant)
             ->get()
             ->map(function ($agent) use ($from, $to, $tenantId, $feeColumn) {
                 $leadCount = Lead::where('tenant_id', $tenantId)

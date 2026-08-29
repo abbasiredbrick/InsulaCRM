@@ -77,9 +77,7 @@ class DashboardController extends Controller
         // Team Performance Leaderboard (admin only)
         $teamPerformance = collect();
         if ($user->isAdmin()) {
-            $agentRoleIds = \App\Models\Role::whereIn('name', \App\Services\BusinessModeService::getAgentRoleNames())->pluck('id');
-            $teamPerformance = User::where('tenant_id', $user->tenant_id)
-                ->whereIn('role_id', $agentRoleIds)
+            $teamPerformance = User::assignable($user->tenant)
                 ->get()
                 ->map(function ($agent) use ($feeColumn) {
                     $dealsClosed = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')

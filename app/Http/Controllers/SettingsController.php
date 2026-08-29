@@ -6,10 +6,13 @@ use App\Http\Requests\DistributionSettingsRequest;
 use App\Http\Requests\GeneralSettingsRequest;
 use App\Models\AuditLog;
 use App\Models\CustomFieldDefinition;
+use App\Models\Deal;
+use App\Models\Lead;
 use App\Models\LeadSourceCost;
 use App\Models\Permission;
 use App\Models\Plugin;
 use App\Models\Role;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\BusinessModeService;
 use App\Services\CustomFieldService;
@@ -23,6 +26,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use App\Notifications\TeamMemberInvited;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
@@ -58,7 +63,17 @@ class SettingsController extends Controller
 
         // For backward compat, pass as both 'agents' and 'teamMembers'
         $agents = $teamMembers;
-        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady'));
+
+        // Every team member, including the current admin: deleting a member
+        // requires handing their records to somebody who remains.
+        $reassignTargets = User::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->orderBy('name')
+            ->get();
+
+        $businessModeImpact = $this->businessModeImpact($tenant);
+
+        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady', 'reassignTargets', 'businessModeImpact'));
     }
 
     public function updateGeneral(GeneralSettingsRequest $request)
@@ -362,6 +377,178 @@ class SettingsController extends Controller
         AuditLog::log('agent.toggled', $user);
 
         return redirect()->route('settings.index', ['tab' => 'team'])->with('success', 'Agent status updated.');
+    }
+
+    /**
+     * Permanently delete a team member, handing their work to another user.
+     *
+     * Every agent_id foreign key on leads, deals, tasks, activities, showings
+     * and open houses cascades on delete, so the rows must be reassigned inside
+     * the same transaction as the delete - dropping the user first would take
+     * their entire book of business with them.
+     *
+     * Deletion (rather than deactivation alone) is what frees the email
+     * address: users.email is globally unique and the table has no soft
+     * deletes, so a deactivated member holds their address forever.
+     */
+    public function destroyAgent(Request $request, User $user)
+    {
+        $this->authorize('manageTeamMember', $user);
+
+        if ($user->id === auth()->id()) {
+            return redirect()->route('settings.index', ['tab' => 'team'])
+                ->with('error', __('You cannot delete your own account.'));
+        }
+
+        $tenantId = auth()->user()->tenant_id;
+
+        $remainingAdmins = User::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('id', '!=', $user->id)
+            ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+            ->count();
+
+        if ($user->isAdmin() && $remainingAdmins === 0) {
+            return redirect()->route('settings.index', ['tab' => 'team'])
+                ->with('error', __('You cannot delete the last admin of this workspace.'));
+        }
+
+        $validated = $request->validate([
+            'reassign_to' => [
+                'required',
+                'integer',
+                Rule::notIn([$user->id]),
+                Rule::exists('users', 'id')->where(fn ($q) => $q->where('tenant_id', $tenantId)),
+            ],
+        ], [
+            'reassign_to.required' => __('Choose who should inherit this member\'s records.'),
+            'reassign_to.not_in'   => __('Records cannot be reassigned to the member being deleted.'),
+        ]);
+
+        $newOwnerId = (int) $validated['reassign_to'];
+
+        $deleted = [
+            'name'  => $user->name,
+            'email' => $user->email,
+            'role'  => $user->role->name ?? null,
+        ];
+
+        DB::transaction(function () use ($user, $newOwnerId, $tenantId) {
+            foreach (['leads', 'deals', 'tasks', 'activities', 'showings', 'open_houses'] as $table) {
+                if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'agent_id')) {
+                    continue;
+                }
+
+                $query = DB::table($table)->where('agent_id', $user->id);
+
+                if (Schema::hasColumn($table, 'tenant_id')) {
+                    $query->where('tenant_id', $tenantId);
+                }
+
+                $query->update(['agent_id' => $newOwnerId]);
+            }
+
+            // Lead claims are transient per-agent offers, not business records.
+            if (Schema::hasTable('lead_claims')) {
+                DB::table('lead_claims')->where('agent_id', $user->id)->delete();
+            }
+
+            // Notifications are personal and would otherwise be orphaned.
+            if (Schema::hasTable('notifications')) {
+                DB::table('notifications')
+                    ->where('notifiable_type', User::class)
+                    ->where('notifiable_id', $user->id)
+                    ->delete();
+            }
+
+            $user->delete();
+        });
+
+        AuditLog::log('agent.deleted', null, $deleted, ['reassigned_to' => $newOwnerId]);
+
+        return redirect()->route('settings.index', ['tab' => 'team'])
+            ->with('success', __('Team member deleted. Their records were reassigned and :email can be used again.', ['email' => $deleted['email']]));
+    }
+
+    /**
+     * Switch the tenant between wholesale and real estate mode.
+     *
+     * This deliberately does NOT migrate existing data. Stages and statuses are
+     * stored as raw strings, and the two modes use different vocabularies, so
+     * remapping is a judgement call only the operator can make. The settings
+     * screen shows exactly how many records would be stranded and requires a
+     * typed confirmation before this endpoint will act.
+     */
+    public function updateBusinessMode(Request $request)
+    {
+        if (! auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $tenant = auth()->user()->tenant;
+
+        $validated = $request->validate([
+            'business_mode' => ['required', Rule::in(array_keys(BusinessModeService::MODES))],
+            'confirmation'  => ['required', 'string'],
+        ]);
+
+        if (strtoupper(trim($validated['confirmation'])) !== 'SWITCH') {
+            return redirect()->route('settings.index', ['tab' => 'general'])
+                ->with('error', __('Type SWITCH to confirm the business mode change.'));
+        }
+
+        $from = $tenant->business_mode ?? 'wholesale';
+        $to   = $validated['business_mode'];
+
+        if ($from === $to) {
+            return redirect()->route('settings.index', ['tab' => 'general'])
+                ->with('error', __('That is already the current business mode.'));
+        }
+
+        $impact = $this->businessModeImpact($tenant);
+
+        $tenant->update(['business_mode' => $to]);
+
+        AuditLog::log(
+            'tenant.business_mode_changed',
+            $tenant,
+            ['business_mode' => $from],
+            ['business_mode' => $to, 'stranded_deals' => $impact['deals'], 'stranded_leads' => $impact['leads']]
+        );
+
+        return redirect()->route('settings.index', ['tab' => 'general'])
+            ->with('success', __('Business mode switched to :mode. Review any deals and leads still holding stages or statuses from the previous mode.', [
+                'mode' => __(BusinessModeService::MODES[$to]),
+            ]));
+    }
+
+    /**
+     * How many records currently hold a stage or status that does not exist in
+     * the other business mode. Shown before a switch so the decision is made
+     * against real numbers rather than an abstract warning.
+     */
+    private function businessModeImpact(Tenant $tenant): array
+    {
+        $current = $tenant->business_mode ?? 'wholesale';
+        $target  = BusinessModeService::oppositeMode($current);
+
+        $targetStages   = array_keys(BusinessModeService::getStagesForMode($target));
+        $targetStatuses = array_keys(BusinessModeService::getLeadStatusesForMode($target));
+
+        $deals = Schema::hasTable('deals')
+            ? Deal::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotIn('stage', $targetStages)->count()
+            : 0;
+
+        $leads = Schema::hasTable('leads')
+            ? Lead::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotIn('status', $targetStatuses)->count()
+            : 0;
+
+        return [
+            'current'      => $current,
+            'target'       => $target,
+            'deals'        => $deals,
+            'leads'        => $leads,
+        ];
     }
 
     public function reset2fa(User $user)

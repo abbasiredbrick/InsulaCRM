@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Admins can now be assigned leads, deals and tasks. On a fresh install the admin
+  was the only user but was excluded from every agent list, leaving the "Assigned
+  Agent" dropdown with zero options and making it impossible to create a first
+  lead (#3).
+- The assigned-agent dropdown now renders a placeholder option and an explanatory
+  message when no one is assignable, instead of an empty required select that can
+  never be satisfied.
+- Editing a lead keeps its current owner selectable even after that user has been
+  deactivated, so saving no longer silently reassigns the lead.
+- Custom tenant-defined roles are now included in agent lists, matching what the
+  team invite form already allowed.
+- Dashboards, reports, the activity inbox and PDF exports use the same assignable
+  user list, so work owned by an admin no longer disappears from team performance.
+
+### Added
+
+- Team members can be deleted, not only deactivated (#3). Deletion requires
+  choosing who inherits their leads, deals, tasks, activities, showings and open
+  houses — every `agent_id` foreign key cascades, so the records are reassigned in
+  the same transaction as the delete. Deleting a member frees their email address
+  for reuse; deactivation alone held it forever.
+- Guards against deleting your own account or the last remaining admin.
+- Business mode can be changed after installation from Settings → General (#4).
+  The switch deliberately does not migrate data: the screen shows how many deals
+  and leads currently hold a stage or status that does not exist in the target
+  mode, and requires typing SWITCH to confirm. The change is written to the audit
+  log.
+- README section documenting the wholesale/real-estate mode split, so modules
+  hidden by the other mode are no longer mistaken for missing files (#4).
+
 ## 1.0.0 - 2026-03-28
 
 Initial open-source release.
