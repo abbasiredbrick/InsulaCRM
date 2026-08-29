@@ -83,10 +83,24 @@ follow up if operators actually switch modes in practice.
   custom role can be created under Settings but cannot then be assigned to a new
   team member through the form. Agent lists themselves do recognise custom roles
   since 1.1.0.
-* **Role lookups are not tenant scoped.** Several `Role::whereIn('name', ...)`
-  queries match on name alone. System roles are global so this is currently
-  harmless, but a tenant custom role sharing a name with another tenant's would
-  match across tenants.
+* **Custom role names are unique across every tenant.** `SettingsController`
+  generates a role slug and resolves collisions globally:
+
+  ```php
+  while (Role::where('name', $name)->exists()) {
+      $name = $baseName . '_' . $counter++;
+  }
+  ```
+
+  A tenant that creates a role named `sales` causes the next tenant to receive
+  `sales_1`, so a tenant admin can infer which role names already exist
+  elsewhere on the instance by watching the suffix. It needs an authenticated
+  admin and reveals nothing beyond role names, but the uniqueness check belongs
+  scoped to the tenant.
+* **One role lookup is still unscoped.** `DealController` resolves notification
+  recipient roles with `Role::whereIn('name', ...)` on name alone. The recipient
+  query is filtered by `tenant_id` immediately afterwards, so nothing crosses
+  tenants today; it is a correctness wart rather than a leak.
 * **The OpenAPI spec version is hardcoded.** `ApiDocsController` reports
   `'version' => '1.0.0'` rather than reading `config('app.version')`. Arguably
   correct if it is meant to describe the API contract rather than the app, but it
