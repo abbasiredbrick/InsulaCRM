@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- WhatsApp quick action on the lead detail page, next to Call Lead. Opens a
+  wa.me conversation in a new tab and respects the do not contact flag, so it is
+  hidden for any lead marked as such. Originally contributed by
+  @klaraheesen-eng in #1.
+- Phone numbers are normalised for wa.me using the dialing code of the tenant's
+  configured country rather than a fixed one. Numbers already in international
+  form, whether written with a plus or a 00 prefix, are passed through untouched,
+  and numbers that already carry their country code are not doubled up. National
+  numbers are handled both for countries that use a leading trunk zero and for
+  those that do not, such as the North American numbering plan.
+- `TenantFormatHelper::dialingCode()` alongside the existing country list, and
+  `TenantFormatHelper::forgetTenant()` for processes that handle several tenants
+  in turn.
+
+### Changed
+
+- The WhatsApp button uses a `.btn-whatsapp` class instead of inline styles.
+
 ## 1.1.0 - 2026-08-29
 
 First maintenance release. Unblocks new installations, closes a data

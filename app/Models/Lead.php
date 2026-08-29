@@ -51,6 +51,53 @@ class Lead extends Model
         return "{$this->first_name} {$this->last_name}";
     }
 
+    /**
+     * The lead's phone number in the digits-only international form wa.me needs.
+     *
+     * Numbers are stored however the user typed them, so the country code is
+     * resolved from the tenant's country rather than assumed. Returns null when
+     * there is no usable number, so callers can hide the action entirely.
+     */
+    public function getWhatsappPhoneAttribute(): ?string
+    {
+        $raw = trim((string) $this->phone);
+
+        if ($raw === '') {
+            return null;
+        }
+
+        $isExplicitlyInternational = str_starts_with($raw, '+');
+        $digits = preg_replace('/\D+/', '', $raw);
+
+        if ($digits === '') {
+            return null;
+        }
+
+        if (! $isExplicitlyInternational) {
+            if (str_starts_with($digits, '00')) {
+                // 00 is the international access prefix; drop it.
+                $digits = substr($digits, 2);
+            } else {
+                $dialingCode = \App\Helpers\TenantFormatHelper::dialingCode();
+
+                if ($dialingCode !== null) {
+                    if (str_starts_with($digits, '0')) {
+                        // National trunk prefix: replace it with the country code.
+                        $digits = $dialingCode . ltrim(substr($digits, 1), '0');
+                    } elseif (! str_starts_with($digits, $dialingCode)) {
+                        // A national number with no trunk prefix, as used in the
+                        // NANP. Anything already carrying the code is left alone.
+                        $digits = $dialingCode . $digits;
+                    }
+                }
+            }
+        }
+
+        // Shortest realistic international number is 7 digits; below that the
+        // input was not a phone number and a wa.me link would be nonsense.
+        return strlen($digits) >= 7 ? $digits : null;
+    }
+
     public function agent()
     {
         return $this->belongsTo(User::class, 'agent_id');

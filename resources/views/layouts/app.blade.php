@@ -14,6 +14,13 @@
         .navbar-vertical::-webkit-scrollbar { display: none; }
         .navbar-vertical .navbar-collapse { scrollbar-width: none; }
         .navbar-vertical .navbar-collapse::-webkit-scrollbar { display: none; }
+        /* WhatsApp brand colour; Tabler has no equivalent variant */
+        .btn-whatsapp, .btn-whatsapp:hover, .btn-whatsapp:focus, .btn-whatsapp:active {
+            background-color: #25d366;
+            border-color: #25d366;
+            color: #fff;
+        }
+        .btn-whatsapp:hover { background-color: #1fb855; border-color: #1fb855; }
         /* Ensure solid-bg badges always have white readable text */
         .badge.bg-secondary, .badge.bg-primary, .badge.bg-success, .badge.bg-danger,
         .badge.bg-warning, .badge.bg-info, .badge.bg-dark,

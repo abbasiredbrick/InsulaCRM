@@ -98,6 +98,15 @@ class TenantFormatHelper
     }
 
     /**
+     * Drop the cached tenant so the next call resolves again from auth.
+     * Needed when one process handles several tenants in turn.
+     */
+    public static function forgetTenant(): void
+    {
+        static::$cachedTenant = null;
+    }
+
+    /**
      * Format a monetary value with the tenant's currency symbol.
      */
     public static function currency(float|int|null $amount, int $decimals = 2): string
@@ -380,6 +389,33 @@ class TenantFormatHelper
     /**
      * Get all supported countries for the settings dropdown.
      */
+    /**
+     * International dialing codes, keyed to the same ISO codes as countries().
+     */
+    protected static array $dialingCodes = [
+        'US' => '1',   'CA' => '1',   'GB' => '44',  'IE' => '353', 'AU' => '61',
+        'NZ' => '64',  'DE' => '49',  'FR' => '33',  'ES' => '34',  'IT' => '39',
+        'PT' => '351', 'NL' => '31',  'BE' => '32',  'AT' => '43',  'CH' => '41',
+        'SE' => '46',  'NO' => '47',  'DK' => '45',  'FI' => '358', 'PL' => '48',
+        'CZ' => '420', 'HU' => '36',  'RO' => '40',  'GR' => '30',  'TR' => '90',
+        'IL' => '972', 'AE' => '971', 'SA' => '966', 'EG' => '20',  'ZA' => '27',
+        'NG' => '234', 'KE' => '254', 'IN' => '91',  'JP' => '81',  'CN' => '86',
+        'KR' => '82',  'TH' => '66',  'PH' => '63',  'MY' => '60',  'SG' => '65',
+        'ID' => '62',  'HK' => '852', 'BR' => '55',  'MX' => '52',  'AR' => '54',
+        'CO' => '57',  'CL' => '56',  'PE' => '51',
+    ];
+
+    /**
+     * Dialing code for a country, defaulting to the current tenant's country.
+     * Returns null when the country is unknown, so callers can decline to guess.
+     */
+    public static function dialingCode(?string $country = null): ?string
+    {
+        $country = strtoupper($country ?? static::tenant()?->country ?? 'US');
+
+        return static::$dialingCodes[$country] ?? null;
+    }
+
     public static function countries(): array
     {
         return [

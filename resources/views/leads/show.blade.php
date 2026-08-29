@@ -454,6 +454,12 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2"/></svg>
                         {{ __('Call Lead') }}
                     </a>
+                    @if($lead->whatsapp_phone)
+                    <a href="https://wa.me/{{ $lead->whatsapp_phone }}" target="_blank" rel="noopener" class="btn btn-whatsapp">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>
+                        {{ __('Send WhatsApp') }}
+                    </a>
+                    @endif
                     @endif
                     @if($lead->email && !$lead->do_not_contact)
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sendEmailModal">
