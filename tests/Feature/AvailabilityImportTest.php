@@ -132,7 +132,7 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(5, $result['updated']);
     }
 
-    public function test_units_missing_from_latest_sheet_become_unlisted(): void
+    public function test_units_missing_from_latest_sheet_become_leased(): void
     {
         $source = $this->createAmsSource();
         $service = new AvailabilityIngestService();
@@ -140,21 +140,58 @@ class AvailabilityImportTest extends TestCase
 
         $service->ingest($source, $full['rows'], $this->tenant->id, $this->adminUser->id);
         $this->assertSame(5, Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
-            ->where('availability_source_id', $source->id)->where('availability', '!=', 'unlisted')->count());
+            ->where('availability_source_id', $source->id)->where('availability', '!=', 'leased')->count());
 
         $shortRows = array_slice($full['rows'], 0, 3);
         $service->ingest($source, $shortRows, $this->tenant->id, $this->adminUser->id);
 
-        $unlisted = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
-            ->where('availability_source_id', $source->id)->where('availability', 'unlisted')->get();
+        $leased = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->where('availability', 'leased')->get();
 
-        $this->assertCount(3, $unlisted);
-        $this->assertTrue($unlisted->pluck('source_unit_ref')->contains('304'));
-        $this->assertStringContainsString('Removed from AMS Properties', $unlisted->first()->notes);
+        $this->assertCount(3, $leased);
+        $this->assertTrue($leased->pluck('source_unit_ref')->contains('304'));
+        $this->assertTrue($leased->pluck('source_unit_ref')->contains('P-105'));
+        $this->assertStringContainsString('Leased per AMS Properties', $leased->first()->notes);
 
         $stillThere = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
             ->where('availability_source_id', $source->id)->where('source_unit_ref', '1301')->first();
         $this->assertSame('ready_to_list', $stillThere->availability);
+    }
+
+    public function test_previously_available_unit_becomes_leased_when_sheet_says_rented(): void
+    {
+        $source = $this->createAmsSource();
+        $service = new AvailabilityIngestService();
+        $table = $service->parseText($this->amsText(), $source->parse_options);
+
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1301')->first();
+        $this->assertSame('ready_to_list', $unit->availability);
+
+        // Re-upload same unit but now marked "Rented" → must flip to leased.
+        $service->ingest($source, $service->parseText(implode("\n", [
+            "Bey View Tower\t1301\t4 BR + Maids room 352 Sq Mtr / 3744 Sq Foot\t240,000\t12,000\t20,000\tRented\t2 Parkings\t",
+        ]), $source->parse_options)['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit->refresh();
+        $this->assertSame('leased', $unit->availability);
+    }
+
+    public function test_new_unit_first_appearing_as_leased_is_created_leased(): void
+    {
+        $source = $this->createAmsSource();
+        $service = new AvailabilityIngestService();
+
+        $service->ingest($source, $service->parseText(implode("\n", [
+            "Bey View Tower\t1405\t1 BR - City View\t90,000\t4,500\t2,000\tLeased\t1 Parking\t",
+        ]), $source->parse_options)['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1405')->first();
+        $this->assertNotNull($unit);
+        $this->assertSame('leased', $unit->availability);
     }
 
     public function test_source_status_map_maps_under_offer_to_reserved(): void

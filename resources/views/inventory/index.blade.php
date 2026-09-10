@@ -80,6 +80,10 @@
     <div class="card-header">
         <h3 class="card-title">{{ __('Units') }}</h3>
         <div class="card-actions">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="copy-share-link" title="{{ __('Copy a client-facing link of the current view') }}">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"/><path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"/></svg>
+                {{ __('Copy share link') }}
+            </button>
             <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
             <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
         </div>
@@ -388,4 +392,42 @@
     </div>
     @endif
 </div>
+
+@push('scripts')
+<script>
+document.getElementById('copy-share-link')?.addEventListener('click', function () {
+    const form = document.getElementById('inventory-search-form');
+    const params = {};
+
+    function grab(attr, key) {
+        const el = form.querySelector('[name="' + attr + '"]');
+        if (el && el.value !== '') params[key] = el.value;
+    }
+
+    grab('search', 'search');
+    grab('community', 'community');
+    grab('sub_community', 'building');
+    grab('furnishing', 'furnishing');
+    grab('category', 'category');
+    grab('rent_max', 'max_rent');
+
+    const bedsMin = form.querySelector('[name="bedrooms_min"]');
+    const bedsMax = form.querySelector('[name="bedrooms_max"]');
+    if (bedsMin && bedsMax && bedsMin.value !== '' && bedsMin.value === bedsMax.value) {
+        params.bedrooms = bedsMin.value;
+    }
+
+    const base = '{{ route('share.inventory', auth()->user()->tenant->slug) }}';
+    const qs = new URLSearchParams(params).toString();
+    const url = base + (qs ? '?' + qs : '');
+
+    const btn = this;
+    navigator.clipboard.writeText(url).then(function () {
+        const original = btn.innerHTML;
+        btn.innerHTML = '{{ __('Copied ✓') }}';
+        setTimeout(function () { btn.innerHTML = original; }, 1500);
+    });
+});
+</script>
+@endpush
 @endsection

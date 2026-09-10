@@ -100,6 +100,12 @@ Route::post('/p/{slug}/register', [BuyerPortalController::class, 'register'])->m
 Route::get('/p/{slug}/registered', [BuyerPortalController::class, 'registered'])->name('buyer-portal.registered');
 Route::get('/p/{slug}/properties', [BuyerPortalController::class, 'properties'])->name('buyer-portal.properties');
 
+// Public shared-inventory links (client can verify / self-register, then browse & flag interest)
+Route::get('/s/{slug}', [\App\Http\Controllers\ClientShareController::class, 'index'])->name('share.inventory');
+Route::post('/s/{slug}/verify', [\App\Http\Controllers\ClientShareController::class, 'verify'])->middleware('throttle:10,1')->name('share.verify');
+Route::post('/s/{slug}/interest/{property}', [\App\Http\Controllers\ClientShareController::class, 'interest'])->middleware('throttle:30,1')->name('share.interest');
+Route::post('/s/{slug}/logout', [\App\Http\Controllers\ClientShareController::class, 'logout'])->name('share.logout');
+
 // Offline fallback (PWA)
 Route::get('/offline', fn () => view('offline'))->name('offline');
 

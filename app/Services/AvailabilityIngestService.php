@@ -175,10 +175,8 @@ class AvailabilityIngestService
         $seenRefs = [];
         $skippedExamples = [];
 
-        $forbiddenStatuses = ['leased', 'sold'];
-
         DB::transaction(function () use (
-            $rows, $columnMap, $statusMap, $city, $source, $tenantId, $userId, $forbiddenStatuses,
+            $rows, $columnMap, $statusMap, $city, $source, $tenantId, $userId,
             &$created, &$updated, &$skipped, &$total, &$seenRefs, &$skippedExamples
         ) {
             foreach ($rows as $row) {
@@ -373,13 +371,14 @@ class AvailabilityIngestService
                 }
 
                 if ($existing) {
-                    // Never auto-mark a unit leased/sold downwards while the sheet
-                    // still lists it; only refresh the factual fields.
-                    $record['availability'] = in_array($availability, $forbiddenStatuses) ? $existing->availability : $availability;
+                    // Reflect the PM sheet exactly: a unit the sheet marks leased/sold
+                    // becomes leased/sold here, even if it was previously available.
+                    $record['availability'] = $availability;
                     $existing->update($record);
                     $updated++;
                 } else {
-                    $record['availability'] = in_array($availability, $forbiddenStatuses) ? 'unlisted' : $availability;
+                    // New units get the exact status shared by the PM.
+                    $record['availability'] = $availability;
                     Property::create($record);
                     $created++;
                 }
@@ -397,9 +396,11 @@ class AvailabilityIngestService
             foreach ($linked as $property) {
                 $key = ($property->sub_community ?? '') . '|' . ($property->source_unit_ref ?? '');
                 if (!isset($seenRefs[$key]) && $property->availability_synced_at !== null) {
-                    $append = "Removed from {$source->name} availability sheet on " . now()->format('d.m.Y') . '.';
+                    // The unit is no longer in the PM sheet → treat it as leased,
+                    // exactly mirroring what the PM shared.
+                    $append = 'Leased per ' . $source->name . ' availability update on ' . now()->format('d.m.Y') . '.';
                     $property->update([
-                        'availability' => 'unlisted',
+                        'availability' => 'leased',
                         'notes' => trim(($property->notes ?? '') . ' ' . $append),
                     ]);
                     $missing++;
