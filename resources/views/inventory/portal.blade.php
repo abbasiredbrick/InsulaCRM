@@ -5,8 +5,8 @@
 
 @section('content')
 <div class="alert alert-info">
-    {{ __('Units with status') }} <strong>{{ __('Ready to List') }}</strong> / <strong>{{ __('Listed') }}</strong>, {{ __('a RERA permit number and a category are') }} <strong>{{ __('Portal ready') }}</strong>.
-    {{ __('Download a portal feed for manual upload, or push units straight to a connected portal with the API.') }}
+    {{ __('Use the list/unlist toggle per unit to record portal status — including units that are already live on a portal after a manual upload.') }}
+    {{ __('Pushing via the API requires portal-ready units (') }}<strong>{{ __('Ready to List') }}</strong>/<strong>{{ __('Listed') }}</strong>, {{ __('a RERA permit number and a category') }}<strong>.</strong>
     <span class="d-block mt-1">
         @if(auth()->user()->isAdmin())
         <a href="{{ route('portal-integrations.index') }}" class="btn btn-sm btn-outline-primary">{{ __('Portal Integrations') }}</a>
@@ -119,9 +119,9 @@
                     </td>
                     <td class="text-nowrap">{{ $unit->price_line }}</td>
                     <td>{{ $unit->rera_permit_no ?: '—' }}</td>
-                    <td>@include('inventory._portal-badge', ['status' => $unit->bayut_status])</td>
-                    <td>@include('inventory._portal-badge', ['status' => $unit->dubizzle_status])</td>
-                    <td>@include('inventory._portal-badge', ['status' => $unit->propertyfinder_status])</td>
+                    <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'bayut', 'label' => 'Bayut']])</td>
+                    <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'dubizzle', 'label' => 'Dubizzle']])</td>
+                    <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'propertyfinder', 'label' => 'Property Finder']])</td>
                     <td>
                         <a href="{{ route('inventory.show', $unit) }}" class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
                         @if($ready && in_array('bayut', $enabled_portals))
@@ -148,6 +148,6 @@
 
 {{-- Batch mark live helper: link to each unit for per-portal recording --}}
 <div class="alert alert-secondary mt-3 mb-0">
-    {{ __('Tip: after uploading a feed, open each unit and record the portal status + listing URL. Do not set units to "Listed" availability until they are actually live.') }}
+    {{ __('Tip: the list/unlist toggle records a unit as Live on a portal instantly (and can mark externally-listed units too). For richer tracking - listing URL and reference - open the unit and use Record.') }}
 </div>
 @endsection

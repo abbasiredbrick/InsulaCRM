@@ -209,6 +209,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/inventory/{property}/photos', [ListingController::class, 'uploadPhotos'])->name('inventory.photos.upload');
         Route::delete('/inventory/{property}/photos/{photo}', [ListingController::class, 'deletePhoto'])->name('inventory.photos.delete');
         Route::post('/inventory/{property}/portal-status', [ListingController::class, 'updatePortalStatus'])->name('inventory.portal-status');
+        Route::post('/inventory/{property}/portal-toggle', [ListingController::class, 'togglePortalStatus'])->name('inventory.portal-toggle');
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
             ->name('inventory.push');
@@ -324,8 +325,12 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::patch('/leads/{lead}/status', [LeadController::class, 'updateStatus'])->name('leads.updateStatus');
         Route::post('/leads/{lead}/claim', [LeadController::class, 'claim'])->name('leads.claim');
 
+        Route::get('/team', [\App\Http\Controllers\TeamController::class, 'index'])->name('team.index');
+        Route::post('/team/set-manager', [\App\Http\Controllers\TeamController::class, 'setManager'])->name('team.setManager');
+
         // Activities on leads
         Route::post('/leads/{lead}/activities', [ActivityController::class, 'store'])->name('leads.activities.store');
+        Route::post('/leads/{lead}/reassign', [LeadController::class, 'reassign'])->name('leads.reassign');
         Route::post('/leads/{lead}/send-email', [ActivityController::class, 'sendEmail'])->name('leads.sendEmail');
         Route::put('/activities/{activity}', [ActivityController::class, 'update'])->name('activities.update');
         Route::delete('/activities/{activity}', [ActivityController::class, 'destroy'])->name('activities.destroy');

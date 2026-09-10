@@ -37,11 +37,19 @@ class DashboardController extends Controller
         $totalLeads = (clone $leadQuery)->count();
         $leadsThisMonth = (clone $leadQuery)->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count();
 
+        $closedDealsThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->count();
         $activeDeals = (clone $dealQuery)->whereNotIn('stage', ['closed_won', 'closed_lost'])->count();
-        $closedThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->count();
         $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
-        $feesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->sum($feeColumn);
+        $dealFeesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->sum($feeColumn);
         $totalPipelineValue = (clone $dealQuery)->whereNotIn('stage', ['closed_won', 'closed_lost'])->sum('contract_price');
+
+        // Closed leases (real estate mode): rental leads that reached closed_won.
+        $leaseAgentId = $user->isAgent() || $user->isDispositionAgent() ? $user->id : null;
+        $closedLeasesThisMonth = \App\Services\DashboardMetricsService::closedLeasesCount($leaseAgentId);
+        $leaseFeesThisMonth = \App\Services\DashboardMetricsService::closedLeasesFees($leaseAgentId);
+
+        $closedThisMonth = $closedDealsThisMonth + $closedLeasesThisMonth;
+        $feesThisMonth = $dealFeesThisMonth + $leaseFeesThisMonth;
 
         $hotLeads = (clone $leadQuery)->where('temperature', 'hot')->whereNotIn('status', ['closed', 'dead'])->count();
         $overdueTasks = (clone $taskQuery)->where('is_completed', false)->where('due_date', '<', now())->count();
@@ -77,13 +85,25 @@ class DashboardController extends Controller
         // Team Performance Leaderboard (admin only)
         $teamPerformance = collect();
         if ($user->isAdmin()) {
+            $leaseCounts = [];
+            $leaseFees = [];
+            foreach (\App\Services\DashboardMetricsService::closedLeasesQuery()
+                ->whereBetween('updated_at', [now()->startOfMonth(), now()->endOfMonth()])
+                ->with('properties:id,admin_fee')
+                ->get() as $lease) {
+                $leaseCounts[$lease->agent_id] = ($leaseCounts[$lease->agent_id] ?? 0) + 1;
+                $leaseFees[$lease->agent_id] = ($leaseFees[$lease->agent_id] ?? 0) + $lease->properties->sum('admin_fee');
+            }
+
             $teamPerformance = User::assignable($user->tenant)
                 ->get()
-                ->map(function ($agent) use ($feeColumn) {
+                ->map(function ($agent) use ($feeColumn, $leaseCounts, $leaseFees) {
                     $dealsClosed = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')
                         ->whereMonth('created_at', now()->month)->count();
                     $feesGenerated = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')
                         ->whereMonth('created_at', now()->month)->sum($feeColumn);
+                    $dealsClosed += $leaseCounts[$agent->id] ?? 0;
+                    $feesGenerated += $leaseFees[$agent->id] ?? 0;
                     return (object) compact('agent', 'dealsClosed', 'feesGenerated');
                 })
                 ->sortByDesc('dealsClosed')

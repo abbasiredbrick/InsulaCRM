@@ -112,6 +112,14 @@ class AppServiceProvider extends ServiceProvider
             }
         }, 99);
 
+        $hooks->addAction('activity.logged', function ($activity) {
+            try {
+                app(\App\Services\TeamNotifier::class)->notifyActivityLogged($activity);
+            } catch (\Throwable $e) {
+                Log::error("TeamNotifier activity_logged failed: {$e->getMessage()}");
+            }
+        }, 100);
+
         $hooks->addAction('buyer.notified', function ($buyer, $deal = null) {
             try {
                 app(\App\Services\WorkflowEngine::class)->trigger('new_buyer_match', $buyer, [

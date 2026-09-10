@@ -24,10 +24,11 @@ class ActivityController extends Controller
     {
         $this->authorizeLead($lead);
 
-        // Check DNC/timezone restrictions for outreach activity types
+        // Check DNC (do-not-contact) before logging an outreach activity.
+        // Manual logging is never blocked by calling-hours time of day.
         if (in_array($request->type, CustomFieldService::$outreachActivityTypes)) {
             $dncService = app(DncService::class);
-            $check = $dncService->canContact($lead);
+            $check = $dncService->canLog($lead);
             if (!$check['allowed']) {
                 return redirect()->route('leads.show', $lead)->with('error', $check['reason']);
             }
@@ -45,9 +46,15 @@ class ActivityController extends Controller
 
         // Agents can move the lead along at the same time they log an activity.
         if ($request->filled('status') || $request->filled('temperature')) {
+            $oldStatus = $lead->status;
             $lead->status = $request->filled('status') ? $request->status : $lead->status;
             $lead->temperature = $request->filled('temperature') ? $request->temperature : $lead->temperature;
             $lead->save();
+
+            // Marking a lead lost/dead alerts management for cross-checking.
+            if ($request->filled('status') && $oldStatus !== $lead->status && \App\Services\LostLeadNotifier::isLostStatus($lead->status)) {
+                \App\Services\LostLeadNotifier::notify($lead, $lead->status, $oldStatus);
+            }
         }
 
         // Advance the lead along its leasing/sales pipeline stage.
@@ -60,6 +67,14 @@ class ActivityController extends Controller
             if ($oldStage !== $lead->stage) {
                 AuditLog::log('lead.stage_changed', $lead, ['stage' => $oldStage], ['stage' => $lead->stage]);
                 Hooks::doAction('lead.stage_changed', $lead, $oldStage);
+            }
+
+            // Moving the lead to a viewing stage must surface on the team calendar
+            // so the manager sees the engagement (agent arranged a unit viewing).
+            if (\App\Services\LeadViewingService::isViewingStage($lead->stage)
+                && $oldStage !== $lead->stage
+                && $lead->dealType() === 'rent') {
+                app(\App\Services\LeadViewingService::class)->logViewingActivity($lead, $lead->stage);
             }
         }
 
@@ -87,9 +102,9 @@ class ActivityController extends Controller
                 ->with('error', __('This lead does not have an email address.'));
         }
 
-        // Check DNC restrictions
+        // DNC check (do-not-contact only; manual sends are not gated by time-of-day)
         $dncService = app(DncService::class);
-        $check = $dncService->canContact($lead);
+        $check = $dncService->canLog($lead);
         if (!$check['allowed']) {
             return redirect()->route('leads.show', $lead)->with('error', $check['reason']);
         }

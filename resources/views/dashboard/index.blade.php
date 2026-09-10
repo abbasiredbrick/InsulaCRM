@@ -267,8 +267,11 @@ loadWidget('monthly', document.getElementById('chart-monthly'), function(data, e
         series: [
             { name: '{{ __('New Leads') }}', data: data.leadsPerMonth },
             { name: '{{ __('Closed') }} {{ $modeTerms['deal_label'] ?? __('Deals') }}s', data: data.dealsPerMonth },
+            @if(\App\Services\BusinessModeService::isRealEstate())
+            { name: '{{ __('Closed') }} {{ __('Leases') }}', data: data.closedLeasesPerMonth },
+            @endif
         ],
-        colors: ['#206bc4', '#2fb344'],
+        colors: ['#206bc4', '#2fb344'@if(\App\Services\BusinessModeService::isRealEstate()), '#f59f00'@endif],
         plotOptions: {
             bar: { columnWidth: '50%', borderRadius: 4 }
         },

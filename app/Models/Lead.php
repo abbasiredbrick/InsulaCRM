@@ -244,6 +244,11 @@ class Lead extends Model
         return $this->hasMany(Activity::class);
     }
 
+    public function showings()
+    {
+        return $this->hasMany(Showing::class);
+    }
+
     public function tasks()
     {
         return $this->hasMany(Task::class);

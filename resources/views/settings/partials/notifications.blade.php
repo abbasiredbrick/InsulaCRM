@@ -5,6 +5,18 @@
             'label' => __('Lead Assigned'),
             'description' => __('Notify agents when a new lead is assigned to them.'),
         ],
+        'lead_reassigned' => [
+            'label' => __('Lead Reassigned'),
+            'description' => __('Notify the old and new agent when a lead is moved to another agent.'),
+        ],
+        'team_activity' => [
+            'label' => __('Team Activity'),
+            'description' => __('Notify managers whenever a team member logs activity on a lead assigned to their team.'),
+        ],
+        'team_reassigned' => [
+            'label' => __('Team Reassignment'),
+            'description' => __('Notify managers when a lead in their team changes hands.'),
+        ],
         'deal_stage_changed' => [
             'label' => __('Deal Stage Changed'),
             'description' => __('Notify agents when a deal moves to a new pipeline stage.'),

@@ -46,6 +46,17 @@
             <div class="card-header">
                 <h3 class="card-title">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Contact Details') : __('Lead Information') }}</h3>
                 <div class="card-actions">
+                    @if(($businessMode ?? 'wholesale') === 'realestate')
+                    <a href="{{ route('showings.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-orange btn-sm me-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/><line x1="11" y1="15" x2="12" y2="15"/><line x1="12" y1="15" x2="12" y2="18"/></svg>
+                        {{ __('Schedule Viewing') }}
+                    </a>
+                    @endif
+                    @if($canReassign)
+                    <button type="button" class="btn btn-outline-warning btn-sm me-1" data-bs-toggle="modal" data-bs-target="#reassignModal">
+                        {{ __('Reassign') }}
+                    </button>
+                    @endif
                     <a href="{{ route('leads.edit', $lead) }}" class="btn btn-outline-primary btn-sm">{{ __('Edit') }}</a>
                 </div>
             </div>
@@ -223,6 +234,43 @@
             @include('leads._linked_units_panel')
         @else
             @include('leads._property_form')
+        @endif
+
+        <!-- Viewings / Showings Panel (real estate mode) -->
+        @if(($businessMode ?? 'wholesale') === 'realestate')
+        <div class="card mb-3" id="viewings-panel">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Viewings / Showings') }}</h3>
+                <div class="card-actions">
+                    <a href="{{ route('showings.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-orange btn-sm">{{ __('+ Schedule Viewing') }}</a>
+                </div>
+            </div>
+            <div class="card-body">
+                @if($lead->showings->isNotEmpty())
+                    <div class="list-group">
+                        @foreach($lead->showings->sortByDesc('showing_date') as $showing)
+                            <a href="{{ route('showings.show', $showing) }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+                                <span class="avatar avatar-sm {{ $showing->status === 'completed' ? 'bg-green-lt' : ($showing->status === 'scheduled' ? 'bg-orange-lt' : 'bg-secondary-lt') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/></svg>
+                                </span>
+                                <div class="flex-fill">
+                                    <span class="fw-bold">{{ $showing->property->address ?? __('Unit #:id', ['id' => $showing->property_id]) }}</span>
+                                    <span class="d-block text-muted small">
+                                        {{ $showing->showing_date->format('M j, Y') }} {{ $showing->showing_time }}
+                                        @if($showing->agent) • {{ $showing->agent->name }} @endif
+                                    </span>
+                                </div>
+                                <span class="badge {{ $showing->status === 'completed' ? 'bg-green-lt' : ($showing->status === 'scheduled' ? 'bg-orange-lt' : 'bg-secondary-lt') }}">
+                                    {{ \App\Models\Showing::statusLabel($showing->status) }}
+                                </span>
+                            </a>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-secondary mb-0">{{ __('No viewings scheduled yet for this client.') }}</p>
+                @endif
+            </div>
+        </div>
         @endif
 
         <!-- Log Activity Form -->
@@ -1591,6 +1639,41 @@ if (window.trackRecentlyViewed) {
                 </div>
             </form>
         </div>
+    </div>
+</div>
+@endif
+
+@if($canReassign)
+<div class="modal modal-blur fade" id="reassignModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form method="POST" action="{{ route('leads.reassign', $lead) }}">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ __('Reassign :name', ['name' => $lead->full_name]) }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required">{{ __('Assign to') }}</label>
+                        <select name="agent_id" class="form-select" required>
+                            @foreach($reassignAgents as $agent)
+                                <option value="{{ $agent->id }}" {{ $agent->id === $lead->agent_id ? 'selected' : '' }}>{{ $agent->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('Reason') }}</label>
+                        <textarea name="reason" class="form-control" rows="3" placeholder="{{ __('Why is this lead moving to a different agent?') }}"></textarea>
+                        <div class="form-hint">{{ __('The reason is recorded on the lead and sent in the notifications.') }}</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-warning">{{ __('Reassign') }}</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 @endif

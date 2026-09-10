@@ -104,7 +104,7 @@ class LeadController extends Controller
         $query = Lead::whereIn('id', $request->ids);
 
         // Agent scoping - agents can only bulk-act on their own leads
-        if (auth()->user()->isAgent()) {
+        if (auth()->user()->isAgent() && ! auth()->user()->isManager()) {
             $query->where('agent_id', auth()->id());
         }
 
@@ -214,10 +214,57 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
-        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps']);
+        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps', 'showings.property']);
         $sequences = \App\Models\Sequence::where('is_active', true)->get();
         $assignmentHistory = app(AssignmentHistoryService::class)->getHistory($lead);
-        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory'));
+        $reassignAgents = $this->getAgents($lead);
+        $canReassign = auth()->user()->can('reassign', $lead);
+        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory', 'reassignAgents', 'canReassign'));
+    }
+
+    /**
+     * Manager/admin only: move a lead to another agent, record the reason and
+     * notify the old agent, new agent and the managers of the new agent.
+     */
+    public function reassign(Request $request, Lead $lead)
+    {
+        $this->authorize('reassign', $lead);
+
+        $data = $request->validate([
+            'agent_id' => 'required|integer|exists:users,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $target = User::where('tenant_id', auth()->user()->tenant_id)->findOrFail($data['agent_id']);
+        $oldAgent = $lead->agent;
+        $reason = trim((string) ($data['reason'] ?? ''));
+
+        $lead->update(['agent_id' => $target->id]);
+
+        if (! $lead->wasChanged('agent_id')) {
+            return redirect()->route('leads.show', $lead)->with('info', __('Lead is already assigned to :name.', ['name' => $target->name]));
+        }
+
+        if ($reason) {
+            $lead->activities()->create([
+                'tenant_id' => $lead->tenant_id,
+                'agent_id' => auth()->id(),
+                'type' => 'note',
+                'subject' => __('Reassigned to :name', ['name' => $target->name]),
+                'body' => $reason,
+                'logged_at' => now(),
+            ]);
+        }
+
+        AuditLog::log('lead.reassigned', $lead, [
+            'from' => $oldAgent?->id,
+            'to' => $target->id,
+            'reason' => $reason ?: null,
+        ]);
+
+        app(\App\Services\TeamNotifier::class)->notifyLeadReassigned($lead, $oldAgent, $target, $reason ?: null);
+
+        return redirect()->route('leads.show', $lead)->with('success', __('Lead reassigned to :name.', ['name' => $target->name]));
     }
 
     public function edit(Lead $lead)
@@ -241,10 +288,29 @@ class LeadController extends Controller
 
         $lead->update($data);
 
+        // Reassigning an agent via the edit form also informs everyone involved.
+        $oldAgentId = $lead->getOriginal('agent_id');
+        if ($lead->wasChanged('agent_id') && $oldAgentId !== null) {
+            app(\App\Services\TeamNotifier::class)->notifyLeadReassigned(
+                $lead,
+                User::find($oldAgentId),
+                $lead->agent,
+                null
+            );
+        }
+
         // A stage from the other pipeline no longer makes sense once the deal
         // type changes, so reset it and let the agent pick a fresh stage.
         if ($lead->wasChanged('deal_type') && $lead->stage && ! array_key_exists($lead->stage, $lead->stageOptions())) {
             $lead->update(['stage' => null, 'stage_changed_at' => null]);
+        }
+
+        // Moving the lead to a viewing stage via the edit form must surface on
+        // the team calendar so the manager sees the arranged viewing.
+        if (\App\Services\LeadViewingService::isViewingStage($lead->stage)
+            && $lead->wasChanged('stage')
+            && $lead->dealType() === 'rent') {
+            app(\App\Services\LeadViewingService::class)->logViewingActivity($lead, $lead->stage);
         }
 
         app(MotivationScoreService::class)->recalculate($lead);
@@ -254,6 +320,11 @@ class LeadController extends Controller
         if ($oldStatus !== $lead->status) {
             event(new LeadStatusChanged($lead, $oldStatus));
             Hooks::doAction('lead.status_changed', $lead, $oldStatus);
+
+            // Marking a lead lost/dead alerts management for cross-checking.
+            if (\App\Services\LostLeadNotifier::isLostStatus($lead->status)) {
+                \App\Services\LostLeadNotifier::notify($lead, $lead->status, $oldStatus);
+            }
         }
 
         AuditLog::log('lead.updated', $lead);
@@ -355,6 +426,11 @@ class LeadController extends Controller
         if ($oldStatus !== $lead->status) {
             event(new LeadStatusChanged($lead, $oldStatus));
             Hooks::doAction('lead.status_changed', $lead, $oldStatus);
+
+            // Marking a lead lost/dead alerts management for cross-checking.
+            if (\App\Services\LostLeadNotifier::isLostStatus($lead->status)) {
+                \App\Services\LostLeadNotifier::notify($lead, $lead->status, $oldStatus);
+            }
         }
 
         return response()->json(['success' => true]);
@@ -534,14 +610,24 @@ class LeadController extends Controller
     {
         $user = auth()->user();
 
-        if ($user->isAgent()) {
-            return collect([$user]);
-        }
+        // Managers assign within their team; plain agents only ever assign to themselves.
+        if ($user->isManager()) {
+            $teamIds = $user->teamUserIds();
+            $teamIds[] = $user->id;
 
-        $agents = User::assignable($user->tenant)
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
+            $agents = User::assignable($user->tenant)
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        } elseif ($user->isAgent()) {
+            return collect([$user]);
+        } else {
+            $agents = User::assignable($user->tenant)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
 
         if ($lead?->agent_id && ! $agents->contains('id', $lead->agent_id)) {
             $current = User::where('tenant_id', $user->tenant_id)->find($lead->agent_id);

@@ -292,6 +292,14 @@
                         </select>
                     </div>
                     <div class="col-md-2">
+                        <select name="reports_to" class="form-select">
+                            <option value="">{{ __('No manager') }}</option>
+                            @foreach($teamMembers as $member)
+                                <option value="{{ $member->id }}">{{ $member->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">{{ __('Add') }}</button>
                     </div>
                 </form>

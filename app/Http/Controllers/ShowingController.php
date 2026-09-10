@@ -7,6 +7,7 @@ use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\Property;
 use App\Models\Showing;
+use App\Services\LeadViewingService;
 use Illuminate\Http\Request;
 
 class ShowingController extends Controller
@@ -69,7 +70,9 @@ class ShowingController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('showings.create', compact('properties', 'leads', 'agents'));
+        $preselectedLeadId = request()->input('lead_id');
+
+        return view('showings.create', compact('properties', 'leads', 'agents', 'preselectedLeadId'));
     }
 
     public function store(ShowingRequest $request)
@@ -81,6 +84,12 @@ class ShowingController extends Controller
         $data['agent_id'] = $data['agent_id'] ?? auth()->id();
 
         $showing = Showing::create($data);
+
+        // Advance the linked leasing lead's pipeline: arranging a viewing = the
+        // client is going to see the unit, so the lead moves to "Viewing Scheduled".
+        if ($showing->lead_id) {
+            app(LeadViewingService::class)->advanceToStage($showing->lead, 'viewing_scheduled');
+        }
 
         // Log activity on the lead if linked
         if ($showing->lead_id) {
@@ -129,7 +138,38 @@ class ShowingController extends Controller
     {
         $this->authorize('update', $showing);
 
+        $oldStatus = $showing->status;
         $showing->update($request->validated());
+
+        // The viewing happened: move the leasing lead to "Unit Viewed".
+        if ($oldStatus !== $showing->status && $showing->status === 'completed' && $showing->lead_id) {
+            app(LeadViewingService::class)->advanceToStage($showing->lead, 'viewing_done');
+
+            Activity::create([
+                'tenant_id' => auth()->user()->tenant_id,
+                'lead_id' => $showing->lead_id,
+                'deal_id' => $showing->deal_id,
+                'agent_id' => auth()->id(),
+                'type' => 'meeting',
+                'subject' => __('Unit viewed'),
+                'body' => __('Unit was shown to the client on :date', ['date' => $showing->showing_date->format('M j, Y')]),
+                'logged_at' => now(),
+            ]);
+        } elseif ($oldStatus !== $showing->status && $showing->lead_id) {
+            Activity::create([
+                'tenant_id' => auth()->user()->tenant_id,
+                'lead_id' => $showing->lead_id,
+                'deal_id' => $showing->deal_id,
+                'agent_id' => auth()->id(),
+                'type' => 'note',
+                'subject' => __('Showing :status', ['status' => \App\Models\Showing::statusLabel($showing->status)]),
+                'body' => __('Showing status changed from :from to :to', [
+                    'from' => \App\Models\Showing::statusLabel($oldStatus),
+                    'to' => \App\Models\Showing::statusLabel($showing->status),
+                ]),
+                'logged_at' => now(),
+            ]);
+        }
 
         if ($request->ajax()) {
             return response()->json(['success' => true, 'showing' => $showing->fresh()]);

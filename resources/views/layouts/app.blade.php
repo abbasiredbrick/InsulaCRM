@@ -197,6 +197,17 @@
                         </li>
                         @endunless
 
+                        @if(auth()->user()->isAdmin() || auth()->user()->isManager())
+                        <li class="nav-item {{ request()->is('team*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('team.index') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 19a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4"/><path d="M16 7a4 4 0 1 1 8 0a4 4 0 1 1 -8 0"/><path d="M17 13h6v-1a3 3 0 0 0 -6 0z"/><path d="M17 21v-1a3 3 0 0 1 3 -3h3"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('Team') }}</span>
+                            </a>
+                        </li>
+                        @endif
+
                         @if(auth()->user()->canManageBuyers())
                         <li class="nav-item {{ request()->is('buyers*') ? 'active' : '' }}">
                             <a class="nav-link" href="{{ route('buyers.index') }}">

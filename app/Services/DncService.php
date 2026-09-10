@@ -30,6 +30,29 @@ class DncService
     }
 
     /**
+     * Whether a manual activity can be logged for this lead.
+     *
+     * Agents record work at any time of day - the activity timestamp reflects
+     * when the entry was made, not necessarily when the outreach happened - so
+     * only the Do Not Contact list blocks manual logging. The calling-hours
+     * timezone window applies only to real-time autonomous outreach.
+     */
+    public function canLog(Lead $lead): array
+    {
+        if ($this->check($lead)) {
+            return [
+                'allowed' => false,
+                'reason' => 'Lead is on the Do Not Contact list.',
+            ];
+        }
+
+        return [
+            'allowed' => true,
+            'reason' => 'Lead is eligible for logging.',
+        ];
+    }
+
+    /**
      * Determine if a lead can be contacted, with reasoning.
      */
     public function canContact(Lead $lead): array

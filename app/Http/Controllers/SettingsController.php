@@ -346,11 +346,17 @@ class SettingsController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'role_id' => ['required', 'exists:roles,id', \Illuminate\Validation\Rule::in($allowedRoleIds)],
+            'reports_to' => ['nullable', 'integer', function ($attribute, $value, $fail) {
+                if ($value && ! User::where('tenant_id', auth()->user()->tenant_id)->where('id', $value)->exists()) {
+                    $fail(__('The manager must be a member of this tenant.'));
+                }
+            }],
         ]);
 
         $agent = User::create([
             'tenant_id' => auth()->user()->tenant_id,
             'role_id' => $request->role_id,
+            'reports_to' => $request->filled('reports_to') ? $request->reports_to : null,
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
@@ -996,6 +1002,9 @@ class SettingsController extends Controller
 
         $notificationTypes = [
             'lead_assigned',
+            'lead_reassigned',
+            'team_activity',
+            'team_reassigned',
             'deal_stage_changed',
             'due_diligence_warning',
             'buyer_matched',

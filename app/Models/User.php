@@ -13,6 +13,7 @@ class User extends Authenticatable
     protected $fillable = [
         'tenant_id',
         'role_id',
+        'reports_to',
         'name',
         'email',
         'password',
@@ -66,6 +67,98 @@ class User extends Authenticatable
     public function role()
     {
         return $this->belongsTo(Role::class);
+    }
+
+    // ── Team management ────────────────────────────────────────
+
+    public function manager()
+    {
+        return $this->belongsTo(User::class, 'reports_to');
+    }
+
+    public function directReports()
+    {
+        return $this->hasMany(User::class, 'reports_to');
+    }
+
+    /**
+     * Whether this user manages at least one person (direct report).
+     */
+    public function isManager(): bool
+    {
+        return $this->directReports()->exists();
+    }
+
+    /**
+     * Everyone under this user in the reporting chain (recursive, excluding self).
+     */
+    public function allReports(): \Illuminate\Support\Collection
+    {
+        $all = collect();
+        $seen = collect([$this->id]);
+        $queue = $this->directReports()->with('role')->get();
+
+        while ($queue->isNotEmpty()) {
+            $member = $queue->shift();
+            if ($seen->contains($member->id)) {
+                continue;
+            }
+            $seen->push($member->id);
+            $all->push($member);
+            $queue = $queue->merge($member->directReports()->with('role')->get());
+        }
+
+        return $all;
+    }
+
+    /**
+     * IDs of every user in this manager's team (recursive, excluding self).
+     */
+    public function teamUserIds(): array
+    {
+        return $this->allReports()->pluck('id')->all();
+    }
+
+    /**
+     * Whether the given user reports directly or indirectly to this user.
+     */
+    public function managesUser(?User $user): bool
+    {
+        return $user !== null
+            && $user->id !== $this->id
+            && in_array($user->id, $this->teamUserIds(), true);
+    }
+
+    /**
+     * Whether this user is a manager of the agent that owns the lead, or an admin.
+     */
+    public function managesLead(\App\Models\Lead $lead): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $lead->agent_id !== null
+            && $this->isManager()
+            && in_array($lead->agent_id, $this->teamUserIds(), true);
+    }
+
+    /**
+     * Every manager above this user, closest first (recursive up the tree).
+     */
+    public function managerChain(): array
+    {
+        $chain = [];
+        $seen = [];
+        $current = $this->manager;
+
+        while ($current !== null && ! in_array($current->id, $seen, true)) {
+            $seen[] = $current->id;
+            $chain[] = $current;
+            $current = $current->manager;
+        }
+
+        return $chain;
     }
 
     public function hasRole(string $roleName): bool

@@ -193,11 +193,11 @@
                                 @endif
                             </div>
                         </div>
-                        @if($property->is_portal_ready)
-                        <a href="{{ route('inventory.show', $property) }}#portal-{{ $portal['key'] }}" class="btn btn-sm btn-outline-primary btn-pill">{{ __('Record') }}</a>
-                        @endif
+                        <div class="d-flex align-items-center gap-2">
+                            @include('inventory._portal-toggle', ['unit' => $property, 'portal' => $portal])
+                            <a href="{{ route('inventory.show', $property) }}#portal-{{ $portal['key'] }}" class="btn btn-sm btn-outline-primary btn-pill">{{ __('Record') }}</a>
+                        </div>
                     </div>
-                    @if($property->is_portal_ready)
                     <div id="portal-{{ $portal['key'] }}">
                         <form method="POST" action="{{ route('inventory.portal-status', $property) }}" class="row g-2 mt-2">
                             @csrf
@@ -221,7 +221,6 @@
                             <div class="col-12"><button type="submit" class="btn btn-sm btn-primary w-100">{{ __('Save status') }}</button></div>
                         </form>
                     </div>
-                    @endif
                 </div>
                 @endforeach
             </div>

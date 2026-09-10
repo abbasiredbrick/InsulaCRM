@@ -39,7 +39,22 @@ class ReportController extends Controller
         // Conversion rate
         $totalLeads = (clone $leadQuery)->count();
         $closedDeals = (clone $dealQuery)->where('stage', 'closed_won')->count();
-        $conversionRate = $totalLeads > 0 ? round(($closedDeals / $totalLeads) * 100, 1) : 0;
+
+        // Closed leases (real estate mode) fall in the same reporting window
+        $closedLeases = 0;
+        $leaseAgentId = null;
+        if (\App\Services\BusinessModeService::isRealEstate()) {
+            if (auth()->user()->isAgent()) {
+                $leaseAgentId = auth()->id();
+            } elseif ($agentId) {
+                $leaseAgentId = $agentId;
+            }
+            $closedLeases = \App\Services\DashboardMetricsService::closedLeasesQuery($leaseAgentId)
+                ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                ->count();
+        }
+        $closedTotal = $closedDeals + $closedLeases;
+        $conversionRate = $totalLeads > 0 ? round(($closedTotal / $totalLeads) * 100, 1) : 0;
 
         // Top agents (admin only)
         $topAgents = [];
@@ -51,6 +66,40 @@ class ReportController extends Controller
                 ->with('agent')
                 ->orderByDesc('deals_closed')
                 ->get();
+
+            // Merge closed leases so leasing agents appear too (real estate mode only).
+            if (\App\Services\BusinessModeService::isRealEstate()) {
+                $leaseCounts = [];
+                $leaseFees = [];
+                foreach (\App\Services\DashboardMetricsService::closedLeasesQuery()
+                    ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                    ->with('properties:id,admin_fee')
+                    ->get() as $lease) {
+                    $leaseCounts[$lease->agent_id] = ($leaseCounts[$lease->agent_id] ?? 0) + 1;
+                    $leaseFees[$lease->agent_id] = ($leaseFees[$lease->agent_id] ?? 0) + $lease->properties->sum('admin_fee');
+                }
+
+                $topAgents = $topAgents->map(function ($row) use ($leaseCounts, $leaseFees) {
+                    $row->deals_closed = $row->deals_closed + ($leaseCounts[$row->agent_id] ?? 0);
+                    $row->total_fees = $row->total_fees + ($leaseFees[$row->agent_id] ?? 0);
+
+                    return $row;
+                });
+
+                foreach ($leaseCounts as $agentId => $count) {
+                    if ($topAgents->contains('agent_id', $agentId)) {
+                        continue;
+                    }
+                    $topAgents->push((object) [
+                        'agent_id' => $agentId,
+                        'deals_closed' => $count,
+                        'total_fees' => $leaseFees[$agentId] ?? 0,
+                        'agent' => \App\Models\User::find($agentId),
+                    ]);
+                }
+
+                $topAgents = $topAgents->sortByDesc('deals_closed')->values();
+            }
         }
 
         $agents = auth()->user()->isAdmin()
@@ -92,6 +141,12 @@ class ReportController extends Controller
                     ->whereHas('lead', fn($q) => $q->where('lead_source', $source->lead_source))
                     ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
                     ->count();
+                if (\App\Services\BusinessModeService::isRealEstate()) {
+                    $closedFromSource += \App\Services\DashboardMetricsService::closedLeasesQuery()
+                        ->where('lead_source', $source->lead_source)
+                        ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                        ->count();
+                }
                 $leadSourceROI[] = (object)[
                     'source' => $source->lead_source,
                     'leads' => $source->count,
@@ -141,16 +196,35 @@ class ReportController extends Controller
                 ->selectRaw('agent_id, count(*) as cnt, sum(' . \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'] . ') as fees')
                 ->groupBy('agent_id')->get()->keyBy('agent_id');
 
+            // Closed leases per agent (real estate mode)
+            $leaseClosedMap = [];
+            if (\App\Services\BusinessModeService::isRealEstate()) {
+                foreach (\App\Services\DashboardMetricsService::closedLeasesQuery()
+                    ->whereIn('agent_id', $agentIds)
+                    ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                    ->with('properties:id,admin_fee')
+                    ->get() as $lease) {
+                    $leaseClosedMap[$lease->agent_id]['cnt'] = ($leaseClosedMap[$lease->agent_id]['cnt'] ?? 0) + 1;
+                    $leaseClosedMap[$lease->agent_id]['fees'] = ($leaseClosedMap[$lease->agent_id]['fees'] ?? 0) + $lease->properties->sum('admin_fee');
+                }
+            }
+
             $teamPerformance = User::assignable(auth()->user()->tenant)
                 ->get()
-                ->map(function ($agent) use ($leadsContactedMap, $offersMadeMap, $dealsClosedMap) {
+                ->map(function ($agent) use ($leadsContactedMap, $offersMadeMap, $dealsClosedMap, $leaseClosedMap) {
                     $closedRow = $dealsClosedMap->get($agent->id);
+                    $leaseRow = $leaseClosedMap[$agent->id] ?? ['cnt' => 0, 'fees' => 0];
+                    $closedCount = ($closedRow->cnt ?? 0) + $leaseRow['cnt'];
+                    $feesTotal = ($closedRow->fees ?? 0) + $leaseRow['fees'];
+
                     return (object) [
                         'agent' => $agent,
                         'leadsContacted' => $leadsContactedMap->get($agent->id, 0),
                         'offersMade' => $offersMadeMap->get($agent->id, 0),
-                        'dealsClosed' => $closedRow->cnt ?? 0,
-                        'feesGenerated' => $closedRow->fees ?? 0,
+                        'dealsClosed' => $closedCount,
+                        'feesGenerated' => $feesTotal,
+                        'dealsFromDeals' => $closedRow->cnt ?? 0,
+                        'dealsFromLeases' => $leaseRow['cnt'],
                     ];
                 })
                 ->sortByDesc('dealsClosed');
@@ -180,6 +254,11 @@ class ReportController extends Controller
 
             $monthLeads = Lead::whereBetween('created_at', [$monthStart, $monthEnd])->count();
             $monthClosed = Deal::where('stage', 'closed_won')->whereBetween('stage_changed_at', [$monthStart, $monthEnd])->count();
+            if (\App\Services\BusinessModeService::isRealEstate()) {
+                $monthClosed += \App\Services\DashboardMetricsService::closedLeasesQuery($leaseAgentId)
+                    ->whereBetween('updated_at', [$monthStart, $monthEnd])
+                    ->count();
+            }
             $conversionTrend[] = (object) [
                 'month' => $monthStart->format('M Y'),
                 'leads' => $monthLeads,
@@ -249,8 +328,14 @@ class ReportController extends Controller
             $months = [];
             $leadsPerMonth = [];
             $dealsPerMonth = [];
+            $closedLeasesPerMonth = [];
+
+            $leaseAgentId = $user->isAgent() ? $user->id : null;
+            $closedLeasesMonthly = \App\Services\DashboardMetricsService::monthlyClosedLeases($leaseAgentId);
+
             for ($i = 5; $i >= 0; $i--) {
                 $date = now()->subMonths($i);
+                $monthKey = $date->format('Y-m');
                 $months[] = $date->format('M Y');
 
                 $lq = Lead::whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
@@ -260,10 +345,12 @@ class ReportController extends Controller
                 $dq = Deal::where('stage', 'closed_won')->whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
                 if ($user->isAgent()) $dq->where('agent_id', $user->id);
                 $dealsPerMonth[] = $dq->count();
+
+                $closedLeasesPerMonth[] = $closedLeasesMonthly[$monthKey]['count'] ?? 0;
             }
 
             if ($widget === 'monthly') {
-                return response()->json(compact('months', 'leadsPerMonth', 'dealsPerMonth'));
+                return response()->json(compact('months', 'leadsPerMonth', 'dealsPerMonth', 'closedLeasesPerMonth'));
             }
         }
 
@@ -291,6 +378,11 @@ class ReportController extends Controller
                 $closedFromSource = Deal::where('stage', 'closed_won')
                     ->whereHas('lead', fn($q) => $q->where('lead_source', $source->lead_source))
                     ->count();
+                if (\App\Services\BusinessModeService::isRealEstate()) {
+                    $closedFromSource += \App\Services\DashboardMetricsService::closedLeasesQuery()
+                        ->where('lead_source', $source->lead_source)
+                        ->count();
+                }
                 $roi[] = [
                     'source' => $source->lead_source,
                     'leads' => $source->count,
@@ -329,8 +421,18 @@ class ReportController extends Controller
         $leadChange = $totalLeadsLastMonth > 0 ? round((($totalLeadsThisMonth - $totalLeadsLastMonth) / $totalLeadsLastMonth) * 100, 1) : 0;
 
         $activeDeals = (clone $dealQuery)->whereNotIn('stage', ['closed_won', 'closed_lost'])->count();
-        $closedThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->count();
-        $feesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->sum(\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column']);
+
+        $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
+        $closedDealsThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->count();
+        $dealFeesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->sum($feeColumn);
+
+        // Closed leases (real estate mode)
+        $leaseAgentId = $user->isAgent() ? $user->id : null;
+        $closedLeasesThisMonth = \App\Services\DashboardMetricsService::closedLeasesCount($leaseAgentId);
+        $leaseFeesThisMonth = \App\Services\DashboardMetricsService::closedLeasesFees($leaseAgentId);
+
+        $closedThisMonth = $closedDealsThisMonth + $closedLeasesThisMonth;
+        $feesThisMonth = $dealFeesThisMonth + $leaseFeesThisMonth;
 
         // Full response (backwards compatible)
         return response()->json([
@@ -338,6 +440,7 @@ class ReportController extends Controller
             'months' => $months ?? [],
             'leadsPerMonth' => $leadsPerMonth ?? [],
             'dealsPerMonth' => $dealsPerMonth ?? [],
+            'closedLeasesPerMonth' => $closedLeasesPerMonth ?? [],
             'pipelineValue' => $pipelineValue ?? [],
             'kpi' => [
                 'totalLeadsThisMonth' => $totalLeadsThisMonth,

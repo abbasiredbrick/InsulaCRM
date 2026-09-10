@@ -508,6 +508,32 @@ class ListingController extends Controller
     }
 
     /**
+     * Quick list/unlist toggle for a portal, usable on any unit regardless of
+     * portal readiness - units that are already live on a portal (uploaded
+     * outside the CRM) can be flagged as such immediately.
+     */
+    public function togglePortalStatus(Request $request, Property $property)
+    {
+        $portal = $request->validate(['portal' => 'required|in:bayut,dubizzle,propertyfinder'])['portal'];
+
+        $statusField = "{$portal}_status";
+        $listedAtField = "{$portal}_listed_at";
+
+        $wasLive = $property->{$statusField} === 'live';
+        $property->update([
+            $statusField => $wasLive ? 'not_listed' : 'live',
+            $listedAtField => $wasLive ? null : now()->toDateString(),
+        ]);
+
+        AuditLog::log($wasLive ? 'inventory.portal_unlisted_' . $portal : 'inventory.portal_listed_' . $portal, $property, ['portal' => $portal]);
+
+        return back()->with('success', __(':portal marked as :status.', [
+            'portal' => ucfirst($portal),
+            'status' => $wasLive ? __('Not listed') : __('Live'),
+        ]));
+    }
+
+    /**
      * Push a ready unit to Bayut/Dubizzle or Property Finder via the portal API.
      */
     public function pushToPortal(Request $request, Property $property, string $portal)
@@ -545,11 +571,17 @@ class ListingController extends Controller
         }
 
         if ($portal === 'bayut') {
+            // Bayut owns Dubizzle: it auto-duplicates each listing, so a
+            // successful Bayut push also publishes the unit on Dubizzle.
             $property->update(array_filter([
                 'bayut_status'   => 'live',
                 'bayut_listed_at' => now()->toDateString(),
                 'bayut_listing_id' => $result['reference'] ?? null,
                 'bayut_url'      => $result['url'] ?? null,
+                'dubizzle_status' => 'live',
+                'dubizzle_listing_reference' => $result['reference'] ?? null,
+                'dubizzle_listed_at' => now()->toDateString(),
+                'dubizzle_url'   => $result['url'] ?? null,
             ]));
         } else {
             $property->update(array_filter([
