@@ -95,6 +95,11 @@
                             <input type="number" name="admin_fee" min="0" step="0.01" class="form-control @error('admin_fee') is-invalid @enderror" value="{{ old('admin_fee', $property->admin_fee) }}">
                             @error('admin_fee') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Tawtheeq fee (AED)') }}</label>
+                            <input type="number" name="tawtheeq_fee" min="0" step="0.01" class="form-control @error('tawtheeq_fee') is-invalid @enderror" value="{{ old('tawtheeq_fee', $property->tawtheeq_fee) }}">
+                            @error('tawtheeq_fee') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
                         <div class="col-md-2">
                             <label class="form-label">{{ __('Rent period') }}</label>
                             <select name="rent_period" class="form-select">

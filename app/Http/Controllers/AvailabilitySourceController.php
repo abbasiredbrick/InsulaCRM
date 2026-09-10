@@ -37,6 +37,9 @@ class AvailabilitySourceController extends Controller
             'default_building' => 'nullable|string|max:150',
             'default_category' => 'nullable|string|max:40',
             'default_city' => 'nullable|string|max:100',
+            'default_deposit' => 'nullable|numeric|min:0',
+            'default_admin_fee' => 'nullable|numeric|min:0',
+            'default_tawtheeq_fee' => 'nullable|numeric|min:0',
         ]);
 
         $source = AvailabilitySource::create([
@@ -61,6 +64,9 @@ class AvailabilitySourceController extends Controller
             'default_building' => 'nullable|string|max:150',
             'default_category' => 'nullable|string|max:40',
             'default_city' => 'nullable|string|max:100',
+            'default_deposit' => 'nullable|numeric|min:0',
+            'default_admin_fee' => 'nullable|numeric|min:0',
+            'default_tawtheeq_fee' => 'nullable|numeric|min:0',
             'column_map' => 'nullable|array',
             'column_map.*.source' => 'nullable|string|max:60',
             'column_map.*.target' => 'nullable|string|max:40',
@@ -97,6 +103,9 @@ class AvailabilitySourceController extends Controller
             'default_building' => $data['default_building'] ?? null,
             'default_category' => $data['default_category'] ?? null,
             'default_city' => $data['default_city'] ?? null,
+            'default_deposit' => $data['default_deposit'] ?? null,
+            'default_admin_fee' => $data['default_admin_fee'] ?? null,
+            'default_tawtheeq_fee' => $data['default_tawtheeq_fee'] ?? null,
             'column_map' => $columnMap,
             'parse_options' => [
                 'delimiter' => $data['delimiter'] ?? 'multi_space',
@@ -194,7 +203,7 @@ class AvailabilitySourceController extends Controller
         $counts = ['total' => count($preview['rows']), 'mapped' => 0];
         $mappedHeaders = [];
         foreach ($columnMap as $header => $target) {
-            if (in_array($target, ['unit_no', 'building', 'features', 'rent', 'deposit', 'admin_fee', 'status', 'parking', 'key_date', 'amenities', 'remarks', 'community'])) {
+            if (in_array($target, ['unit_no', 'building', 'features', 'rent', 'deposit', 'admin_fee', 'tawtheeq', 'status', 'parking', 'key_date', 'amenities', 'remarks', 'community'])) {
                 $mappedHeaders[] = $header;
             }
         }

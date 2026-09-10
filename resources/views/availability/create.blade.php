@@ -37,6 +37,18 @@
                             <label class="form-label">{{ __('Default city') }}</label>
                             <input type="text" name="default_city" class="form-control" value="{{ old('default_city', 'Abu Dhabi') }}">
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default deposit (AED)') }}</label>
+                            <input type="number" name="default_deposit" min="0" step="0.01" class="form-control" value="{{ old('default_deposit') }}" placeholder="{{ __('applied when sheet has no deposit column') }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default admin fee (AED)') }}</label>
+                            <input type="number" name="default_admin_fee" min="0" step="0.01" class="form-control" value="{{ old('default_admin_fee') }}" placeholder="{{ __('e.g. 1050') }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default Tawtheeq fee (AED)') }}</label>
+                            <input type="number" name="default_tawtheeq_fee" min="0" step="0.01" class="form-control" value="{{ old('default_tawtheeq_fee') }}" placeholder="{{ __('e.g. 150') }}">
+                        </div>
                     </div>
                     <div class="form-hint mb-3">{{ __('You define the column mapping on the next screen. After that, importing a refreshed list is a one-click job that reuses the same layout.') }}</div>
                     <button class="btn btn-primary">{{ __('Save & Configure Mapping') }}</button>

@@ -39,6 +39,18 @@
                             <label class="form-label">{{ __('Default city') }}</label>
                             <input type="text" name="default_city" class="form-control" value="{{ old('default_city', $source->default_city ?? 'Abu Dhabi') }}">
                         </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default deposit (AED)') }}</label>
+                            <input type="number" name="default_deposit" min="0" step="0.01" class="form-control" value="{{ old('default_deposit', $source->default_deposit) }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default admin fee (AED)') }}</label>
+                            <input type="number" name="default_admin_fee" min="0" step="0.01" class="form-control" value="{{ old('default_admin_fee', $source->default_admin_fee) }}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Default Tawtheeq fee (AED)') }}</label>
+                            <input type="number" name="default_tawtheeq_fee" min="0" step="0.01" class="form-control" value="{{ old('default_tawtheeq_fee', $source->default_tawtheeq_fee) }}">
+                        </div>
                     </div>
                 </div>
             </div>

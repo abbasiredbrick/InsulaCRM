@@ -265,4 +265,103 @@ class AvailabilityImportTest extends TestCase
         $this->get(route('availability-sources.review', $source))
             ->assertRedirect(route('availability-sources.import', $source));
     }
+
+    public function test_tawtheeq_fee_maps_from_sheet_and_source_defaults(): void
+    {
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_building' => 'Burj Al Shams',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false],
+            'column_map' => [
+                'col0' => 'unit_no',
+                'col1' => 'features',
+                'col2' => 'amenities',
+                'col3' => 'rent',
+                'col4' => 'deposit',
+                'col5' => 'admin_fee',
+                'col6' => 'tawtheeq',
+            ],
+            'default_admin_fee' => 1050,
+            'default_tawtheeq_fee' => 150,
+        ]);
+
+        $service = new AvailabilityIngestService();
+        $table = $service->parseText(implode("\n", [
+            "406\t2 BR - Sea View\tBalcony\t97,000\t5,000\t1050\t150",
+            "1903\t2 BR - Sea View\t\t119,000\t5,950\t\t", // empty → source defaults
+        ]), $source->parse_options);
+
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+        $this->assertSame(2, $result['created']);
+
+        $withColumn = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '406')->first();
+        $this->assertSame(97000.0, (float) $withColumn->rent_price);
+        $this->assertSame(5000.0, (float) $withColumn->deposit_amount);
+        $this->assertSame(1050.0, (float) $withColumn->admin_fee);
+        $this->assertSame(150.0, (float) $withColumn->tawtheeq_fee);
+
+        $fromDefaults = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1903')->first();
+        $this->assertSame(1050.0, (float) $fromDefaults->admin_fee);
+        $this->assertSame(150.0, (float) $fromDefaults->tawtheeq_fee);
+        $this->assertStringContainsString('Tawtheeq: AED 150', $fromDefaults->marketing_description);
+    }
+
+    public function test_pre_existing_unlinked_unit_is_linked_and_updated_not_duplicated(): void
+    {
+        $existing = Property::create([
+            'tenant_id' => $this->tenant->id,
+            'unit_no' => '2506',
+            'sub_community' => null,
+            'intent' => 'rent',
+            'rent_price' => 120000,
+            'availability' => 'listed',
+            'rent_period' => 'yearly',
+            'market_class' => 'ready',
+            'city' => 'Abu Dhabi',
+            'state' => '',
+            'zip_code' => '',
+            'address' => '2506 Burj Al Shams Abu Dhabi',
+            'source_unit_ref' => null,
+        ]);
+
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_building' => 'Burj Al Shams',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false],
+            'column_map' => [
+                'col0' => 'unit_no',
+                'col1' => 'features',
+                'col2' => 'amenities',
+                'col3' => 'rent',
+                'col4' => 'deposit',
+                'col5' => 'admin_fee',
+                'col6' => 'tawtheeq',
+            ],
+        ]);
+
+        $service = new AvailabilityIngestService();
+        $table = $service->parseText(
+            "2506\t2 BR + Maids - Sea View\t\t119,000\t5,950\t1,050\t150",
+            $source->parse_options
+        );
+
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('unit_no', '2506')->get();
+        $this->assertCount(1, $units);
+        $this->assertSame($source->id, $units->first()->availability_source_id);
+        $this->assertSame(119000.0, (float) $units->first()->rent_price);
+        $this->assertSame('Burj Al Shams', $units->first()->sub_community);
+        $this->assertSame((int) $existing->id, (int) $units->first()->id);
+
+        // sheet listed it → refetched to ready_to_list, not unlisted
+        $this->assertSame('ready_to_list', $units->first()->availability);
+    }
 }

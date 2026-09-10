@@ -260,9 +260,10 @@ class AvailabilityIngestService
                 $commissionNote = preg_match('/commission/i', $remarkLine) ? $remarkLine : null;
                 $amenityLine = trim((string) $amenitiesRaw);
 
-                $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? null;
-                $adminFee = $data['admin_fee'] ?? null;
+                $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? $source->default_deposit ?? null;
+                $adminFee = $data['admin_fee'] ?? $source->default_admin_fee ?? null;
                 $rentPrice = $data['rent'] ?? $data['rent_price'] ?? null;
+                $tawtheeqFee = $data['tawtheeq'] ?? $data['tawtheeq_fee'] ?? $source->default_tawtheeq_fee ?? null;
 
                 $notesParts = ["Source: {$source->name} availability sheet."];
                 if ($rawStatus !== '') {
@@ -293,13 +294,16 @@ class AvailabilityIngestService
                 if ($remarkLine !== '') {
                     $descriptionParts[] = $remarkLine;
                 }
-                if ($deposit !== null || $adminFee !== null) {
+                if ($deposit !== null || $adminFee !== null || $tawtheeqFee !== null) {
                     $bits = [];
                     if ($deposit !== null) {
                         $bits[] = "Deposit: AED " . number_format($deposit);
                     }
                     if ($adminFee !== null) {
                         $bits[] = "Admin fee: AED " . number_format($adminFee);
+                    }
+                    if ($tawtheeqFee !== null) {
+                        $bits[] = "Tawtheeq: AED " . number_format($tawtheeqFee);
                     }
                     $descriptionParts[] = implode(' | ', $bits);
                 }
@@ -334,6 +338,7 @@ class AvailabilityIngestService
                     'rent_price' => $rentPrice,
                     'deposit_amount' => $deposit,
                     'admin_fee' => $adminFee,
+                    'tawtheeq_fee' => $tawtheeqFee,
                     'rent_period' => 'yearly',
                     'handover_date' => $handover ? $handover->toDateString() : null,
                     'address' => $address,
@@ -350,6 +355,22 @@ class AvailabilityIngestService
                     ->where('source_unit_ref', $unitNo)
                     ->where('sub_community', $building)
                     ->first();
+
+                // Link a pre-existing unit (created manually / from another source)
+                // so re-imports update it instead of creating a duplicate.
+                if (!$existing) {
+                    $existing = Property::withoutGlobalScopes()
+                        ->where('tenant_id', $tenantId)
+                        ->where('intent', 'rent')
+                        ->where('unit_no', $unitNo)
+                        ->whereNull('availability_source_id')
+                        ->where(function ($query) use ($building) {
+                            $query->where('sub_community', $building)
+                                ->orWhereNull('sub_community')
+                                ->orWhere('sub_community', '');
+                        })
+                        ->first();
+                }
 
                 if ($existing) {
                     // Never auto-mark a unit leased/sold downwards while the sheet
@@ -407,7 +428,7 @@ class AvailabilityIngestService
         return match ($field) {
             'unit_no', 'building', 'floor_no', 'plot_no', 'community',
             'rera_permit_no', 'title_deed_no', 'owner_name' => $value,
-            'rent_price', 'rent', 'deposit', 'deposit_amount', 'admin_fee',
+            'rent_price', 'rent', 'deposit', 'deposit_amount', 'admin_fee', 'tawtheeq', 'tawtheeq_fee',
             'service_charge', 'list_price' => $this->moneyNumeric($value),
             'parking' => $this->parkingCount($value),
             'bedrooms', 'bathrooms' => $this->intOrNull($value),

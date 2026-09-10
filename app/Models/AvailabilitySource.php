@@ -14,6 +14,9 @@ class AvailabilitySource extends Model
         'default_building',
         'default_category',
         'default_city',
+        'default_deposit',
+        'default_admin_fee',
+        'default_tawtheeq_fee',
         'column_map',
         'parse_options',
         'status_map',
@@ -26,6 +29,9 @@ class AvailabilitySource extends Model
             'column_map' => 'array',
             'parse_options' => 'array',
             'status_map' => 'array',
+            'default_deposit' => 'decimal:2',
+            'default_admin_fee' => 'decimal:2',
+            'default_tawtheeq_fee' => 'decimal:2',
             'last_imported_at' => 'datetime',
         ];
     }

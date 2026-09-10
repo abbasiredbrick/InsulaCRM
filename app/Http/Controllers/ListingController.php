@@ -474,6 +474,7 @@ class ListingController extends Controller
             'rent_price'  => 'nullable|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
             'admin_fee'   => 'nullable|numeric|min:0',
+            'tawtheeq_fee' => 'nullable|numeric|min:0',
             'rent_period' => 'nullable|in:yearly,monthly',
             'list_price'  => 'nullable|numeric|min:0',
             'availability' => 'required|in:draft,ready_to_list,listed,reserved,leased,sold,unlisted',
