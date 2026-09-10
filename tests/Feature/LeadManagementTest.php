@@ -266,4 +266,107 @@ class LeadManagementTest extends TestCase
             'subject' => 'Follow up',
         ]);
     }
+
+    public function test_activity_logging_can_advance_lead_stage(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'outreach']);
+
+        $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'meeting',
+            'subject' => 'Site visit',
+            'stage' => 'viewing_done',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('viewing_done', $lead->stage);
+        $this->assertNotNull($lead->stage_changed_at);
+    }
+
+    public function test_activity_logging_without_stage_keeps_lead_stage(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'offer_sent']);
+
+        $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'subject' => 'Log only',
+            'body' => 'No stage change.',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('offer_sent', $lead->stage);
+    }
+
+    public function test_sales_lead_uses_sales_pipeline_stage(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['deal_type' => 'sale']);
+
+        $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'subject' => 'SPA completed',
+            'stage' => 'spa_signed',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('spa_signed', $lead->stage);
+    }
+
+    public function test_activity_logging_rejects_invalid_stage(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead();
+
+        $response = $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'stage' => 'not_a_real_stage_123',
+        ]);
+
+        $response->assertSessionHasErrors('stage');
+    }
+
+    public function test_admin_can_set_deal_type_when_creating_lead(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+
+        $response = $this->post('/leads', [
+            'first_name' => 'Sara',
+            'last_name' => 'Khan',
+            'phone' => '555-0199',
+            'email' => 'sara@example.com',
+            'lead_source' => 'website',
+            'status' => 'new',
+            'temperature' => 'warm',
+            'agent_id' => $this->adminUser->id,
+            'deal_type' => 'sale',
+            'stage' => 'offer_sent',
+        ]);
+
+        $lead = \App\Models\Lead::where('first_name', 'Sara')->first();
+        $response->assertRedirect("/leads/{$lead->id}");
+        $this->assertSame('sale', $lead->deal_type);
+        $this->assertSame('offer_sent', $lead->stage);
+        $this->assertNotNull($lead->stage_changed_at);
+    }
+
+    public function test_changing_deal_type_resets_incompatible_stage(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_done']);
+
+        $this->put("/leads/{$lead->id}", [
+            'first_name' => $lead->first_name,
+            'last_name' => $lead->last_name,
+            'agent_id' => $this->adminUser->id,
+            'lead_source' => $lead->lead_source,
+            'status' => $lead->status,
+            'temperature' => $lead->temperature,
+            'deal_type' => 'sale',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('sale', $lead->deal_type);
+        $this->assertNull($lead->stage);
+    }
 }

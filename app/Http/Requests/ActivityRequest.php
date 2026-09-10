@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Lead;
 use App\Services\CustomFieldService;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -23,6 +24,7 @@ class ActivityRequest extends FormRequest
             'body' => 'nullable|string',
             'status' => "nullable|in:{$leadStatuses}",
             'temperature' => 'nullable|in:hot,warm,cold',
+            'stage' => 'nullable|in:' . implode(',', Lead::allStageKeys()),
         ];
     }
 }

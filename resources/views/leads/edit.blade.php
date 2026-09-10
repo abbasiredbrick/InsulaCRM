@@ -129,6 +129,34 @@
                 </div>
                 @endif
             </div>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">{{ __('Deal Type / Pipeline') }}</label>
+                    <select name="deal_type" class="form-select" id="deal-type-select">
+                        <option value="">{{ __('— Auto (from linked unit) —') }}</option>
+                        @foreach(\App\Models\Lead::DEAL_TYPES as $val => $label)
+                            <option value="{{ $val }}" {{ old('deal_type', $lead->deal_type) == $val ? 'selected' : '' }}>{{ __($label) }}</option>
+                        @endforeach
+                    </select>
+                    <small class="text-secondary">{{ __('Leasing defaults when the linked unit is for rent.') }}</small>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">{{ __('Pipeline Stage') }}</label>
+                    <select name="stage" class="form-select" id="lead-stage-select">
+                        <option value="">{{ __('— None —') }}</option>
+                        <optgroup label="{{ __('Leasing Stages') }}" data-deal-type="rent">
+                            @foreach(\App\Models\Lead::LEASING_STAGES as $val => $label)
+                                <option value="{{ $val }}" {{ old('stage', $lead->stage) == $val ? 'selected' : '' }}>{{ __($label) }}</option>
+                            @endforeach
+                        </optgroup>
+                        <optgroup label="{{ __('Sales Stages') }}" data-deal-type="sale">
+                            @foreach(\App\Models\Lead::SALES_STAGES as $val => $label)
+                                <option value="{{ $val }}" {{ old('stage', $lead->stage) == $val ? 'selected' : '' }}>{{ __($label) }}</option>
+                            @endforeach
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
             @if(($businessMode ?? 'wholesale') === 'wholesale' && ($lead->motivation_score || $lead->ai_motivation_score !== null))
             <div class="row">
                 <div class="col-md-8">
@@ -211,3 +239,26 @@
     </div>
 </form>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var dealTypeSelect = document.getElementById('deal-type-select');
+    var stageSelect = document.getElementById('lead-stage-select');
+    function syncStageOptions() {
+        var dealType = dealTypeSelect ? dealTypeSelect.value : '';
+        stageSelect.querySelectorAll('optgroup').forEach(function (g) {
+            g.disabled = g.dataset.dealType && g.dataset.dealType !== dealType;
+        });
+        var selected = stageSelect.options[stageSelect.selectedIndex];
+        if (selected && selected.parentElement && selected.parentElement.disabled) {
+            stageSelect.value = '';
+        }
+    }
+    if (dealTypeSelect && stageSelect) {
+        syncStageOptions();
+        dealTypeSelect.addEventListener('change', syncStageOptions);
+    }
+});
+</script>
+@endpush

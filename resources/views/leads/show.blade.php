@@ -118,6 +118,22 @@
                         </div>
                     </div>
                     <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Pipeline') }}</div>
+                        <div class="datagrid-content">
+                            @php
+                                $dealTypeLabel = \App\Models\Lead::DEAL_TYPES[$lead->dealType()] ?? $lead->dealType();
+                                $stageLabel = $lead->stageLabel();
+                            @endphp
+                            <span class="badge {{ $lead->dealType() === 'sale' ? 'bg-indigo-lt' : 'bg-teal-lt' }}">{{ __($dealTypeLabel) }}</span>
+                            @if($stageLabel)
+                            <span class="badge bg-purple-lt" title="{{ __('Current pipeline stage') }}">{{ __($stageLabel) }}</span>
+                            @if($lead->stage_changed_at)
+                            <small class="text-secondary d-block" style="font-size:11px;">{{ __('since :date', ['date' => $lead->stage_changed_at->diffForHumans()]) }}</small>
+                            @endif
+                            @endif
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Assigned Agent') }}</div>
                         <div class="datagrid-content">{{ $lead->agent->name ?? '-' }}</div>
                     </div>
@@ -298,9 +314,22 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <small class="text-secondary">{{ __('Leave blank to keep the lead unchanged.') }}</small>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">{{ __('Advance to stage') }}</label>
+                            <select name="stage" class="form-select" id="activity-stage-select">
+                                @php $stageOptions = $lead->stageOptions(); @endphp
+                                <option value="">{{ $lead->stage ? __('Keep current (:stage)', ['stage' => $lead->stageLabel()]) : __('— Select stage —') }}</option>
+                                @foreach($stageOptions as $val => $label)
+                                    @if($val === $lead->stage)
+                                        @continue
+                                    @endif
+                                    <option value="{{ $val }}">{{ __($label) }}</option>
+                                @endforeach
+                            </select>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <small class="text-secondary">{{ __('Leave status, temperature, or stage blank to keep the lead unchanged.') }}</small>
                     </div>
                     <div class="mb-3">
                         <textarea name="body" class="form-control" rows="2" placeholder="{{ __('Notes...') }}"></textarea>

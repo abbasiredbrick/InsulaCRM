@@ -50,6 +50,19 @@ class ActivityController extends Controller
             $lead->save();
         }
 
+        // Advance the lead along its leasing/sales pipeline stage.
+        if ($request->filled('stage')) {
+            $oldStage = $lead->stage;
+            $lead->stage = $request->stage;
+            $lead->stage_changed_at = now();
+            $lead->save();
+
+            if ($oldStage !== $lead->stage) {
+                AuditLog::log('lead.stage_changed', $lead, ['stage' => $oldStage], ['stage' => $lead->stage]);
+                Hooks::doAction('lead.stage_changed', $lead, $oldStage);
+            }
+        }
+
         app(MotivationScoreService::class)->recalculate($lead);
         event(new ActivityLogged($activity));
         Hooks::doAction('activity.logged', $activity);

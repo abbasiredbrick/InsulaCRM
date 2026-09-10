@@ -31,6 +31,8 @@ class LeadRequest extends FormRequest
             'timezone' => 'nullable|string|max:50',
             'do_not_contact' => 'nullable|boolean',
             'contact_type' => 'nullable|string|in:seller_lead,buyer_lead,active_client,past_client',
+            'deal_type' => 'nullable|string|in:rent,sale',
+            'stage' => 'nullable|in:' . implode(',', \App\Models\Lead::allStageKeys()),
             'notes' => 'nullable|string',
             'custom_fields' => 'nullable|array',
             'custom_fields.*' => 'nullable',

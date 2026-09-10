@@ -72,4 +72,36 @@ class ActivityApiTest extends TestCase
         $response->assertJson(['error' => 'Validation failed.']);
         $this->assertArrayHasKey('status', $response->json('details'));
     }
+
+    public function test_store_activity_via_api_advances_lead_stage(): void
+    {
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_scheduled']);
+
+        $response = $this->postJson('/api/v1/activities', [
+            'lead_id' => $lead->id,
+            'type' => 'call',
+            'subject' => 'Post-viewing follow up',
+            'stage' => 'offer_sent',
+        ], $this->headers);
+
+        $response->assertStatus(201);
+        $lead->refresh();
+        $this->assertSame('offer_sent', $lead->stage);
+        $this->assertNotNull($lead->stage_changed_at);
+    }
+
+    public function test_store_activity_via_api_rejects_invalid_stage(): void
+    {
+        $lead = $this->createLead();
+
+        $response = $this->postJson('/api/v1/activities', [
+            'lead_id' => $lead->id,
+            'type' => 'note',
+            'stage' => 'bogus_stage',
+        ], $this->headers);
+
+        $response->assertStatus(422);
+        $response->assertJson(['error' => 'Validation failed.']);
+        $this->assertArrayHasKey('stage', $response->json('details'));
+    }
 }

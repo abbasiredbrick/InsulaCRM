@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Events\ActivityLogged;
 use App\Facades\Hooks;
 use App\Models\Activity;
+use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Services\CustomFieldService;
 use App\Services\MotivationScoreService;
@@ -59,6 +60,7 @@ class ActivityApiController extends Controller
             'logged_at' => 'nullable|date',
             'status'   => 'nullable|in:' . implode(',', CustomFieldService::getValidSlugs('lead_status', $tenant)),
             'temperature' => 'nullable|in:hot,warm,cold',
+            'stage'    => 'nullable|in:' . implode(',', Lead::allStageKeys()),
         ]);
 
         if ($validator->fails()) {
@@ -88,6 +90,20 @@ class ActivityApiController extends Controller
             $lead->temperature = $data['temperature'] ?? $lead->temperature;
             $lead->save();
             app(MotivationScoreService::class)->recalculate($lead);
+        }
+
+        // Advance the lead along its leasing/sales pipeline stage.
+        if (array_key_exists('stage', $data)) {
+            $oldStage = $lead->stage;
+            $lead->stage = $data['stage'];
+            $lead->stage_changed_at = now();
+            $lead->save();
+            app(MotivationScoreService::class)->recalculate($lead);
+
+            if ($oldStage !== $lead->stage) {
+                AuditLog::log('lead.stage_changed', $lead, ['stage' => $oldStage], ['stage' => $lead->stage]);
+                Hooks::doAction('lead.stage_changed', $lead, $oldStage);
+            }
         }
 
         event(new ActivityLogged($activity));

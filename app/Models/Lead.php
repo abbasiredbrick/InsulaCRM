@@ -11,6 +11,45 @@ class Lead extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /**
+     * Fleet of deal types a lead can follow.
+     */
+    public const DEAL_TYPES = [
+        'rent' => 'Leasing',
+        'sale' => 'Sales',
+    ];
+
+    /**
+     * Predefined pipeline stages for a leasing deal.
+     */
+    public const LEASING_STAGES = [
+        'new_lead' => 'New / Registered',
+        'outreach' => 'Contacted (Call / SMS / WhatsApp / Email)',
+        'availability_shared' => 'Availability Shared (Incl. Alternatives)',
+        'viewing_requested' => 'Viewing Requested',
+        'viewing_scheduled' => 'Viewing Scheduled (Owner Confirmed)',
+        'viewing_done' => 'Unit Viewed',
+        'offer_sent' => 'Offer Sent',
+        'negotiating' => 'Negotiating (Price / Payments / Deposit or PDC)',
+        'offer_signed' => 'Offer Signed',
+        'deposit_collected' => 'Deposit / First Payment & Commission',
+        'tawtheeq_ejari' => 'Tawtheeq (ADGM/DARI) / Ejari (DLD)',
+        'move_in_permit' => 'Move-In Permit Issued',
+        'moved_in' => 'Moved In / Settled',
+    ];
+
+    /**
+     * Predefined pipeline stages for a sales deal.
+     */
+    public const SALES_STAGES = [
+        'offer_sent' => 'Offer Sent',
+        'negotiating' => 'Negotiating (Price / Terms)',
+        'offer_accepted' => 'Offer Accepted',
+        'spa_signed' => 'SPA Signed',
+        'deed_transfer' => 'Transfer at ADREC / DARI / ADGM',
+        'closed' => 'Closed',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'agent_id',
@@ -23,6 +62,9 @@ class Lead extends Model
         'status',
         'contact_type',
         'temperature',
+        'deal_type',
+        'stage',
+        'stage_changed_at',
         'motivation_score',
         'ai_motivation_score',
         'do_not_contact',
@@ -38,6 +80,7 @@ class Lead extends Model
             'motivation_score' => 'integer',
             'ai_motivation_score' => 'integer',
             'custom_fields' => 'array',
+            'stage_changed_at' => 'datetime',
         ];
     }
 
@@ -50,12 +93,71 @@ class Lead extends Model
             if (! $lead->timezone && $lead->tenant_id) {
                 $lead->timezone = \App\Models\Tenant::whereKey($lead->tenant_id)->value('timezone');
             }
+
+            if ($lead->stage && ! $lead->stage_changed_at) {
+                $lead->stage_changed_at = now();
+            }
+        });
+
+        // Keep stage_changed_at in sync whenever the stage moves.
+        static::updating(function (Lead $lead) {
+            if ($lead->isDirty('stage') && $lead->stage && ! $lead->stage_changed_at) {
+                $lead->stage_changed_at = now();
+            }
         });
     }
 
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * All valid pipeline stage keys across both deal types, used for validation.
+     */
+    public static function allStageKeys(): array
+    {
+        return array_merge(array_keys(self::LEASING_STAGES), array_keys(self::SALES_STAGES));
+    }
+
+    /**
+     * Resolve the pipeline (rent or sale) this lead belongs to.
+     *
+     * Prefers the stored deal_type; otherwise it falls back to the intent of the
+     * linked inventory unit and finally assumes leasing.
+     */
+    public function dealType(): string
+    {
+        if ($this->deal_type && in_array($this->deal_type, ['rent', 'sale'], true)) {
+            return $this->deal_type;
+        }
+
+        $intent = $this->property?->intent;
+        if ($intent === 'sale') {
+            return 'sale';
+        }
+
+        return 'rent';
+    }
+
+    /**
+     * The available pipeline stages for this lead's deal type.
+     */
+    public function stageOptions(): array
+    {
+        return $this->dealType() === 'sale' ? self::SALES_STAGES : self::LEASING_STAGES;
+    }
+
+    /**
+     * Human-readable label for the lead's current stage.
+     */
+    public function stageLabel(): ?string
+    {
+        if (! $this->stage) {
+            return null;
+        }
+
+        return $this->stageOptions()[$this->stage] ?? $this->stage;
     }
 
     /**

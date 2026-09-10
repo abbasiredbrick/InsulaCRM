@@ -189,7 +189,7 @@ class ReportController extends Controller
         }
 
         // Lead-to-close velocity (avg days from lead creation to closed_won)
-        $velocityData = Deal::where('stage', 'closed_won')
+        $velocityData = Deal::where('deals.stage', 'closed_won')
             ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
             ->join('leads', 'deals.lead_id', '=', 'leads.id')
             ->when(DB::getDriverName() === 'sqlite', function ($q) {

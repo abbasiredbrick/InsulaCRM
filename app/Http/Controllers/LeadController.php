@@ -240,6 +240,13 @@ class LeadController extends Controller
         }
 
         $lead->update($data);
+
+        // A stage from the other pipeline no longer makes sense once the deal
+        // type changes, so reset it and let the agent pick a fresh stage.
+        if ($lead->wasChanged('deal_type') && $lead->stage && ! array_key_exists($lead->stage, $lead->stageOptions())) {
+            $lead->update(['stage' => null, 'stage_changed_at' => null]);
+        }
+
         app(MotivationScoreService::class)->recalculate($lead);
 
         $this->syncLinkedUnits($request, $lead);
