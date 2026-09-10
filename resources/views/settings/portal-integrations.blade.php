@@ -39,12 +39,10 @@
                     @csrf
                     <button type="submit" class="btn btn-sm btn-outline-primary">{{ __('Test connection') }}</button>
                 </form>
-                    @if($box['portal'] === 'propertyfinder')
-                    <form method="POST" action="{{ route('portal-integrations.sync-leads', $box['portal']) }}" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Sync leads') }}</button>
-                    </form>
-                    @endif
+                <form method="POST" action="{{ route('portal-integrations.sync-leads', $box['portal']) }}" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Sync leads') }}</button>
+                </form>
                 @endif
                 @endif
             </div>
@@ -70,6 +68,12 @@
                     <div class="col-md-6">
                         <label class="form-label">{{ __('Agent reference') }}</label>
                         <input type="text" name="agent_reference" class="form-control" value="{{ $integration?->agent_reference ?? '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('Leads API token') }}</label>
+                        <input type="password" name="leads_api_token" class="form-control monospace" placeholder="{{ $integration?->maskedLeadsToken() ?? '• • • •' }}" autocomplete="new-password" value="">
+                        @if($integration?->leads_api_token)<div class="form-hint">{{ __('Token stored:') }} {{ $integration->maskedLeadsToken() }}</div>@endif
+                        <div class="form-hint">{{ __('Overall leads Extract API key. Used to pull leads from Bayut and Dubizzle.') }}</div>
                     </div>
                 @else
                     <div class="col-md-6">
@@ -119,6 +123,17 @@
             <div class="monospace">{{ $integration?->webhook_url ?? route('portal.webhooks.receive', 'propertyfinder', true) }}</div>
             <div class="form-hint">{{ __('Subscribe to lead webhook events in PF Enterprise so new enquiries land here instantly.') }}</div>
         </div>
+        @endif
+
+        @if($box['portal'] === 'bayut' && $integration?->leads_last_synced_at)
+        <div class="alert alert-secondary mt-3 mb-0">
+            <div class="fw-bold small text-uppercase">{{ __('Leads pull') }}</div>
+            <div class="form-hint">{{ __('Last pulled:') }} {{ $integration->leads_last_synced_at->format('d M Y H:i') }}</div>
+        </div>
+        @endif
+
+        @if($box['portal'] === 'bayut' && $integration?->leads_last_error)
+        <div class="alert alert-warning mt-3 mb-0">{{ $integration->leads_last_error }}</div>
         @endif
 
         @if($integration?->last_error)

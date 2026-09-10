@@ -22,6 +22,9 @@ class PortalIntegration extends Model
         'public_profile_id',
         'default_location_id',
         'webhook_secret',
+        'leads_api_token',
+        'leads_last_synced_at',
+        'leads_last_error',
         'last_synced_at',
         'last_error',
     ];
@@ -33,6 +36,8 @@ class PortalIntegration extends Model
             'api_token' => 'encrypted',
             'api_secret' => 'encrypted',
             'webhook_secret' => 'encrypted',
+            'leads_api_token' => 'encrypted',
+            'leads_last_synced_at' => 'datetime',
             'last_synced_at' => 'datetime',
         ];
     }
@@ -65,6 +70,11 @@ class PortalIntegration extends Model
     public function maskedWebhookSecret(): ?string
     {
         return $this->mask($this->webhook_secret);
+    }
+
+    public function maskedLeadsToken(): ?string
+    {
+        return $this->mask($this->leads_api_token);
     }
 
     protected function mask(?string $value): ?string

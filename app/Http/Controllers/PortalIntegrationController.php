@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\PortalIntegration;
+use App\Services\Portals\BayutLeadsPullService;
 use App\Services\Portals\BayutPortalService;
 use App\Services\Portals\PortalLeadService;
 use App\Services\Portals\PortalPayloadNormalizer;
@@ -40,6 +41,7 @@ class PortalIntegrationController extends Controller
             'public_profile_id' => 'nullable|string|max:100',
             'default_location_id' => 'nullable|string|max:100',
             'webhook_secret' => 'nullable|string',
+            'leads_api_token' => 'nullable|string',
         ]);
 
         $integration = PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
@@ -61,6 +63,9 @@ class PortalIntegrationController extends Controller
         }
         if (blank($data['webhook_secret'] ?? null)) {
             unset($data['webhook_secret']);
+        }
+        if (blank($data['leads_api_token'] ?? null)) {
+            unset($data['leads_api_token']);
         }
 
         $data['is_active'] = true;
@@ -125,40 +130,66 @@ class PortalIntegrationController extends Controller
 
     public function syncLeads(Request $request, string $portal)
     {
-        abort_unless($portal === 'propertyfinder', 404);
+        abort_unless(in_array($portal, ['propertyfinder', 'bayut'], true), 404);
 
         $integration = PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
-            ->where('portal', 'propertyfinder')
+            ->where('portal', $portal)
             ->where('is_active', true)
             ->first();
 
         if ($integration === null) {
-            return back()->with('error', __('No active Property Finder integration.'));
+            return back()->with('error', __('No active integration for this portal.'));
         }
 
-        $service = new PropertyFinderPortalService($integration);
-        $leads = $service->fetchLeads($integration->last_synced_at?->toIso8601String());
+        if ($portal === 'propertyfinder') {
+            $service = new PropertyFinderPortalService($integration);
+            $leads = $service->fetchLeads($integration->last_synced_at?->toIso8601String());
 
-        $created = 0;
-        $ignored = 0;
-        foreach ($leads as $raw) {
-            if (! is_array($raw)) {
-                continue;
+            $created = 0;
+            $ignored = 0;
+            foreach ($leads as $raw) {
+                if (! is_array($raw)) {
+                    continue;
+                }
+
+                $normalized = (new PortalPayloadNormalizer)->normalize('propertyfinder', $raw);
+                $lead = (new PortalLeadService)->createFromPayload($integration, 'property_finder', $normalized);
+
+                $lead === null ? $ignored++ : $created++;
             }
 
-            $normalized = (new PortalPayloadNormalizer)->normalize('propertyfinder', $raw);
-            $lead = (new PortalLeadService)->createFromPayload($integration, 'property_finder', $normalized);
+            $integration->update([
+                'last_synced_at' => now(),
+                'last_error'     => null,
+            ]);
 
-            $lead === null ? $ignored++ : $created++;
+            AuditLog::log('settings.portal_integration_propertyfinder_synced', $integration, compact('created', 'ignored'));
+
+            return back()->with('success', __('Synced :created new leads (:ignored existing).', compact('created', 'ignored')));
         }
 
+        $service = new BayutLeadsPullService($integration);
+        $result = $service->pull($integration->leads_last_synced_at);
+
         $integration->update([
-            'last_synced_at' => now(),
-            'last_error'     => null,
+            'leads_last_synced_at' => now(),
+            'leads_last_error'     => $result['error'],
         ]);
 
-        AuditLog::log('settings.portal_integration_propertyfinder_synced', $integration, compact('created', 'ignored'));
+        AuditLog::log('settings.portal_integration_bayut_leads_synced', $integration, [
+            'created' => $result['created'],
+            'ignored' => $result['ignored'],
+        ]);
 
-        return back()->with('success', __('Synced :created new leads (:ignored existing).', compact('created', 'ignored')));
+        $message = __('Synced :created new leads (:ignored existing).', [
+            'created' => $result['created'],
+            'ignored' => $result['ignored'],
+        ]);
+
+        if ($result['error'] !== null) {
+            return back()->with('error', $message . ' ' . $result['error']);
+        }
+
+        return back()->with('success', $message);
     }
 }
