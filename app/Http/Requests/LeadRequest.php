@@ -34,6 +34,8 @@ class LeadRequest extends FormRequest
             'notes' => 'nullable|string',
             'custom_fields' => 'nullable|array',
             'custom_fields.*' => 'nullable',
+            'linked_units' => 'nullable|array',
+            'linked_units.*' => 'integer',
         ];
 
         // Add validation for required custom fields

@@ -203,7 +203,11 @@
 
         <!-- Property Section -->
         <div id="property-details"></div>
-        @include('leads._property_form')
+        @if(($businessMode ?? 'wholesale') === 'realestate')
+            @include('leads._linked_units_panel')
+        @else
+            @include('leads._property_form')
+        @endif
 
         <!-- Photos Section -->
         @include('leads._photos')

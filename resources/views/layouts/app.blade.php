@@ -138,9 +138,17 @@
                                 <span class="nav-link-title">{{ __('Listings') }}</span>
                             </a>
                         </li>
+                        <li class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('inventory.index') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0"/><path d="M5 21v-14l8 -4v18"/><path d="M19 21v-10l-6 -4"/><path d="M9 9l0 .01"/><path d="M9 12l0 .01"/><path d="M9 15l0 .01"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('Inventory') }}</span>
+                            </a>
+                        </li>
                         @endif
 
-                        @unless(auth()->user()->isDispositionAgent())
+                        @unless(auth()->user()->isDispositionAgent() || (($businessMode ?? 'wholesale') === 'realestate'))
                         <li class="nav-item {{ request()->is('properties*') ? 'active' : '' }}">
                             <a class="nav-link" href="{{ route('properties.index') }}">
                                 <span class="nav-link-icon">

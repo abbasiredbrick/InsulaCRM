@@ -41,12 +41,15 @@ use App\Http\Controllers\CalendarSyncController;
 use App\Http\Controllers\ErrorLogController;
 use App\Http\Controllers\KnowledgeBaseController;
 use App\Http\Controllers\Api\WebFormController;
+use App\Http\Controllers\Api\PortalWebhookController;
+use App\Http\Controllers\PortalIntegrationController;
 use App\Http\Controllers\BuyerPortalController;
 use App\Http\Controllers\BuyerPortalSettingsController;
 use App\Http\Controllers\WebhookRecipeController;
 use App\Http\Controllers\ShowingController;
 use App\Http\Controllers\OpenHouseController;
 use App\Http\Controllers\ListingDashboardController;
+use App\Http\Controllers\ListingController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\DocumentTemplateController;
@@ -83,6 +86,12 @@ Route::post('/install/complete/snapshot', [InstallController::class, 'createInit
 // Public lead capture web forms
 Route::get('/forms/{api_key}', [WebFormController::class, 'show'])->name('forms.show');
 Route::post('/forms/{api_key}', [WebFormController::class, 'submit'])->middleware('throttle:10,1')->name('forms.submit');
+
+// Portal inbound lead webhooks (Bayut/Dubizzle + Property Finder push leads to these URLs)
+Route::post('/portal/webhooks/{portal}', [PortalWebhookController::class, 'receive'])
+    ->middleware('throttle:120,1')
+    ->whereIn('portal', ['bayut', 'propertyfinder'])
+    ->name('portal.webhooks.receive');
 
 // Public buyer portal (no auth)
 Route::get('/p/{slug}', [BuyerPortalController::class, 'show'])->name('buyer-portal.show');
@@ -172,6 +181,32 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Listings Dashboard (real estate agent mode) ───────────────
     Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
         Route::get('/listings', [ListingDashboardController::class, 'index'])->name('listings.index');
+    });
+
+    // ── Inventory / Units (real estate agent mode) ────────────────
+    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+        Route::get('/inventory', [ListingController::class, 'index'])->name('inventory.index');
+        Route::get('/inventory/create', [ListingController::class, 'create'])->name('inventory.create');
+        Route::post('/inventory', [ListingController::class, 'store'])->name('inventory.store');
+        Route::get('/inventory/portal', [ListingController::class, 'portal'])->name('inventory.portal');
+        Route::get('/inventory/export/bayut', [ListingController::class, 'exportBayut'])->name('inventory.export.bayut');
+        Route::get('/inventory/export/dubizzle', [ListingController::class, 'exportDubizzle'])->name('inventory.export.dubizzle');
+        Route::get('/inventory/export/propertyfinder', [ListingController::class, 'exportPropertyFinder'])->name('inventory.export.propertyfinder');
+        Route::get('/inventory/search', [ListingController::class, 'searchForLead'])->name('inventory.search');
+        Route::get('/inventory/{property}', [ListingController::class, 'show'])->name('inventory.show');
+        Route::get('/inventory/{property}/edit', [ListingController::class, 'edit'])->name('inventory.edit');
+        Route::put('/inventory/{property}', [ListingController::class, 'update'])->name('inventory.update');
+        Route::delete('/inventory/{property}', [ListingController::class, 'destroy'])->name('inventory.destroy');
+        Route::post('/inventory/{property}/portal-status', [ListingController::class, 'updatePortalStatus'])->name('inventory.portal-status');
+        Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
+            ->whereIn('portal', ['bayut', 'propertyfinder'])
+            ->name('inventory.push');
+    });
+
+    // ── Lead ↔ Inventory linking (lead is the entry point) ────────
+    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+        Route::post('/leads/{lead}/link-property', [\App\Http\Controllers\LeadController::class, 'linkProperty'])->name('leads.property.link');
+        Route::delete('/leads/{lead}/link-property/{property}', [\App\Http\Controllers\LeadController::class, 'unlinkProperty'])->name('leads.property.unlink');
     });
 
     // ── Global Search (all roles) ────────────────────────
@@ -508,6 +543,13 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/integrations', [IntegrationController::class, 'store'])->name('integrations.store');
         Route::patch('/settings/integrations/{integration}/toggle', [IntegrationController::class, 'toggle'])->name('integrations.toggle');
         Route::delete('/settings/integrations/{integration}', [IntegrationController::class, 'destroy'])->name('integrations.destroy');
+
+        // Portal Integrations (Bayut/Dubizzle + Property Finder)
+        Route::get('/settings/portal-integrations', [PortalIntegrationController::class, 'index'])->name('portal-integrations.index');
+        Route::post('/settings/portal-integrations/{portal}', [PortalIntegrationController::class, 'update'])->name('portal-integrations.update');
+        Route::post('/settings/portal-integrations/{portal}/toggle', [PortalIntegrationController::class, 'toggle'])->name('portal-integrations.toggle');
+        Route::post('/settings/portal-integrations/{portal}/test', [PortalIntegrationController::class, 'test'])->name('portal-integrations.test');
+        Route::post('/settings/portal-integrations/{portal}/sync-leads', [PortalIntegrationController::class, 'syncLeads'])->name('portal-integrations.sync-leads');
 
         // Document Templates (admin manages templates)
         Route::get('/document-templates', [DocumentTemplateController::class, 'index'])->name('document-templates.index');

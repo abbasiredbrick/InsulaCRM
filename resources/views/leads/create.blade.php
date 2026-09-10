@@ -186,6 +186,8 @@
         </div>
     </div>
 
+    @include('leads._inventory_selector')
+
     <div class="d-flex justify-content-between">
         <a href="{{ route('leads.index') }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
         <button type="submit" class="btn btn-primary">{{ __('Create Lead') }}</button>

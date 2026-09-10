@@ -41,6 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->prependToGroup('web', \App\Http\Middleware\CheckInstalled::class);
 
+        $middleware->validateCsrfTokens(except: [
+            'portal/webhooks/*',
+        ]);
+
         $middleware->alias([
             'tenant' => \App\Http\Middleware\TenantMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,

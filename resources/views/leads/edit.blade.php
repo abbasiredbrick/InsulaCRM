@@ -203,6 +203,8 @@
         </div>
     </div>
 
+    @include('leads._inventory_selector')
+
     <div class="d-flex justify-content-between">
         <a href="{{ route('leads.show', $lead) }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
         <button type="submit" class="btn btn-primary">{{ __('Update Lead') }}</button>

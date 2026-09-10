@@ -113,6 +113,13 @@ class Lead extends Model
         return $this->hasOne(Property::class);
     }
 
+    public function properties()
+    {
+        return $this->belongsToMany(Property::class, 'lead_property')
+            ->withPivot('relation_type')
+            ->withTimestamps();
+    }
+
     public function campaign()
     {
         return $this->belongsTo(Campaign::class);

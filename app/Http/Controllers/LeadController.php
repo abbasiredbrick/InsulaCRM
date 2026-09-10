@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\LeadClaim;
 use App\Models\LeadPhoto;
+use App\Models\Property;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -155,7 +156,9 @@ class LeadController extends Controller
         $this->authorize('create', Lead::class);
 
         $agents = $this->getAgents();
-        return view('leads.create', compact('agents'));
+        $inventoryUnits = $this->visibleInventory();
+        $selectedUnitIds = [];
+        return view('leads.create', compact('agents', 'inventoryUnits', 'selectedUnitIds'));
     }
 
     public function store(LeadRequest $request)
@@ -176,6 +179,8 @@ class LeadController extends Controller
 
         $lead = Lead::create($data);
         app(MotivationScoreService::class)->recalculate($lead);
+
+        $this->syncLinkedUnits($request, $lead);
 
         // AI auto-qualify temperature
         if (auth()->user()->tenant->ai_enabled) {
@@ -209,7 +214,7 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
-        $lead->load(['agent', 'property', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps']);
+        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps']);
         $sequences = \App\Models\Sequence::where('is_active', true)->get();
         $assignmentHistory = app(AssignmentHistoryService::class)->getHistory($lead);
         return view('leads.show', compact('lead', 'sequences', 'assignmentHistory'));
@@ -219,7 +224,9 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $agents = $this->getAgents($lead);
-        return view('leads.edit', compact('lead', 'agents'));
+        $inventoryUnits = $this->visibleInventory();
+        $selectedUnitIds = $lead->properties->pluck('id')->all();
+        return view('leads.edit', compact('lead', 'agents', 'inventoryUnits', 'selectedUnitIds'));
     }
 
     public function update(LeadRequest $request, Lead $lead)
@@ -234,6 +241,8 @@ class LeadController extends Controller
 
         $lead->update($data);
         app(MotivationScoreService::class)->recalculate($lead);
+
+        $this->syncLinkedUnits($request, $lead);
 
         if ($oldStatus !== $lead->status) {
             event(new LeadStatusChanged($lead, $oldStatus));
@@ -261,6 +270,70 @@ class LeadController extends Controller
         AuditLog::log('lead.deleted', $lead);
 
         return redirect()->route('leads.index')->with('success', __('Lead deleted successfully.'));
+    }
+
+    /**
+     * Link an inventory unit to a lead (leads are created/managed from the lead side).
+     */
+    public function linkProperty(Request $request, Lead $lead)
+    {
+        $this->authorize('update', $lead);
+
+        $propertyId = $request->validate(['property_id' => 'required|integer'])['property_id'];
+
+        $property = Property::where('tenant_id', $lead->tenant_id)->findOrFail($propertyId);
+
+        $lead->properties()->syncWithoutDetaching([$property->id]);
+
+        AuditLog::log('lead.property_linked', $lead, ['property_id' => $property->id]);
+
+        return back()->with('success', __('Unit linked to this lead.'));
+    }
+
+    /**
+     * Unlink an inventory unit from a lead.
+     */
+    public function unlinkProperty(Request $request, Lead $lead, Property $property)
+    {
+        $this->authorize('update', $lead);
+
+        $lead->properties()->detach($property->id);
+
+        AuditLog::log('lead.property_unlinked', $lead, ['property_id' => $property->id]);
+
+        return back()->with('success', __('Unit unlinked from this lead.'));
+    }
+
+    /**
+     * Units the current user may link to a lead (same visibility as the inventory screen).
+     */
+    protected function visibleInventory(): \Illuminate\Database\Eloquent\Collection
+    {
+        $query = Property::where('tenant_id', auth()->user()->tenant_id)
+            ->whereIn('availability', ['draft', 'ready_to_list', 'listed', 'reserved']);
+
+        if (auth()->user()->isAgent()) {
+            $query->where(fn ($q) => $q->where('assigned_agent_id', auth()->id())->orWhereNull('assigned_agent_id'));
+        }
+
+        return $query->latest('updated_at')->take(50)->get();
+    }
+
+    /**
+     * Sync the inventory units selected on the lead create/edit form.
+     */
+    protected function syncLinkedUnits(Request $request, Lead $lead): void
+    {
+        if (! $request->exists('linked_units')) {
+            return;
+        }
+
+        $propertyIds = Property::where('tenant_id', auth()->user()->tenant_id)
+            ->whereIn('id', (array) $request->input('linked_units', []))
+            ->pluck('id')
+            ->all();
+
+        $lead->properties()->sync($propertyIds);
     }
 
     public function updateStatus(Request $request, Lead $lead)

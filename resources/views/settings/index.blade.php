@@ -59,6 +59,11 @@
                         <li class="nav-item">
                             <a href="#tab-integrations" class="nav-link" data-bs-toggle="tab">{{ __('Integrations') }}</a>
                         </li>
+                        @if(($businessMode ?? 'wholesale') === 'realestate')
+                        <li class="nav-item">
+                            <a href="{{ route('portal-integrations.index') }}" class="nav-link">{{ __('Portal Integrations') }}</a>
+                        </li>
+                        @endif
                         <li class="nav-item">
                             <a href="#tab-storage" class="nav-link" data-bs-toggle="tab">{{ __('Storage') }}</a>
                         </li>

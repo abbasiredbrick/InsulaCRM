@@ -112,20 +112,23 @@ class BusinessModeService
     // ── Real estate lead sources ──
 
     public const REALESTATE_LEAD_SOURCES = [
-        'website'      => 'Website',
-        'referral'     => 'Referral',
-        'open_house'   => 'Open House',
-        'sign_call'    => 'Sign Call',
-        'ppc'          => 'PPC / Paid Ads',
-        'seo'          => 'SEO / Organic',
-        'social_media' => 'Social Media',
-        'zillow'       => 'Zillow',
-        'realtor_com'  => 'Realtor.com',
-        'mls'          => 'MLS',
-        'sphere'       => 'Sphere of Influence',
-        'past_client'  => 'Past Client',
-        'api'          => 'API / Integration',
-        'other'        => 'Other',
+        'website'        => 'Website',
+        'referral'       => 'Referral',
+        'open_house'     => 'Open House',
+        'sign_call'      => 'Sign Call',
+        'ppc'            => 'PPC / Paid Ads',
+        'seo'            => 'SEO / Organic',
+        'social_media'   => 'Social Media',
+        'bayut'          => 'Bayut',
+        'dubizzle'       => 'Dubizzle',
+        'property_finder' => 'Property Finder',
+        'zillow'         => 'Zillow',
+        'realtor_com'    => 'Realtor.com',
+        'mls'            => 'MLS',
+        'sphere'         => 'Sphere of Influence',
+        'past_client'    => 'Past Client',
+        'api'            => 'API / Integration',
+        'other'          => 'Other',
     ];
 
     // ── Wholesale roles ──
