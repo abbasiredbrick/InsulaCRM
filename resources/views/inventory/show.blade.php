@@ -47,12 +47,24 @@
                         <div class="fw-bold">{{ $property->rent_price ? \App\Helpers\TenantFormatHelper::currency($property->rent_price) . ' / ' . __(\App\Models\Property::RENT_PERIODS[$property->rent_period] ?? $property->rent_period) : '—' }}</div>
                     </div>
                     <div class="col-md-4">
+                        <div class="text-muted small">{{ __('Deposit') }}</div>
+                        <div class="fw-bold">{{ $property->deposit_amount ? \App\Helpers\TenantFormatHelper::currency($property->deposit_amount) : '—' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">{{ __('Admin fee') }}</div>
+                        <div class="fw-bold">{{ $property->admin_fee ? \App\Helpers\TenantFormatHelper::currency($property->admin_fee) : '—' }}</div>
+                    </div>
+                    <div class="col-md-4">
                         <div class="text-muted small">{{ __('Sale') }}</div>
                         <div class="fw-bold">{{ $property->sale_price ? \App\Helpers\TenantFormatHelper::currency($property->sale_price) : '—' }}</div>
                     </div>
                     <div class="col-md-4">
                         <div class="text-muted small">{{ __('Service charge') }}</div>
                         <div class="fw-bold">{{ $property->service_charge ? \App\Helpers\TenantFormatHelper::currency($property->service_charge) : '—' }}</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-muted small">{{ __('Handover / Key') }}</div>
+                        <div class="fw-bold">{{ $property->handover_date ? $property->handover_date->format('d M Y') : '—' }}</div>
                     </div>
                 </div>
             </div>

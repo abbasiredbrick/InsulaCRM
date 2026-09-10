@@ -99,6 +99,9 @@ class Property extends Model
         'sold_at',
         'sold_price',
         'notes',
+        'availability_source_id',
+        'source_unit_ref',
+        'availability_synced_at',
         // ── Brokerage fields ──
         'intent',
         'market_class',
@@ -114,6 +117,8 @@ class Property extends Model
         'unit_no',
         'floor_no',
         'rent_price',
+        'deposit_amount',
+        'admin_fee',
         'rent_period',
         'service_charge',
         'furnishing',
@@ -208,6 +213,11 @@ class Property extends Model
     public function media()
     {
         return $this->hasMany(PropertyMedia::class)->orderBy('sort_order');
+    }
+
+    public function availabilitySource()
+    {
+        return $this->belongsTo(AvailabilitySource::class, 'availability_source_id');
     }
 
     public function comparableSales()

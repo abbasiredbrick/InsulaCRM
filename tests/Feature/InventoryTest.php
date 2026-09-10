@@ -55,6 +55,34 @@ class InventoryTest extends TestCase
         $this->assertSame('Dubai Marina', $property->city);
     }
 
+    public function test_store_persists_deposit_and_admin_fee(): void
+    {
+        $this->post(route('inventory.store'), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'community' => 'Reem Island',
+            'sub_community' => 'Canal Residence',
+            'rent_price' => 85000,
+            'deposit_amount' => 4250,
+            'admin_fee' => 1000,
+            'rent_period' => 'yearly',
+            'availability' => 'ready_to_list',
+            'unit_no' => '502',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('properties', [
+            'deposit_amount' => 4250,
+            'admin_fee' => 1000,
+        ]);
+
+        $property = Property::where('unit_no', '502')->first();
+        $this->get(route('inventory.show', $property))
+            ->assertOk()
+            ->assertSee('4,250')
+            ->assertSee('1,000');
+    }
+
     public function test_show_displays_portal_tracking(): void
     {
         $property = $this->createProperty([

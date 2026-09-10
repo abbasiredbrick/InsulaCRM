@@ -472,6 +472,8 @@ class ListingController extends Controller
             'furnishing'  => 'nullable|in:unfurnished,semi_furnished,furnished',
             'service_charge' => 'nullable|numeric|min:0',
             'rent_price'  => 'nullable|numeric|min:0',
+            'deposit_amount' => 'nullable|numeric|min:0',
+            'admin_fee'   => 'nullable|numeric|min:0',
             'rent_period' => 'nullable|in:yearly,monthly',
             'list_price'  => 'nullable|numeric|min:0',
             'availability' => 'required|in:draft,ready_to_list,listed,reserved,leased,sold,unlisted',

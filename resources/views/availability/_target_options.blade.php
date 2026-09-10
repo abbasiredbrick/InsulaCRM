@@ -1,0 +1,23 @@
+@foreach([
+    'unit_no' => 'Unit No.',
+    'building' => 'Building',
+    'features' => 'Unit features (beds, size, view, kitchen)',
+    'rent' => 'Rent (AED)',
+    'deposit' => 'Deposit (AED)',
+    'admin_fee' => 'Admin fee (AED)',
+    'status' => 'Status word (Vacant / Up-coming…)',
+    'parking' => 'Parking',
+    'key_date' => 'Key / vacant date',
+    'amenities' => 'Amenities / facilities',
+    'remarks' => 'Remarks & commission',
+    'community' => 'Community / area',
+    'bedrooms' => 'Bedrooms',
+    'bathrooms' => 'Bathrooms',
+    'square_footage' => 'Square footage',
+    'furnishing' => 'Furnishing',
+    'property_category' => 'Category',
+    'handover_date' => 'Handover date',
+    'notes' => 'Notes',
+] as $value => $label)
+<option value="{{ $value }}" {{ ($selected ?? null) === $value ? 'selected' : '' }}>{{ $label }}</option>
+@endforeach

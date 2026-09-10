@@ -85,6 +85,16 @@
                             <input type="number" name="rent_price" min="0" step="0.01" class="form-control @error('rent_price') is-invalid @enderror" value="{{ old('rent_price', $property->rent_price) }}">
                             @error('rent_price') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Deposit (AED)') }}</label>
+                            <input type="number" name="deposit_amount" min="0" step="0.01" class="form-control @error('deposit_amount') is-invalid @enderror" value="{{ old('deposit_amount', $property->deposit_amount) }}" placeholder="{{ __('5% of rent usually') }}">
+                            @error('deposit_amount') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Admin fee (AED)') }}</label>
+                            <input type="number" name="admin_fee" min="0" step="0.01" class="form-control @error('admin_fee') is-invalid @enderror" value="{{ old('admin_fee', $property->admin_fee) }}">
+                            @error('admin_fee') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
                         <div class="col-md-2">
                             <label class="form-label">{{ __('Rent period') }}</label>
                             <select name="rent_period" class="form-select">

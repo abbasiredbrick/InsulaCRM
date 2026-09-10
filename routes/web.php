@@ -205,6 +205,30 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
             ->name('inventory.push');
     });
 
+    // ── Availability sheet imports (PM companies) ─────────────
+    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+        Route::get('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'index'])
+            ->name('availability-sources.index');
+        Route::get('/availability-sources/create', [\App\Http\Controllers\AvailabilitySourceController::class, 'create'])
+            ->name('availability-sources.create');
+        Route::post('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'store'])
+            ->name('availability-sources.store');
+        Route::get('/availability-sources/{source}/edit', [\App\Http\Controllers\AvailabilitySourceController::class, 'edit'])
+            ->name('availability-sources.edit');
+        Route::put('/availability-sources/{source}', [\App\Http\Controllers\AvailabilitySourceController::class, 'update'])
+            ->name('availability-sources.update');
+        Route::get('/availability-sources/{source}/import', [\App\Http\Controllers\AvailabilitySourceController::class, 'importShow'])
+            ->name('availability-sources.import');
+        Route::post('/availability-sources/{source}/import', [\App\Http\Controllers\AvailabilitySourceController::class, 'importParse'])
+            ->name('availability-sources.import-parse');
+        Route::get('/availability-sources/{source}/review', [\App\Http\Controllers\AvailabilitySourceController::class, 'importReview'])
+            ->name('availability-sources.review');
+        Route::post('/availability-sources/{source}/run', [\App\Http\Controllers\AvailabilitySourceController::class, 'importRun'])
+            ->name('availability-sources.run');
+        Route::post('/availability-sources/{source}/cancel', [\App\Http\Controllers\AvailabilitySourceController::class, 'importCancel'])
+            ->name('availability-sources.cancel');
+    });
+
     // ── Lead ↔ Inventory linking (lead is the entry point) ────────
     Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
         Route::post('/leads/{lead}/link-property', [\App\Http\Controllers\LeadController::class, 'linkProperty'])->name('leads.property.link');
