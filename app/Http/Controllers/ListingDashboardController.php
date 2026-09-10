@@ -83,7 +83,7 @@ class ListingDashboardController extends Controller
                 ->get(['id', 'name']);
         }
 
-        return view('listings.index', compact(
+        return view('listings.mandates', compact(
             'listings', 'activeCount', 'avgDom', 'totalVolume',
             'showingsThisWeek', 'pendingOffers', 'listingStageLabels', 'agents'
         ));

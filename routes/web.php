@@ -50,6 +50,7 @@ use App\Http\Controllers\ShowingController;
 use App\Http\Controllers\OpenHouseController;
 use App\Http\Controllers\ListingDashboardController;
 use App\Http\Controllers\ListingController;
+use App\Http\Controllers\ListingsController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\WorkflowController;
 use App\Http\Controllers\DocumentTemplateController;
@@ -178,9 +179,11 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::delete('/open-house-attendees/{attendee}', [OpenHouseController::class, 'removeAttendee'])->name('open-houses.removeAttendee');
     });
 
-    // ── Listings Dashboard (real estate agent mode) ───────────────
+    // ── Listings (real estate agent mode) ───────────────────────────
+    // '/listings' = Listed Units board; '/listings/mandates' = sales deal pipeline.
     Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
-        Route::get('/listings', [ListingDashboardController::class, 'index'])->name('listings.index');
+        Route::get('/listings', [ListingsController::class, 'index'])->name('listings.index');
+        Route::get('/listings/mandates', [ListingDashboardController::class, 'index'])->name('listings.mandates');
     });
 
     // ── Inventory / Units (real estate agent mode) ────────────────

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', __('Listings'))
-@section('page-title', __('Listings'))
+@section('title', __('Listed Units'))
+@section('page-title', __('Listed Units'))
 
 @section('content')
 {{-- KPI Cards --}}
@@ -16,25 +16,8 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium">{{ $activeCount }}</div>
-                        <div class="text-muted">{{ __('Active Listings') }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-auto">
-                        <span class="bg-yellow text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
-                        </span>
-                    </div>
-                    <div class="col">
-                        <div class="font-weight-medium">{{ $avgDom ? number_format($avgDom, 0) : '-' }}</div>
-                        <div class="text-muted">{{ __('Avg Days on Market') }}</div>
+                        <div class="font-weight-medium">{{ $kpis['listed'] }}</div>
+                        <div class="text-muted">{{ __('Listed Units') }}</div>
                     </div>
                 </div>
             </div>
@@ -46,12 +29,29 @@
                 <div class="row align-items-center">
                     <div class="col-auto">
                         <span class="bg-green text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M16.7 8a3 3 0 0 0 -2.7 -2h-4a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-4a3 3 0 0 1 -2.7 -2"/><path d="M12 3v3m0 12v3"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium">{{ Fmt::currency($totalVolume) }}</div>
-                        <div class="text-muted">{{ __('Total Volume') }}</div>
+                        <div class="font-weight-medium">{{ $kpis['live'] }}</div>
+                        <div class="text-muted">{{ __('Live on a Portal') }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-azure text-white avatar">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3v18"/><path d="M16 7l-4 4l-4 -4"/><path d="M4 21h16"/></svg>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">{{ $kpis['ready'] }}</div>
+                        <div class="text-muted">{{ __('Ready to List') }}</div>
                     </div>
                 </div>
             </div>
@@ -63,12 +63,12 @@
                 <div class="row align-items-center">
                     <div class="col-auto">
                         <span class="bg-orange text-white avatar">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3v18"/><path d="M16 7l-4 4l-4 -4"/><path d="M4 21h16"/></svg>
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium">{{ $showingsThisWeek }} {{ __('showings') }} / {{ $pendingOffers }} {{ __('offers') }}</div>
-                        <div class="text-muted">{{ __('This Week') }}</div>
+                        <div class="font-weight-medium">{{ $kpis['avg_rent'] ? Fmt::currency($kpis['avg_rent']) : '-' }}</div>
+                        <div class="text-muted">{{ __('Avg Rent / year') }}</div>
                     </div>
                 </div>
             </div>
@@ -76,21 +76,43 @@
     </div>
 </div>
 
-{{-- Listings Table --}}
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">{{ __('Active Listings') }}</h3>
+        <h3 class="card-title">{{ __('Listed Units') }}</h3>
+        <div class="card-actions">
+            <a href="{{ route('listings.mandates') }}" class="btn btn-sm btn-outline-secondary">{{ __('Sales Mandates') }}</a>
+            <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
+            <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
+        </div>
     </div>
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
         <form method="GET" action="{{ route('listings.index') }}" class="row g-2 align-items-end">
             <div class="col-md-2">
-                <label class="form-label">{{ __('Stage') }}</label>
-                <select name="stage" class="form-select form-select-sm">
-                    <option value="">{{ __('All Stages') }}</option>
-                    @foreach($listingStageLabels as $key => $label)
-                        <option value="{{ $key }}" {{ request('stage') === $key ? 'selected' : '' }}>{{ $label }}</option>
+                <label class="form-label">{{ __('Source') }}</label>
+                <select name="source" class="form-select form-select-sm">
+                    <option value="">{{ __('All Sources') }}</option>
+                    @foreach($sources as $s)
+                        <option value="{{ $s->id }}" {{ request('source') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">{{ __('Building') }}</label>
+                <select name="building" class="form-select form-select-sm">
+                    <option value="">{{ __('All Buildings') }}</option>
+                    @foreach($buildings as $b)
+                        <option value="{{ $b }}" {{ request('building') === $b ? 'selected' : '' }}>{{ $b }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">{{ __('Intent') }}</label>
+                <select name="intent" class="form-select form-select-sm">
+                    <option value="">{{ __('All') }}</option>
+                    @foreach(\App\Models\Property::INTENTS as $key => $label)
+                        <option value="{{ $key }}" {{ request('intent') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
                     @endforeach
                 </select>
             </div>
@@ -107,7 +129,7 @@
             @endif
             <div class="col-md-3">
                 <label class="form-label">{{ __('Search') }}</label>
-                <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Address, title...') }}">
+                <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Title, unit, building, community...') }}">
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
@@ -120,81 +142,79 @@
         <table class="table table-vcenter card-table">
             <thead>
                 <tr>
-                    <th>{{ __('Property') }}</th>
-                    <th>{{ __('List Price') }}</th>
-                    <th>{{ __('DOM') }}</th>
-                    <th>{{ __('MLS #') }}</th>
-                    <th>{{ __('Stage') }}</th>
-                    <th>{{ __('Agent') }}</th>
+                    <th>{{ __('Unit') }}</th>
+                    <th>{{ __('Price') }}</th>
+                    <th>{{ __('Fees') }}</th>
+                    <th>{{ __('Source') }}</th>
+                    <th>{{ __('Portals') }}</th>
+                    <th>{{ __('Listed Since') }}</th>
                     <th class="w-1"></th>
                 </tr>
             </thead>
             <tbody>
-                @forelse($listings as $deal)
-                @php $property = $deal->lead?->property; @endphp
+                @forelse($units as $unit)
+                @php
+                    $portalDates = [$unit->bayut_listed_at, $unit->dubizzle_listed_at, $unit->propertyfinder_listed_at];
+                    $listedOn = $unit->listed_at ?: collect($portalDates)->filter()->max();
+                @endphp
                 <tr>
                     <td>
-                        @if($property)
-                            <div class="fw-bold">{{ $property->address }}</div>
-                            <div class="text-muted small">{{ $property->city }}, {{ $property->state }} {{ $property->zip_code }}</div>
-                            @if($property->bedrooms || $property->bathrooms || $property->square_footage)
-                            <div class="text-muted small">
-                                @if($property->bedrooms){{ $property->bedrooms }} {{ __('bd') }}@endif
-                                @if($property->bathrooms) / {{ $property->bathrooms }} {{ __('ba') }}@endif
-                                @if($property->square_footage) / {{ Fmt::area($property->square_footage) }}@endif
-                            </div>
+                        <div class="fw-bold">{{ $unit->display_name }}</div>
+                        <div class="text-muted small">
+                            {{ $unit->unit_no ? __('Unit') . ' ' . $unit->unit_no . ' • ' : '' }}{{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
+                            @if($unit->bedrooms || $unit->square_footage)
+                                • @if($unit->bedrooms){{ $unit->bedrooms }} {{ __('bd') }}@endif
+                                @if($unit->square_footage) / {{ Fmt::area($unit->square_footage) }}@endif
                             @endif
-                        @else
-                            <span class="text-muted">{{ $deal->title }}</span>
+                        </div>
+                        @if($unit->furnishing)
+                            <div class="text-muted small">{{ __(\App\Models\Property::FURNISHING[$unit->furnishing] ?? $unit->furnishing) }}</div>
                         @endif
                     </td>
+                    <td class="text-nowrap">
+                        <strong>{{ $unit->price_line }}</strong>
+                    </td>
                     <td>
-                        @if($property && $property->list_price)
-                            <strong>{{ Fmt::currency($property->list_price) }}</strong>
-                        @elseif($deal->contract_price)
-                            <span class="text-muted">{{ Fmt::currency($deal->contract_price) }}</span>
+                        @if($unit->deposit_amount || $unit->admin_fee || $unit->tawtheeq_fee)
+                            <div class="text-nowrap">
+                                @if($unit->deposit_amount)<span class="text-muted">{{ __('Dep') }} {{ Fmt::currency($unit->deposit_amount) }}</span>@endif
+                                @if($unit->admin_fee)<span class="text-muted ms-1">{{ __('Adm') }} {{ Fmt::currency($unit->admin_fee) }}</span>@endif
+                                @if($unit->tawtheeq_fee)<span class="text-muted ms-1">{{ __('Taw') }} {{ Fmt::currency($unit->tawtheeq_fee) }}</span>@endif
+                            </div>
                         @else
-                            -
+                            <span class="text-muted">-</span>
                         @endif
                     </td>
+                    <td>{{ $unit->availabilitySource->name ?? '-' }}</td>
                     <td>
-                        @if($deal->days_on_market)
-                            <span class="{{ $deal->days_on_market > 60 ? 'text-danger' : ($deal->days_on_market > 30 ? 'text-warning' : '') }}">
-                                {{ $deal->days_on_market }} {{ __('days') }}
-                            </span>
-                        @else
-                            -
-                        @endif
+                        <span class="me-1" title="Bayut">
+                            <span class="badge {{ $unit->bayut_status === 'live' ? 'bg-green' : ($unit->bayut_status === 'removed' ? 'bg-danger' : 'bg-secondary') }}" style="font-size:.65rem;">B</span>
+                        </span>
+                        <span class="me-1" title="Dubizzle">
+                            <span class="badge {{ $unit->dubizzle_status === 'live' ? 'bg-green' : ($unit->dubizzle_status === 'removed' ? 'bg-danger' : 'bg-secondary') }}" style="font-size:.65rem;">D</span>
+                        </span>
+                        <span title="Property Finder">
+                            <span class="badge {{ $unit->propertyfinder_status === 'live' ? 'bg-green' : ($unit->propertyfinder_status === 'removed' ? 'bg-danger' : 'bg-secondary') }}" style="font-size:.65rem;">PF</span>
+                        </span>
                     </td>
-                    <td>{{ $deal->mls_number ?? '-' }}</td>
-                    <td>
-                        @php
-                            $stageColors = [
-                                'listing_agreement' => 'blue',
-                                'active_listing' => 'green',
-                                'showing' => 'orange',
-                                'offer_received' => 'purple',
-                            ];
-                        @endphp
-                        <span class="badge bg-{{ $stageColors[$deal->stage] ?? 'secondary' }}">{{ \App\Models\Deal::stageLabel($deal->stage) }}</span>
-                    </td>
-                    <td>{{ $deal->agent->name ?? '-' }}</td>
-                    <td>
-                        <a href="{{ url('/pipeline/' . $deal->id) }}" class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
+                    <td class="text-nowrap">{{ $listedOn ? $listedOn->format('d M Y') : '-' }}</td>
+                    <td class="text-nowrap">
+                        <a href="{{ route('inventory.show', $unit) }}" class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
+                        <a href="{{ route('inventory.edit', $unit) }}" class="btn btn-sm btn-outline-secondary">{{ __('Edit') }}</a>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">{{ __('No active listings found.') }}</td>
+                    <td colspan="7" class="text-center text-muted py-4">{{ __('No listed units found. Set a unit to "Listed" in the inventory when it goes live on the portals.') }}</td>
                 </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    @if($listings->hasPages())
+    @if($units->hasPages())
     <div class="card-footer d-flex align-items-center">
-        {{ $listings->appends(request()->query())->links('vendor.pagination.tabler') }}
+        {{ $units->appends(request()->query())->links('vendor.pagination.tabler') }}
     </div>
     @endif
 </div>
