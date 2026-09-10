@@ -44,13 +44,13 @@ class LeadPhoto extends Model
 
     public function getUrlAttribute(): string
     {
-        return asset('storage/' . $this->path);
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($this->path);
     }
 
     public function getThumbnailUrlAttribute(): string
     {
         if ($this->thumbnail_path) {
-            return asset('storage/' . $this->thumbnail_path);
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->thumbnail_path);
         }
         return $this->url;
     }

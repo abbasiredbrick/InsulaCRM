@@ -109,7 +109,7 @@
                             <label class="form-label">{{ __('Company Logo') }}</label>
                             @if($tenant->logo_path)
                                 <div class="mb-2">
-                                    <img src="{{ asset('storage/' . $tenant->logo_path) }}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" class="rounded">
+                                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($tenant->logo_path) }}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" class="rounded">
                                 </div>
                             @endif
                             <input type="file" name="logo" class="form-control" accept="image/jpeg,image/png,image/gif">

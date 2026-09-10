@@ -33,23 +33,8 @@
     </div>
 </div>
 
-{{-- Photo gallery --}}
-@if($property->media->where('type', 'photo')->isNotEmpty())
-<div class="card mb-3">
-    <div class="card-header"><h3 class="card-title">{{ __('Photos') }}</h3></div>
-    <div class="card-body">
-        <div class="row g-2">
-            @foreach($property->media->where('type', 'photo') as $photo)
-            <div class="col-6 col-md-3 col-lg-2">
-                <a href="{{ $photo->url() }}" target="_blank" rel="noopener">
-                    <img src="{{ $photo->url() }}" alt="" class="img-fluid rounded" loading="lazy">
-                </a>
-            </div>
-            @endforeach
-        </div>
-    </div>
-</div>
-@endif
+{{-- Photo gallery / upload --}}
+@include('inventory._photos')
 
 <div class="row">
     <div class="col-lg-8">

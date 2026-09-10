@@ -197,6 +197,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/inventory/{property}/edit', [ListingController::class, 'edit'])->name('inventory.edit');
         Route::put('/inventory/{property}', [ListingController::class, 'update'])->name('inventory.update');
         Route::delete('/inventory/{property}', [ListingController::class, 'destroy'])->name('inventory.destroy');
+        Route::post('/inventory/{property}/photos', [ListingController::class, 'uploadPhotos'])->name('inventory.photos.upload');
+        Route::delete('/inventory/{property}/photos/{photo}', [ListingController::class, 'deletePhoto'])->name('inventory.photos.delete');
         Route::post('/inventory/{property}/portal-status', [ListingController::class, 'updatePortalStatus'])->name('inventory.portal-status');
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
@@ -302,10 +304,6 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         // Property for a lead (create/update from lead detail)
         Route::post('/leads/{lead}/property', [PropertyController::class, 'store'])->name('leads.property.store');
-
-        // Lead photos
-        Route::post('/leads/{lead}/photos', [LeadController::class, 'uploadPhoto'])->name('leads.photos.upload');
-        Route::delete('/leads/{lead}/photos/{photo}', [LeadController::class, 'deletePhoto'])->name('leads.photos.delete');
     });
 
     // ── Properties: admin, agent, acquisition_agent, field_scout, listing_agent, buyers_agent ──

@@ -346,7 +346,7 @@ class AiInsightService extends BaseAiFeatureService
         $complianceData .= "- On tenant DNC list (phone/email match): " . ($onDncList ? 'YES' : 'No') . "\n";
         $complianceData .= "- Lead status: {$lead->status}\n";
         $complianceData .= "- Lead temperature: " . ($lead->temperature ?? 'unknown') . "\n";
-        $complianceData .= "- Timezone set: " . ($lead->timezone ? $lead->timezone : "NOT SET - cannot verify {$complianceLaw} calling hours") . "\n";
+        $complianceData .= "- Timezone set: " . ($lead->timezone ? $lead->timezone : ($lead->tenant?->timezone ?: 'NOT SET')) . "\n";
         $complianceData .= "- Current contact window: " . ($timezoneCheck['allowed'] ? 'Within hours (' . $timezoneCheck['local_time'] . ')' : 'OUTSIDE hours (' . $timezoneCheck['local_time'] . ')') . "\n";
         $complianceData .= "- Contact attempts in last 7 days: {$contactAttempts7d}\n";
         $complianceData .= "- Total contact attempts: {$totalContactAttempts}\n";

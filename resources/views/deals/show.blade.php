@@ -314,7 +314,7 @@
                         <div class="row align-items-center">
                             <div class="col-auto">
                                 @php
-                                    $actColors = ['call'=>'bg-green-lt','sms'=>'bg-blue-lt','email'=>'bg-yellow-lt','note'=>'bg-secondary-lt','meeting'=>'bg-purple-lt','stage_change'=>'bg-cyan-lt'];
+                                    $actColors = ['call'=>'bg-green-lt','sms'=>'bg-blue-lt','email'=>'bg-yellow-lt','whatsapp'=>'bg-green-lt','meeting'=>'bg-purple-lt','stage_change'=>'bg-cyan-lt'];
                                 @endphp
                                 <span class="avatar avatar-sm {{ $actColors[$activity->type] ?? 'bg-secondary-lt' }}">
                                     {{ strtoupper(substr($activity->type, 0, 1)) }}

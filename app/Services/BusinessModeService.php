@@ -295,13 +295,11 @@ class BusinessModeService
             ],
 
             'activity_type' => [
-                'call'        => 'Call',
-                'sms'         => 'SMS',
-                'email'       => 'Email',
-                'voicemail'   => 'Voicemail',
-                'direct_mail' => 'Direct Mail',
-                'note'        => 'Note',
-                'meeting'     => 'Meeting',
+                'call'     => 'Call',
+                'sms'      => 'SMS',
+                'email'    => 'Email',
+                'whatsapp' => 'WhatsApp',
+                'meeting'  => 'Meeting',
             ],
 
             'contact_type' => self::isRealEstate($tenant)

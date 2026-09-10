@@ -16,7 +16,7 @@
     <div class="form-wrapper px-3">
         <div class="brand-header">
             @if($tenant->logo_path)
-                <img src="{{ asset('storage/' . $tenant->logo_path) }}" alt="{{ $tenant->name }}" style="max-height: 50px; max-width: 200px; margin-bottom: 12px;">
+                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($tenant->logo_path) }}" alt="{{ $tenant->name }}" style="max-height: 50px; max-width: 200px; margin-bottom: 12px;">
             @endif
             <h2>{{ $tenant->name }}</h2>
             <p class="text-secondary">{{ __('Tell us about your property and we\'ll get back to you.') }}</p>

@@ -44,6 +44,13 @@ class Lead extends Model
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);
+
+        // Default new leads to the tenant's timezone when none was provided.
+        static::creating(function (Lead $lead) {
+            if (! $lead->timezone && $lead->tenant_id) {
+                $lead->timezone = \App\Models\Tenant::whereKey($lead->tenant_id)->value('timezone');
+            }
+        });
     }
 
     public function getFullNameAttribute(): string

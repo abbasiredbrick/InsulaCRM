@@ -16,6 +16,11 @@ class PropertyMedia extends Model
         'type',
         'path',
         'external_url',
+        'caption',
+        'original_name',
+        'uploaded_by',
+        'mime_type',
+        'size',
         'sort_order',
     ];
 
@@ -29,6 +34,11 @@ class PropertyMedia extends Model
         return $this->belongsTo(Property::class);
     }
 
+    public function uploader()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'uploaded_by');
+    }
+
     /**
      * Absolute URL to display / export this media item.
      */
@@ -39,7 +49,7 @@ class PropertyMedia extends Model
         }
 
         if ($this->path) {
-            return asset('storage/' . ltrim($this->path, '/'));
+            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->path);
         }
 
         return null;

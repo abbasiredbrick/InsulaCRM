@@ -534,8 +534,60 @@ class ListingController extends Controller
     }
 
     /**
-     * Sync the unit-to-lead links from the request (tenant scoped).
+     * Upload photos for a unit from its detail page.
      */
+    public function uploadPhotos(Request $request, Property $property)
+    {
+        $request->validate([
+            'photos'   => 'required|array|max:10',
+            'photos.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:10240',
+            'captions' => 'nullable|array',
+            'captions.*' => 'nullable|string|max:255',
+        ]);
+
+        $uploaded = 0;
+        foreach ($request->file('photos') as $i => $file) {
+            if (! $file->isValid()) {
+                continue;
+            }
+
+            $path = $file->store('properties/' . $property->id . '/' . Str::random(6), 'public');
+
+            $property->media()->create([
+                'type'          => 'photo',
+                'path'          => $path,
+                'caption'       => $request->input("captions.{$i}"),
+                'original_name' => $file->getClientOriginalName(),
+                'uploaded_by'   => auth()->id(),
+                'mime_type'     => $file->getMimeType(),
+                'size'          => $file->getSize(),
+                'sort_order'    => $property->media()->max('sort_order') + 1,
+            ]);
+            $uploaded++;
+        }
+
+        return redirect()->route('inventory.show', $property)
+            ->with('success', $uploaded ? __('Photos uploaded.') : __('No valid photo files found.'));
+    }
+
+    /**
+     * Delete a unit photo.
+     */
+    public function deletePhoto(Property $property, PropertyMedia $photo)
+    {
+        if ($photo->property_id !== $property->id || $photo->tenant_id !== auth()->user()->tenant_id) {
+            abort(404);
+        }
+
+        if ($photo->path) {
+            Storage::disk('public')->delete($photo->path);
+        }
+        $photo->delete();
+
+        return redirect()->route('inventory.show', $property)
+            ->with('success', __('Photo deleted.'));
+    }
+
     protected function exportUnits(Request $request, string $statusColumn)
     {
         $units = $this->baseQuery($request)

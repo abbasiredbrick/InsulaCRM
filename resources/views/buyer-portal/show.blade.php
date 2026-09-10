@@ -140,7 +140,7 @@
     <div class="bp-hero">
         <div class="container">
             @if($tenant->logo_path)
-                <img src="{{ asset('storage/' . $tenant->logo_path) }}" alt="{{ $tenant->name }}" class="bp-logo">
+                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($tenant->logo_path) }}" alt="{{ $tenant->name }}" class="bp-logo">
             @endif
             <h1>{{ $tenant->buyer_portal_headline ?? $tenant->name }}</h1>
             @if($tenant->buyer_portal_description)

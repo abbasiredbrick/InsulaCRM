@@ -62,7 +62,7 @@ class DncService
      */
     public function checkTimezoneRestriction(Lead $lead): array
     {
-        $timezone = $lead->timezone ?? 'America/New_York';
+        $timezone = $lead->timezone ?? $lead->tenant?->timezone ?? 'America/New_York';
 
         try {
             $localTime = Carbon::now($timezone);

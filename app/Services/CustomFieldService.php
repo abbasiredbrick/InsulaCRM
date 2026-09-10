@@ -18,7 +18,7 @@ class CustomFieldService
      * Activity types that are considered outreach (blocked by DNC).
      */
     public static array $outreachActivityTypes = [
-        'call', 'sms', 'email', 'voicemail', 'direct_mail',
+        'call', 'sms', 'email', 'voicemail', 'direct_mail', 'whatsapp',
     ];
 
     /**
@@ -129,7 +129,14 @@ class CustomFieldService
      */
     public static function getValidSlugs(string $fieldType, ?Tenant $tenant = null): array
     {
-        return array_keys(self::getOptions($fieldType, $tenant));
+        $slugs = array_keys(self::getOptions($fieldType, $tenant));
+
+        // System-generated activity types are valid but hidden from the UI dropdown.
+        if ($fieldType === 'activity_type') {
+            $slugs = array_values(array_unique(array_merge($slugs, ['note', 'stage_change', 'voicemail', 'direct_mail'])));
+        }
+
+        return $slugs;
     }
 
     /**

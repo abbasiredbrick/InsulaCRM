@@ -84,7 +84,7 @@
     <div class="main-content">
         <div class="confirmation-card">
             @if($tenant->logo_path)
-                <img src="{{ asset('storage/' . $tenant->logo_path) }}" alt="{{ $tenant->name }}" style="max-height: 48px; max-width: 180px; margin-bottom: 1.5rem;">
+                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($tenant->logo_path) }}" alt="{{ $tenant->name }}" style="max-height: 48px; max-width: 180px; margin-bottom: 1.5rem;">
             @endif
 
             <div class="confirmation-icon">
