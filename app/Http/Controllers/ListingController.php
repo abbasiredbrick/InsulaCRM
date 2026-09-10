@@ -29,6 +29,7 @@ class ListingController extends Controller
     {
         $query = $this->baseQuery($request);
 
+        // ── Basic search (matched on any text field) ──
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -40,6 +41,11 @@ class ListingController extends Controller
             });
         }
 
+        if (auth()->user()->isAdmin() && $request->filled('agent')) {
+            $query->where('assigned_agent_id', $request->agent);
+        }
+
+        // ── Advanced search (each field additive) ──
         if ($request->filled('intent')) {
             $query->where('intent', $request->intent);
         }
@@ -56,8 +62,86 @@ class ListingController extends Controller
             $query->where('property_category', $request->category);
         }
 
-        if (auth()->user()->isAdmin() && $request->filled('agent')) {
-            $query->where('assigned_agent_id', $request->agent);
+        if ($request->filled('furnishing')) {
+            $query->where('furnishing', $request->furnishing);
+        }
+
+        if ($request->filled('rent_period')) {
+            $query->where('rent_period', $request->rent_period);
+        }
+
+        if ($request->filled('community')) {
+            $query->where('community', $request->community);
+        }
+
+        if ($request->filled('sub_community')) {
+            $query->where('sub_community', $request->sub_community);
+        }
+
+        if ($request->filled('building_no')) {
+            $query->where('building_no', $request->building_no);
+        }
+
+        if ($request->filled('floor_no')) {
+            $query->where('floor_no', $request->floor_no);
+        }
+
+        if ($request->filled('bedrooms_min')) {
+            $query->where('bedrooms', '>=', (int) $request->bedrooms_min);
+        }
+        if ($request->filled('bedrooms_max')) {
+            $query->where('bedrooms', '<=', (int) $request->bedrooms_max);
+        }
+
+        if ($request->filled('bathrooms')) {
+            $query->where('bathrooms', (int) $request->bathrooms);
+        }
+
+        $this->applyPriceRange($query, $request, 'rent_price', 'rent_min', 'rent_max');
+        $this->applyPriceRange($query, $request, 'list_price', 'sale_min', 'sale_max');
+
+        $this->applyAreaRange($query, $request);
+
+        if ($request->filled('developer_name')) {
+            $query->where('developer_name', 'like', "%{$request->developer_name}%");
+        }
+
+        if ($request->filled('rera_permit_no')) {
+            $query->where('rera_permit_no', 'like', "%{$request->rera_permit_no}%");
+        }
+
+        if ($request->filled('title_deed_no')) {
+            $query->where('title_deed_no', 'like', "%{$request->title_deed_no}%");
+        }
+
+        if ($request->filled('plot_no')) {
+            $query->where('plot_no', 'like', "%{$request->plot_no}%");
+        }
+
+        if ($request->filled('owner_name')) {
+            $query->where('owner_name', 'like', "%{$request->owner_name}%");
+        }
+
+        if ($request->filled('has_photos')) {
+            $query->whereHas('media', function ($q) {
+                $q->where('type', 'photo');
+            });
+        }
+
+        if ($request->filled('has_portal_live')) {
+            $query->where(function ($q) {
+                $q->where('bayut_status', 'live')
+                  ->orWhere('dubizzle_status', 'live')
+                  ->orWhere('propertyfinder_status', 'live');
+            });
+        }
+
+        if ($request->filled('parking')) {
+            $query->where('parking', '>=', (int) $request->parking);
+        }
+
+        if ($request->filled('source')) {
+            $query->where('availability_source_id', $request->source);
         }
 
         $units = (clone $query)->latest('updated_at')->paginate(20);
@@ -81,11 +165,50 @@ class ListingController extends Controller
                 ->orderBy('name')->get(['id', 'name'])
             : collect();
 
+        $sources = \App\Models\AvailabilitySource::orderBy('name')->get(['id', 'name']);
+        $communities = Property::withoutGlobalScopes()
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->whereNotNull('community')->where('community', '!=', '')
+            ->distinct()->orderBy('community')->pluck('community')->take(500);
+        $subCommunities = Property::withoutGlobalScopes()
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->whereNotNull('sub_community')->where('sub_community', '!=', '')
+            ->distinct()->orderBy('sub_community')->pluck('sub_community')->take(500);
+
         return view('inventory.index', [
             'units' => $units,
             'kpis'  => $kpis,
             'agents' => $agents,
+            'sources' => $sources,
+            'communities' => $communities,
+            'subCommunities' => $subCommunities,
         ]);
+    }
+
+    /**
+     * Apply an inclusive lower/upper bound on a decimal price column.
+     */
+    protected function applyPriceRange($query, Request $request, string $column, string $minKey, string $maxKey): void
+    {
+        if ($request->filled($minKey)) {
+            $query->where($column, '>=', (float) $request->{$minKey});
+        }
+        if ($request->filled($maxKey)) {
+            $query->where($column, '<=', (float) $request->{$maxKey});
+        }
+    }
+
+    /**
+     * Apply square-footage lower/upper bounds.
+     */
+    protected function applyAreaRange($query, Request $request): void
+    {
+        if ($request->filled('area_min')) {
+            $query->where('square_footage', '>=', (int) $request->area_min);
+        }
+        if ($request->filled('area_max')) {
+            $query->where('square_footage', '<=', (int) $request->area_max);
+        }
     }
 
     public function create(Request $request)

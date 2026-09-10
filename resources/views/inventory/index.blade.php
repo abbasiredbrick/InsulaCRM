@@ -87,61 +87,218 @@
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('inventory.index') }}" class="row g-2 align-items-end">
-            <div class="col-md-2">
-                <label class="form-label">{{ __('Intent') }}</label>
-                <select name="intent" class="form-select form-select-sm">
-                    <option value="">{{ __('All') }}</option>
-                    @foreach(\App\Models\Property::INTENTS as $key => $label)
-                        <option value="{{ $key }}" {{ request('intent') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
-                    @endforeach
-                </select>
+        <form method="GET" action="{{ route('inventory.index') }}" id="inventory-search-form">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">{{ __('Search') }}</label>
+                    <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Title, address, community, unit...') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ __('Intent') }}</label>
+                    <select name="intent" class="form-select form-select-sm">
+                        <option value="">{{ __('All') }}</option>
+                        @foreach(\App\Models\Property::INTENTS as $key => $label)
+                            <option value="{{ $key }}" {{ request('intent') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ __('Availability') }}</label>
+                    <select name="availability" class="form-select form-select-sm">
+                        <option value="">{{ __('All') }}</option>
+                        @foreach(\App\Models\Property::AVAILABILITIES as $key => $label)
+                            <option value="{{ $key }}" {{ request('availability') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-primary">{{ __('Search') }}</button>
+                    <a href="{{ route('inventory.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#advancedSearch">
+                        {{ __('Advanced') }}
+                    </button>
+                </div>
             </div>
-            <div class="col-md-2">
-                <label class="form-label">{{ __('Availability') }}</label>
-                <select name="availability" class="form-select form-select-sm">
-                    <option value="">{{ __('All') }}</option>
-                    @foreach(\App\Models\Property::AVAILABILITIES as $key => $label)
-                        <option value="{{ $key }}" {{ request('availability') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">{{ __('Stock') }}</label>
-                <select name="market_class" class="form-select form-select-sm">
-                    <option value="">{{ __('All') }}</option>
-                    @foreach(\App\Models\Property::MARKET_CLASSES as $key => $label)
-                        <option value="{{ $key }}" {{ request('market_class') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2">
-                <label class="form-label">{{ __('Category') }}</label>
-                <select name="category" class="form-select form-select-sm">
-                    <option value="">{{ __('All') }}</option>
-                    @foreach(\App\Models\Property::CATEGORIES as $key => $label)
-                        <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
-                    @endforeach
-                </select>
-            </div>
-            @if(auth()->user()->isAdmin() && $agents->isNotEmpty())
-            <div class="col-md-2">
-                <label class="form-label">{{ __('Agent') }}</label>
-                <select name="agent" class="form-select form-select-sm">
-                    <option value="">{{ __('All Agents') }}</option>
-                    @foreach($agents as $agent)
-                        <option value="{{ $agent->id }}" {{ request('agent') == $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            @endif
-            <div class="col-md-3">
-                <label class="form-label">{{ __('Search') }}</label>
-                <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Title, address, community, unit...') }}">
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
-                <a href="{{ route('inventory.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
+
+            <div id="advancedSearch" class="collapse mt-3 {{ request()->hasAny(['market_class','category','furnishing','rent_period','community','sub_community','building_no','floor_no','bedrooms_min','bedrooms_max','bathrooms','rent_min','rent_max','sale_min','sale_max','area_min','area_max','developer_name','rera_permit_no','title_deed_no','plot_no','owner_name','has_photos','has_portal_live','parking','source','agent']) ? 'show' : '' }}">
+                <div class="border rounded p-3 bg-light">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Stock') }}</label>
+                            <select name="market_class" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach(\App\Models\Property::MARKET_CLASSES as $key => $label)
+                                    <option value="{{ $key }}" {{ request('market_class') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Category') }}</label>
+                            <select name="category" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach(\App\Models\Property::CATEGORIES as $key => $label)
+                                    <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Furnishing') }}</label>
+                            <select name="furnishing" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach(\App\Models\Property::FURNISHING as $key => $label)
+                                    <option value="{{ $key }}" {{ request('furnishing') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Rent period') }}</label>
+                            <select name="rent_period" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach(\App\Models\Property::RENT_PERIODS as $key => $label)
+                                    <option value="{{ $key }}" {{ request('rent_period') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Source') }}</label>
+                            <select name="source" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach($sources as $s)
+                                    <option value="{{ $s->id }}" {{ request('source') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @if(auth()->user()->isAdmin() && $agents->isNotEmpty())
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Agent') }}</label>
+                            <select name="agent" class="form-select form-select-sm">
+                                <option value="">{{ __('All Agents') }}</option>
+                                @foreach($agents as $agent)
+                                    <option value="{{ $agent->id }}" {{ request('agent') == $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endif
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Community') }}</label>
+                            <select name="community" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach($communities as $c)
+                                    <option value="{{ $c }}" {{ request('community') === $c ? 'selected' : '' }}>{{ $c }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Building') }}</label>
+                            <select name="sub_community" class="form-select form-select-sm">
+                                <option value="">{{ __('All') }}</option>
+                                @foreach($subCommunities as $s)
+                                    <option value="{{ $s }}" {{ request('sub_community') === $s ? 'selected' : '' }}>{{ $s }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Building No.') }}</label>
+                            <input type="text" name="building_no" class="form-control form-control-sm" value="{{ request('building_no') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Floor No.') }}</label>
+                            <input type="text" name="floor_no" class="form-control form-control-sm" value="{{ request('floor_no') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Beds from') }}</label>
+                            <select name="bedrooms_min" class="form-select form-select-sm">
+                                <option value="">{{ __('Any') }}</option>
+                                @for($i = 0; $i <= 6; $i++)
+                                    <option value="{{ $i }}" {{ request('bedrooms_min') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Beds to') }}</label>
+                            <select name="bedrooms_max" class="form-select form-select-sm">
+                                <option value="">{{ __('Any') }}</option>
+                                @for($i = 0; $i <= 6; $i++)
+                                    <option value="{{ $i }}" {{ request('bedrooms_max') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Baths') }}</label>
+                            <select name="bathrooms" class="form-select form-select-sm">
+                                <option value="">{{ __('Any') }}</option>
+                                @for($i = 1; $i <= 6; $i++)
+                                    <option value="{{ $i }}" {{ request('bathrooms') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Parking ≥') }}</label>
+                            <select name="parking" class="form-select form-select-sm">
+                                <option value="">{{ __('Any') }}</option>
+                                @for($i = 1; $i <= 4; $i++)
+                                    <option value="{{ $i }}" {{ request('parking') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Rent min (AED)') }}</label>
+                            <input type="number" name="rent_min" min="0" step="1000" class="form-control form-control-sm" value="{{ request('rent_min') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Rent max (AED)') }}</label>
+                            <input type="number" name="rent_max" min="0" step="1000" class="form-control form-control-sm" value="{{ request('rent_max') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Sale min (AED)') }}</label>
+                            <input type="number" name="sale_min" min="0" step="1000" class="form-control form-control-sm" value="{{ request('sale_min') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Sale max (AED)') }}</label>
+                            <input type="number" name="sale_max" min="0" step="1000" class="form-control form-control-sm" value="{{ request('sale_max') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Area from (sqft)') }}</label>
+                            <input type="number" name="area_min" min="0" step="10" class="form-control form-control-sm" value="{{ request('area_min') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Area to (sqft)') }}</label>
+                            <input type="number" name="area_max" min="0" step="10" class="form-control form-control-sm" value="{{ request('area_max') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Developer') }}</label>
+                            <input type="text" name="developer_name" class="form-control form-control-sm" value="{{ request('developer_name') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('RERA permit') }}</label>
+                            <input type="text" name="rera_permit_no" class="form-control form-control-sm" value="{{ request('rera_permit_no') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Title deed no.') }}</label>
+                            <input type="text" name="title_deed_no" class="form-control form-control-sm" value="{{ request('title_deed_no') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Plot no.') }}</label>
+                            <input type="text" name="plot_no" class="form-control form-control-sm" value="{{ request('plot_no') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Owner') }}</label>
+                            <input type="text" name="owner_name" class="form-control form-control-sm" value="{{ request('owner_name') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="has_photos" value="1" {{ request('has_photos') ? 'checked' : '' }}>
+                                <span class="form-check-label">{{ __('Has photos') }}</span>
+                            </label>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="has_portal_live" value="1" {{ request('has_portal_live') ? 'checked' : '' }}>
+                                <span class="form-check-label">{{ __('Live on a portal') }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </form>
     </div>

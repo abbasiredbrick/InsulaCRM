@@ -160,6 +160,53 @@ class InventoryTest extends TestCase
         $this->assertStringContainsString('SELL', $xml);
     }
 
+    public function test_advanced_search_filters_by_rent_range(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Cheap Studio',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'rent_price' => 60000,
+            'rent_period' => 'yearly',
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Premium 3BR',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'rent_price' => 180000,
+            'rent_period' => 'yearly',
+        ]);
+
+        $this->get(route('inventory.index') . '?rent_min=100000&rent_max=200000')
+            ->assertOk()
+            ->assertDontSee('Cheap Studio')
+            ->assertSee('Premium 3BR');
+    }
+
+    public function test_advanced_search_filters_by_community_furnishing_and_photos(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Furnished Marina Unit',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Dubai Marina',
+            'sub_community' => 'Marina Heights',
+            'furnishing' => 'furnished',
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Unfurnished Reef',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Reem Island',
+            'furnishing' => 'unfurnished',
+        ]);
+
+        $this->get(route('inventory.index') . '?community=Dubai+Marina&furnishing=furnished')
+            ->assertOk()
+            ->assertSee('Furnished Marina Unit')
+            ->assertDontSee('Unfurnished Reef');
+    }
+
     public function test_destroy_removes_unit(): void
     {
         $property = $this->createProperty();
