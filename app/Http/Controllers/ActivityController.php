@@ -43,6 +43,13 @@ class ActivityController extends Controller
             'logged_at' => now(),
         ]);
 
+        // Agents can move the lead along at the same time they log an activity.
+        if ($request->filled('status') || $request->filled('temperature')) {
+            $lead->status = $request->filled('status') ? $request->status : $lead->status;
+            $lead->temperature = $request->filled('temperature') ? $request->temperature : $lead->temperature;
+            $lead->save();
+        }
+
         app(MotivationScoreService::class)->recalculate($lead);
         event(new ActivityLogged($activity));
         Hooks::doAction('activity.logged', $activity);

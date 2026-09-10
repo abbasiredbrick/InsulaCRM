@@ -273,6 +273,35 @@
                             <input type="text" name="subject" class="form-control" placeholder="{{ __('Subject (optional)') }}">
                         </div>
                     </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">{{ __('Move status to') }}</label>
+                            <select name="status" class="form-select" id="activity-status-select">
+                                <option value="">{{ __('Keep current (:status)', ['status' => \App\Services\CustomFieldService::getOptions('lead_status')[$lead->status] ?? $lead->status]) }}</option>
+                                @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
+                                    @if($val === $lead->status)
+                                        @continue
+                                    @endif
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label mb-1">{{ __('Temperature') }}</label>
+                            <select name="temperature" class="form-select" id="activity-temperature-select">
+                                <option value="">{{ __('Keep current (:temperature)', ['temperature' => __(ucfirst($lead->temperature))]) }}</option>
+                                @foreach(['hot' => __('Hot'), 'warm' => __('Warm'), 'cold' => __('Cold')] as $val => $label)
+                                    @if($val === $lead->temperature)
+                                        @continue
+                                    @endif
+                                    <option value="{{ $val }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <small class="text-secondary">{{ __('Leave blank to keep the lead unchanged.') }}</small>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <textarea name="body" class="form-control" rows="2" placeholder="{{ __('Notes...') }}"></textarea>
                     </div>

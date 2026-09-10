@@ -183,4 +183,87 @@ class LeadManagementTest extends TestCase
         $lead = Lead::first();
         $this->assertEquals($this->tenant->id, $lead->tenant_id);
     }
+
+    public function test_activity_logging_can_update_lead_status_and_temperature(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['status' => 'inquiry', 'temperature' => 'cold']);
+
+        $response = $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'subject' => 'Intro call',
+            'body' => 'Booked a viewing.',
+            'status' => 'active_client',
+            'temperature' => 'hot',
+        ]);
+
+        $response->assertRedirect("/leads/{$lead->id}");
+        $this->assertDatabaseHas('activities', [
+            'tenant_id' => $this->tenant->id,
+            'lead_id' => $lead->id,
+            'type' => 'note',
+        ]);
+        $lead->refresh();
+        $this->assertSame('active_client', $lead->status);
+        $this->assertSame('hot', $lead->temperature);
+    }
+
+    public function test_activity_logging_without_status_keeps_lead_unchanged(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead(['status' => 'inquiry', 'temperature' => 'cold']);
+
+        $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'subject' => 'Log only',
+            'body' => 'No changes.',
+        ]);
+
+        $lead->refresh();
+        $this->assertSame('inquiry', $lead->status);
+        $this->assertSame('cold', $lead->temperature);
+    }
+
+    public function test_activity_logging_rejects_invalid_status(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $lead = $this->createLead();
+
+        $response = $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'note',
+            'status' => 'not_a_real_status_123',
+        ]);
+
+        $response->assertSessionHasErrors('status');
+    }
+
+    public function test_whatsapp_activity_can_be_logged(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        // Pick a timezone where the local hour is currently within the 8am-9pm
+        // contact window so the DNC timezone restriction does not block the insert.
+        $zones = ['Asia/Dubai', 'Europe/London', 'Asia/Kolkata', 'Australia/Sydney', 'America/New_York'];
+        $tz = false;
+        foreach ($zones as $zone) {
+            if (\Carbon\Carbon::now($zone)->hour >= 8 && \Carbon\Carbon::now($zone)->hour < 21) {
+                $tz = $zone;
+                break;
+            }
+        }
+        $lead = $this->createLead(['timezone' => $tz]);
+
+        $response = $this->post("/leads/{$lead->id}/activities", [
+            'type' => 'whatsapp',
+            'subject' => 'Follow up',
+            'body' => 'Sent the brochure via WhatsApp.',
+        ]);
+
+        $response->assertRedirect("/leads/{$lead->id}");
+        $this->assertDatabaseHas('activities', [
+            'tenant_id' => $this->tenant->id,
+            'lead_id' => $lead->id,
+            'type' => 'whatsapp',
+            'subject' => 'Follow up',
+        ]);
+    }
 }

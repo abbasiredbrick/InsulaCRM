@@ -8,6 +8,7 @@ use App\Facades\Hooks;
 use App\Models\Activity;
 use App\Models\Lead;
 use App\Services\CustomFieldService;
+use App\Services\MotivationScoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -56,6 +57,8 @@ class ActivityApiController extends Controller
             'subject'  => 'nullable|string|max:255',
             'body'     => 'nullable|string',
             'logged_at' => 'nullable|date',
+            'status'   => 'nullable|in:' . implode(',', CustomFieldService::getValidSlugs('lead_status', $tenant)),
+            'temperature' => 'nullable|in:hot,warm,cold',
         ]);
 
         if ($validator->fails()) {
@@ -65,7 +68,7 @@ class ActivityApiController extends Controller
         $data = $validator->validated();
 
         // Verify lead belongs to tenant
-        Lead::withoutGlobalScopes()
+        $lead = Lead::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->findOrFail($data['lead_id']);
 
@@ -78,6 +81,14 @@ class ActivityApiController extends Controller
             'body'      => $data['body'] ?? null,
             'logged_at' => $data['logged_at'] ?? now(),
         ]);
+
+        // Let agents in the field move the lead along while logging activity.
+        if (array_key_exists('status', $data) || array_key_exists('temperature', $data)) {
+            $lead->status = $data['status'] ?? $lead->status;
+            $lead->temperature = $data['temperature'] ?? $lead->temperature;
+            $lead->save();
+            app(MotivationScoreService::class)->recalculate($lead);
+        }
 
         event(new ActivityLogged($activity));
         Hooks::doAction('activity.logged', $activity);
