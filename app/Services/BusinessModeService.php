@@ -11,124 +11,125 @@ class BusinessModeService
      * stages, lead statuses and roles a tenant sees.
      */
     public const MODES = [
-        'wholesale'  => 'Wholesaling',
+        'wholesale' => 'Wholesaling',
         'realestate' => 'Real Estate Agent / Broker',
     ];
 
     // ── Wholesale pipeline stages (current default) ──
 
     public const WHOLESALE_STAGES = [
-        'prospecting'     => 'Prospecting',
-        'contacting'      => 'Contacting',
-        'engaging'        => 'Engaging',
+        'prospecting' => 'Prospecting',
+        'contacting' => 'Contacting',
+        'engaging' => 'Engaging',
         'offer_presented' => 'Offer Presented',
-        'under_contract'  => 'Under Contract',
-        'dispositions'    => 'Dispositions',
-        'assigned'        => 'Assigned',
-        'closing'         => 'Closing',
-        'closed_won'      => 'Closed Won',
-        'closed_lost'     => 'Closed Lost',
+        'under_contract' => 'Under Contract',
+        'dispositions' => 'Dispositions',
+        'assigned' => 'Assigned',
+        'closing' => 'Closing',
+        'closed_won' => 'Closed Won',
+        'closed_lost' => 'Closed Lost',
     ];
 
     // ── Real estate agent pipeline stages ──
 
     public const REALESTATE_STAGES = [
-        'lead'              => 'Lead',
+        'lead' => 'Lead',
         'listing_agreement' => 'Listing Agreement',
-        'active_listing'    => 'Active Listing',
-        'showing'           => 'Showing',
-        'offer_received'    => 'Offer Received',
-        'under_contract'    => 'Under Contract',
-        'inspection'        => 'Inspection',
-        'appraisal'         => 'Appraisal',
-        'closing'           => 'Closing',
-        'closed_won'        => 'Closed Won',
-        'closed_lost'       => 'Closed Lost',
+        'active_listing' => 'Active Listing',
+        'showing' => 'Showing',
+        'offer_received' => 'Offer Received',
+        'under_contract' => 'Under Contract',
+        'inspection' => 'Inspection',
+        'appraisal' => 'Appraisal',
+        'closing' => 'Closing',
+        'closed_won' => 'Closed Won',
+        'closed_lost' => 'Closed Lost',
     ];
 
     // ── Wholesale lead statuses ──
 
     public const WHOLESALE_LEAD_STATUSES = [
-        'new'             => 'New',
-        'prospecting'     => 'Prospecting',
-        'contacting'      => 'Contacting',
-        'contacted'       => 'Contacted',
-        'engaging'        => 'Engaging',
-        'negotiating'     => 'Negotiating',
+        'new' => 'New',
+        'prospecting' => 'Prospecting',
+        'contacting' => 'Contacting',
+        'contacted' => 'Contacted',
+        'engaging' => 'Engaging',
+        'negotiating' => 'Negotiating',
         'offer_presented' => 'Offer Presented',
-        'under_contract'  => 'Under Contract',
-        'assigned'        => 'Assigned',
-        'dispositions'    => 'Dispositions',
-        'closing'         => 'Closing',
-        'closed_won'      => 'Closed Won',
-        'closed_lost'     => 'Closed Lost',
-        'dead'            => 'Dead',
+        'under_contract' => 'Under Contract',
+        'assigned' => 'Assigned',
+        'dispositions' => 'Dispositions',
+        'closing' => 'Closing',
+        'closed_won' => 'Closed Won',
+        'closed_lost' => 'Closed Lost',
+        'dead' => 'Dead',
     ];
 
     // ── Real estate lead statuses ──
 
     public const REALESTATE_LEAD_STATUSES = [
-        'new'           => 'New',
-        'inquiry'       => 'Inquiry',
-        'consultation'  => 'Consultation',
+        'new' => 'New',
+        'inquiry' => 'Inquiry',
+        'consultation' => 'Consultation',
         'active_client' => 'Active Client',
-        'nurture'       => 'Nurture',
-        'closed_won'    => 'Closed Won',
-        'closed_lost'   => 'Closed Lost',
-        'dead'          => 'Dead',
+        'nurture' => 'Nurture',
+        'closed_won' => 'Closed Won',
+        'closed_lost' => 'Closed Lost',
+        'dead' => 'Dead',
     ];
 
     // ── Wholesale distress markers ──
 
     public const WHOLESALE_DISTRESS_MARKERS = [
-        'tax_delinquent'   => 'Tax Delinquent',
-        'code_violation'   => 'Code Violation',
-        'absentee_owner'   => 'Absentee Owner',
-        'probate'          => 'Probate',
-        'pre_foreclosure'  => 'Pre-Foreclosure',
-        'divorce'          => 'Divorce',
+        'tax_delinquent' => 'Tax Delinquent',
+        'code_violation' => 'Code Violation',
+        'absentee_owner' => 'Absentee Owner',
+        'probate' => 'Probate',
+        'pre_foreclosure' => 'Pre-Foreclosure',
+        'divorce' => 'Divorce',
         'out_of_state_owner' => 'Out of State Owner',
-        'utility_shutoff'  => 'Utility Shutoff',
-        'fire_damage'      => 'Fire Damage',
-        'vacant'           => 'Vacant',
+        'utility_shutoff' => 'Utility Shutoff',
+        'fire_damage' => 'Fire Damage',
+        'vacant' => 'Vacant',
     ];
 
     // ── Wholesale lead sources ──
 
     public const WHOLESALE_LEAD_SOURCES = [
-        'cold_call'            => 'Cold Call',
-        'direct_mail'          => 'Direct Mail',
-        'website'              => 'Website',
-        'referral'             => 'Referral',
-        'driving_for_dollars'  => 'Driving for Dollars',
-        'ppc'                  => 'PPC / Paid Ads',
-        'seo'                  => 'SEO / Organic',
-        'social_media'         => 'Social Media',
-        'list_import'          => 'List Import',
-        'api'                  => 'API / Integration',
-        'other'                => 'Other',
+        'cold_call' => 'Cold Call',
+        'direct_mail' => 'Direct Mail',
+        'website' => 'Website',
+        'referral' => 'Referral',
+        'driving_for_dollars' => 'Driving for Dollars',
+        'ppc' => 'PPC / Paid Ads',
+        'seo' => 'SEO / Organic',
+        'social_media' => 'Social Media',
+        'list_import' => 'List Import',
+        'api' => 'API / Integration',
+        'other' => 'Other',
     ];
 
     // ── Real estate lead sources ──
 
     public const REALESTATE_LEAD_SOURCES = [
-        'website'        => 'Website',
-        'referral'       => 'Referral',
-        'open_house'     => 'Open House',
-        'sign_call'      => 'Sign Call',
-        'ppc'            => 'PPC / Paid Ads',
-        'seo'            => 'SEO / Organic',
-        'social_media'   => 'Social Media',
-        'bayut'          => 'Bayut',
-        'dubizzle'       => 'Dubizzle',
+        'website' => 'Website',
+        'referral' => 'Referral',
+        'open_house' => 'Open House',
+        'sign_call' => 'Sign Call',
+        'cold_call' => 'Cold Call',
+        'ppc' => 'PPC / Paid Ads',
+        'seo' => 'SEO / Organic',
+        'social_media' => 'Social Media',
+        'bayut' => 'Bayut',
+        'dubizzle' => 'Dubizzle',
         'property_finder' => 'Property Finder',
-        'zillow'         => 'Zillow',
-        'realtor_com'    => 'Realtor.com',
-        'mls'            => 'MLS',
-        'sphere'         => 'Sphere of Influence',
-        'past_client'    => 'Past Client',
-        'api'            => 'API / Integration',
-        'other'          => 'Other',
+        'zillow' => 'Zillow',
+        'realtor_com' => 'Realtor.com',
+        'mls' => 'MLS',
+        'sphere' => 'Sphere of Influence',
+        'past_client' => 'Past Client',
+        'api' => 'API / Integration',
+        'other' => 'Other',
     ];
 
     // ── Wholesale roles ──
@@ -176,6 +177,7 @@ class BusinessModeService
         }
 
         $tenant = self::resolveTenant($tenant);
+
         return $tenant?->business_mode ?? 'wholesale';
     }
 
@@ -212,12 +214,13 @@ class BusinessModeService
     public static function getStageLabel(string $stage, ?Tenant $tenant = null): string
     {
         $stages = self::getStages($tenant);
+
         return __($stages[$stage] ?? ucwords(str_replace('_', ' ', $stage)));
     }
 
     public static function getStageLabels(?Tenant $tenant = null): array
     {
-        return array_map(fn($label) => __($label), self::getStages($tenant));
+        return array_map(fn ($label) => __($label), self::getStages($tenant));
     }
 
     // ─── Buyer Match Trigger Stage ───────────────────────────
@@ -233,26 +236,26 @@ class BusinessModeService
     {
         if (self::isRealEstate($tenant)) {
             return [
-                'money_label'    => __('Commission'),
-                'money_field'    => 'total_commission',
-                'buyer_label'    => __('Clients'),
+                'money_label' => __('Commission'),
+                'money_field' => 'total_commission',
+                'buyer_label' => __('Clients'),
                 'buyer_singular' => __('Client'),
-                'seller_label'   => __('Sellers'),
+                'seller_label' => __('Sellers'),
                 'pipeline_label' => __('Transactions'),
-                'deal_label'     => __('Transaction'),
-                'fee_label'      => __('in commission'),
+                'deal_label' => __('Transaction'),
+                'fee_label' => __('in commission'),
             ];
         }
 
         return [
-            'money_label'    => __('Assignment Fee'),
-            'money_field'    => 'assignment_fee',
-            'buyer_label'    => __('Buyers'),
+            'money_label' => __('Assignment Fee'),
+            'money_field' => 'assignment_fee',
+            'buyer_label' => __('Buyers'),
             'buyer_singular' => __('Buyer'),
-            'seller_label'   => __('Sellers'),
+            'seller_label' => __('Sellers'),
             'pipeline_label' => __('Pipeline'),
-            'deal_label'     => __('Deal'),
-            'fee_label'      => __('in fees'),
+            'deal_label' => __('Deal'),
+            'fee_label' => __('in fees'),
         ];
     }
 
@@ -278,36 +281,36 @@ class BusinessModeService
             // These are shared between modes
             'property_type' => [
                 'single_family' => 'Single Family',
-                'multi_family'  => 'Multi Family',
-                'condo'         => 'Condo',
-                'townhouse'     => 'Townhouse',
-                'commercial'    => 'Commercial',
-                'land'          => 'Land',
-                'other'         => 'Other',
+                'multi_family' => 'Multi Family',
+                'condo' => 'Condo',
+                'townhouse' => 'Townhouse',
+                'commercial' => 'Commercial',
+                'land' => 'Land',
+                'other' => 'Other',
             ],
 
             'property_condition' => [
-                'excellent'  => 'Excellent',
-                'good'       => 'Good',
-                'fair'       => 'Fair',
-                'poor'       => 'Poor',
+                'excellent' => 'Excellent',
+                'good' => 'Good',
+                'fair' => 'Fair',
+                'poor' => 'Poor',
                 'distressed' => 'Distressed',
             ],
 
             'activity_type' => [
-                'call'     => 'Call',
-                'sms'      => 'SMS',
-                'email'    => 'Email',
+                'call' => 'Call',
+                'sms' => 'SMS',
+                'email' => 'Email',
                 'whatsapp' => 'WhatsApp',
-                'meeting'  => 'Meeting',
+                'meeting' => 'Meeting',
             ],
 
             'contact_type' => self::isRealEstate($tenant)
                 ? [
-                    'seller_lead'   => __('Seller Lead'),
-                    'buyer_lead'    => __('Buyer Lead'),
+                    'seller_lead' => __('Seller Lead'),
+                    'buyer_lead' => __('Buyer Lead'),
                     'active_client' => __('Active Client'),
-                    'past_client'   => __('Past Client'),
+                    'past_client' => __('Past Client'),
                 ]
                 : [],
 
@@ -366,7 +369,7 @@ class BusinessModeService
      */
     public static function getAgentRoleNames(?Tenant $tenant = null): array
     {
-        return array_values(array_filter(self::getRoles($tenant), fn($r) => $r !== 'admin'));
+        return array_values(array_filter(self::getRoles($tenant), fn ($r) => $r !== 'admin'));
     }
 
     /**
@@ -412,19 +415,19 @@ class BusinessModeService
     {
         if (self::isRealEstate($tenant)) {
             return [
-                'admin'        => __('Admin'),
+                'admin' => __('Admin'),
                 'listing_agent' => __('Listing Agent'),
                 'buyers_agent' => __('Buyers Agent'),
-                'agent'        => __('Agent'),
+                'agent' => __('Agent'),
             ];
         }
 
         return [
-            'admin'             => __('Admin'),
+            'admin' => __('Admin'),
             'acquisition_agent' => __('Acquisition Agent'),
             'disposition_agent' => __('Disposition Agent'),
-            'field_scout'       => __('Field Scout'),
-            'agent'             => __('Agent'),
+            'field_scout' => __('Field Scout'),
+            'agent' => __('Agent'),
         ];
     }
 
@@ -434,17 +437,17 @@ class BusinessModeService
     {
         if (self::isRealEstate($tenant)) {
             return [
-                'fee_column'   => 'total_commission',
-                'fee_label'    => __('in commission'),
-                'deal_label'   => __('Transactions'),
+                'fee_column' => 'total_commission',
+                'fee_label' => __('in commission'),
+                'deal_label' => __('Transactions'),
                 'closed_label' => __('Closed'),
             ];
         }
 
         return [
-            'fee_column'   => 'assignment_fee',
-            'fee_label'    => __('in fees'),
-            'deal_label'   => __('Deals'),
+            'fee_column' => 'assignment_fee',
+            'fee_label' => __('in fees'),
+            'deal_label' => __('Deals'),
             'closed_label' => __('Closed Won'),
         ];
     }
@@ -467,16 +470,16 @@ class BusinessModeService
         if (self::isRealEstate($tenant)) {
             return [
                 'activity_engagement' => 40,
-                'temperature'         => 25,
-                'showing_history'     => 20,
-                'source_quality'      => 15,
+                'temperature' => 25,
+                'showing_history' => 20,
+                'source_quality' => 15,
             ];
         }
 
         return [
-            'list_stacking'    => 50,
-            'temperature'      => 15,
-            'activity'         => 15,
+            'list_stacking' => 50,
+            'temperature' => 15,
+            'activity' => 15,
             'property_distress' => 20,
         ];
     }
@@ -486,11 +489,11 @@ class BusinessModeService
     public static function getFieldTypes(?Tenant $tenant = null): array
     {
         $types = [
-            'lead_status'       => __('Lead Statuses'),
-            'property_type'     => __('Property Types'),
+            'lead_status' => __('Lead Statuses'),
+            'property_type' => __('Property Types'),
             'property_condition' => __('Property Conditions'),
-            'activity_type'     => __('Activity Types'),
-            'lead_source'       => __('Lead Sources'),
+            'activity_type' => __('Activity Types'),
+            'lead_source' => __('Lead Sources'),
         ];
 
         // Only wholesale mode shows distress markers
@@ -506,9 +509,9 @@ class BusinessModeService
     public static function getShowingOutcomes(): array
     {
         return [
-            'interested'           => __('Interested'),
-            'not_interested'       => __('Not Interested'),
-            'made_offer'           => __('Made Offer'),
+            'interested' => __('Interested'),
+            'not_interested' => __('Not Interested'),
+            'made_offer' => __('Made Offer'),
             'needs_second_showing' => __('Needs Second Showing'),
         ];
     }
@@ -518,11 +521,11 @@ class BusinessModeService
     public static function getFinancingTypes(): array
     {
         return [
-            'cash'         => __('Cash'),
+            'cash' => __('Cash'),
             'conventional' => __('Conventional'),
-            'fha'          => __('FHA'),
-            'va'           => __('VA'),
-            'other'        => __('Other'),
+            'fha' => __('FHA'),
+            'va' => __('VA'),
+            'other' => __('Other'),
         ];
     }
 

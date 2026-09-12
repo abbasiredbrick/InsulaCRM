@@ -18,6 +18,7 @@ class AvailabilityImportRun extends Model
         'created_rows',
         'updated_rows',
         'missing_rows',
+        'conflict_rows',
         'skipped_rows',
         'notes',
         'error_message',

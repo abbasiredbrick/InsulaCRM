@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Models\Deal;
-use App\Models\Activity;
-use App\Models\AuditLog;
 use App\Events\DealStageChanged;
 use App\Facades\Hooks;
+use App\Http\Controllers\Controller;
+use App\Models\Activity;
+use App\Models\AuditLog;
+use App\Models\Deal;
 use App\Services\BusinessModeService;
 use App\Services\BuyerMatchService;
 use Illuminate\Http\Request;
@@ -59,30 +59,30 @@ class DealApiController extends Controller
         $isRE = BusinessModeService::isRealEstate($tenant);
 
         $rules = [
-            'lead_id'              => 'required|integer',
-            'agent_id'             => 'nullable|integer',
-            'title'                => 'nullable|string|max:255',
-            'stage'                => 'nullable|in:' . implode(',', array_keys(Deal::stages())),
-            'contract_price'       => 'nullable|numeric|min:0',
-            'earnest_money'        => 'nullable|numeric|min:0',
-            'contract_date'        => 'nullable|date',
-            'closing_date'         => 'nullable|date',
-            'notes'                => 'nullable|string',
+            'lead_id' => 'required|integer',
+            'agent_id' => 'nullable|integer',
+            'title' => 'nullable|string|max:255',
+            'stage' => 'nullable|in:'.implode(',', array_keys(Deal::stages())),
+            'contract_price' => 'nullable|numeric|min:0',
+            'earnest_money' => 'nullable|numeric|min:0',
+            'contract_date' => 'nullable|date',
+            'closing_date' => 'nullable|date',
+            'notes' => 'nullable|string',
         ];
 
         if ($isRE) {
             $rules += [
                 'listing_commission_pct' => 'nullable|numeric|min:0|max:100',
-                'buyer_commission_pct'   => 'nullable|numeric|min:0|max:100',
-                'total_commission'       => 'nullable|numeric|min:0',
-                'brokerage_split_pct'    => 'nullable|numeric|min:0|max:100',
-                'mls_number'             => 'nullable|string|max:50',
-                'listing_date'           => 'nullable|date',
-                'days_on_market'         => 'nullable|integer|min:0',
+                'buyer_commission_pct' => 'nullable|numeric|min:0|max:100',
+                'total_commission' => 'nullable|numeric|min:0',
+                'brokerage_split_pct' => 'nullable|numeric|min:0|max:100',
+                'mls_number' => 'nullable|string|max:50',
+                'listing_date' => 'nullable|date',
+                'days_on_market' => 'nullable|integer|min:0',
             ];
         } else {
             $rules += [
-                'assignment_fee'         => 'nullable|numeric|min:0',
+                'assignment_fee' => 'nullable|numeric|min:0',
                 'inspection_period_days' => 'nullable|integer|min:0',
             ];
         }
@@ -104,7 +104,7 @@ class DealApiController extends Controller
             ->findOrFail($data['lead_id']);
 
         if (empty($data['title'])) {
-            $data['title'] = $lead->full_name . ' Deal';
+            $data['title'] = $lead->full_name.' Deal';
         }
 
         $deal = Deal::withoutGlobalScopes()->create($data);
@@ -125,27 +125,27 @@ class DealApiController extends Controller
         $isRE = BusinessModeService::isRealEstate($tenant);
 
         $rules = [
-            'stage'                => 'nullable|in:' . implode(',', array_keys(Deal::stages())),
-            'contract_price'       => 'nullable|numeric|min:0',
-            'earnest_money'        => 'nullable|numeric|min:0',
-            'contract_date'        => 'nullable|date',
-            'closing_date'         => 'nullable|date',
-            'notes'                => 'nullable|string',
+            'stage' => 'nullable|in:'.implode(',', array_keys(Deal::stages())),
+            'contract_price' => 'nullable|numeric|min:0',
+            'earnest_money' => 'nullable|numeric|min:0',
+            'contract_date' => 'nullable|date',
+            'closing_date' => 'nullable|date',
+            'notes' => 'nullable|string',
         ];
 
         if ($isRE) {
             $rules += [
                 'listing_commission_pct' => 'nullable|numeric|min:0|max:100',
-                'buyer_commission_pct'   => 'nullable|numeric|min:0|max:100',
-                'total_commission'       => 'nullable|numeric|min:0',
-                'brokerage_split_pct'    => 'nullable|numeric|min:0|max:100',
-                'mls_number'             => 'nullable|string|max:50',
-                'listing_date'           => 'nullable|date',
-                'days_on_market'         => 'nullable|integer|min:0',
+                'buyer_commission_pct' => 'nullable|numeric|min:0|max:100',
+                'total_commission' => 'nullable|numeric|min:0',
+                'brokerage_split_pct' => 'nullable|numeric|min:0|max:100',
+                'mls_number' => 'nullable|string|max:50',
+                'listing_date' => 'nullable|date',
+                'days_on_market' => 'nullable|integer|min:0',
             ];
         } else {
             $rules += [
-                'assignment_fee'         => 'nullable|numeric|min:0',
+                'assignment_fee' => 'nullable|numeric|min:0',
                 'inspection_period_days' => 'nullable|integer|min:0',
             ];
         }
@@ -170,12 +170,16 @@ class DealApiController extends Controller
                 'agent_id' => $deal->agent_id,
                 'type' => 'stage_change',
                 'subject' => 'Deal stage changed via API',
-                'body' => 'Stage changed from "' . Deal::stageLabel($oldStage) . '" to "' . Deal::stageLabel($data['stage']) . '"',
+                'body' => 'Stage changed from "'.Deal::stageLabel($oldStage).'" to "'.Deal::stageLabel($data['stage']).'"',
                 'logged_at' => now(),
             ]);
 
             event(new DealStageChanged($deal, $oldStage));
             Hooks::doAction('deal.stage_changed', $deal, $oldStage);
+
+            if ($data['stage'] === 'closed_won' && $oldStage !== 'closed_won') {
+                app(\App\Services\LeadToClientService::class)->convertFromWonDeal($deal);
+            }
 
             if ($data['stage'] === \App\Services\BusinessModeService::getBuyerMatchTriggerStage()) {
                 app(BuyerMatchService::class)->matchForDeal($deal);

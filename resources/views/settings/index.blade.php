@@ -367,6 +367,38 @@
                                             </form>
                                         </div>
                                     </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#resetPwModal{{ $agent->id }}">
+                                        {{ __('Reset password') }}
+                                    </button>
+                                    <div class="modal fade" id="resetPwModal{{ $agent->id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="POST" action="{{ route('settings.resetPasswordAgent', $agent) }}">
+                                                @csrf
+                                                @method('PUT')
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">{{ __('Reset password for :name', ['name' => $agent->name]) }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="text-secondary">{{ __('Share the new password with :name. The system does not send emails.', ['name' => $agent->name]) }}</p>
+                                                        <div class="mb-3">
+                                                            <label class="form-label required">{{ __('New password') }}</label>
+                                                            <input type="password" name="password" class="form-control" autocomplete="new-password" minlength="8" required autofocus>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label required">{{ __('Confirm password') }}</label>
+                                                            <input type="password" name="password_confirmation" class="form-control" autocomplete="new-password" minlength="8" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                                                        <button type="submit" class="btn btn-warning">{{ __('Set new password') }}</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
                                     @if($agent->two_factor_enabled)
                                         <form method="POST" action="{{ route('settings.reset2fa', $agent) }}" class="d-inline" onsubmit="return confirm('{{ __('Reset 2FA for :name? They will need to set it up again.', ['name' => $agent->name]) }}')">
                                             @csrf

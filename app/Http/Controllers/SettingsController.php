@@ -14,17 +14,17 @@ use App\Models\Plugin;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\TeamMemberInvited;
 use App\Services\BusinessModeService;
 use App\Services\CustomFieldService;
-use App\Services\UpdateManagerService;
 use App\Services\Settings\BackupService;
 use App\Services\Settings\LanguageFileService;
+use App\Services\UpdateManagerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use App\Notifications\TeamMemberInvited;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
@@ -34,8 +34,7 @@ class SettingsController extends Controller
     public function __construct(
         private readonly BackupService $backupService,
         private readonly LanguageFileService $languageFileService,
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -52,7 +51,7 @@ class SettingsController extends Controller
         $modeRoles = \App\Services\BusinessModeService::isRealEstate($tenant)
             ? \App\Services\BusinessModeService::REALESTATE_ROLES
             : \App\Services\BusinessModeService::WHOLESALE_ROLES;
-        $roles = $roles->filter(fn($role) => in_array($role->name, $modeRoles));
+        $roles = $roles->filter(fn ($role) => in_array($role->name, $modeRoles));
         $leadSourceCosts = LeadSourceCost::where('tenant_id', $tenant->id)->pluck('monthly_budget', 'lead_source');
         $webhooks = \App\Models\Webhook::where('tenant_id', $tenant->id)->latest()->get();
         $updateManager = app(UpdateManagerService::class);
@@ -191,7 +190,7 @@ class SettingsController extends Controller
             // Build a temporary S3 disk and attempt to write/read/delete a test file
             $disk = \Illuminate\Support\Facades\Storage::build($config);
 
-            $testFile = '.insulacrm-connection-test-' . uniqid();
+            $testFile = '.insulacrm-connection-test-'.uniqid();
             $disk->put($testFile, 'ok');
             $content = $disk->get($testFile);
             $disk->delete($testFile);
@@ -267,6 +266,7 @@ class SettingsController extends Controller
             ], 422);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('SMS test failed', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => __('SMS sending failed. Check your provider credentials and the application log for details.'),
@@ -283,6 +283,7 @@ class SettingsController extends Controller
     {
         if ($this->backupService->create()) {
             AuditLog::log('backup.created', auth()->user()->tenant);
+
             return response()->json(['success' => true, 'message' => __('Backup created successfully.'), 'backups' => $this->backupService->list()]);
         }
 
@@ -323,7 +324,7 @@ class SettingsController extends Controller
                     'path' => $log->path,
                     'status' => $log->status_code,
                     'ip' => $log->ip_address,
-                    'duration' => $log->duration_ms . 'ms',
+                    'duration' => $log->duration_ms.'ms',
                     'date' => \Carbon\Carbon::parse($log->created_at)->diffForHumans(),
                 ];
             });
@@ -378,11 +379,32 @@ class SettingsController extends Controller
     {
         $this->authorize('manageTeamMember', $user);
 
-        $user->update(['is_active' => !$user->is_active]);
+        $user->update(['is_active' => ! $user->is_active]);
 
         AuditLog::log('agent.toggled', $user);
 
         return redirect()->route('settings.index', ['tab' => 'team'])->with('success', 'Agent status updated.');
+    }
+
+    /**
+     * Reset a team member's password (admin action, no mail required).
+     */
+    public function resetPasswordAgent(Request $request, User $user)
+    {
+        $this->authorize('manageTeamMember', $user);
+
+        $request->validate([
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        AuditLog::log('agent.password_reset', $user);
+
+        return redirect()->route('settings.index', ['tab' => 'team'])
+            ->with('success', __('Password has been reset for :name.', ['name' => $user->name]));
     }
 
     /**
@@ -428,15 +450,15 @@ class SettingsController extends Controller
             ],
         ], [
             'reassign_to.required' => __('Choose who should inherit this member\'s records.'),
-            'reassign_to.not_in'   => __('Records cannot be reassigned to the member being deleted.'),
+            'reassign_to.not_in' => __('Records cannot be reassigned to the member being deleted.'),
         ]);
 
         $newOwnerId = (int) $validated['reassign_to'];
 
         $deleted = [
-            'name'  => $user->name,
+            'name' => $user->name,
             'email' => $user->email,
-            'role'  => $user->role->name ?? null,
+            'role' => $user->role->name ?? null,
         ];
 
         DB::transaction(function () use ($user, $newOwnerId, $tenantId) {
@@ -495,7 +517,7 @@ class SettingsController extends Controller
 
         $validated = $request->validate([
             'business_mode' => ['required', Rule::in(array_keys(BusinessModeService::MODES))],
-            'confirmation'  => ['required', 'string'],
+            'confirmation' => ['required', 'string'],
         ]);
 
         if (strtoupper(trim($validated['confirmation'])) !== 'SWITCH') {
@@ -504,7 +526,7 @@ class SettingsController extends Controller
         }
 
         $from = $tenant->business_mode ?? 'wholesale';
-        $to   = $validated['business_mode'];
+        $to = $validated['business_mode'];
 
         if ($from === $to) {
             return redirect()->route('settings.index', ['tab' => 'general'])
@@ -536,9 +558,9 @@ class SettingsController extends Controller
     private function businessModeImpact(Tenant $tenant): array
     {
         $current = $tenant->business_mode ?? 'wholesale';
-        $target  = BusinessModeService::oppositeMode($current);
+        $target = BusinessModeService::oppositeMode($current);
 
-        $targetStages   = array_keys(BusinessModeService::getStagesForMode($target));
+        $targetStages = array_keys(BusinessModeService::getStagesForMode($target));
         $targetStatuses = array_keys(BusinessModeService::getLeadStatusesForMode($target));
 
         $deals = Schema::hasTable('deals')
@@ -550,10 +572,10 @@ class SettingsController extends Controller
             : 0;
 
         return [
-            'current'      => $current,
-            'target'       => $target,
-            'deals'        => $deals,
-            'leads'        => $leads,
+            'current' => $current,
+            'target' => $target,
+            'deals' => $deals,
+            'leads' => $leads,
         ];
     }
 
@@ -561,7 +583,7 @@ class SettingsController extends Controller
     {
         $this->authorize('manageTeamMember', $user);
 
-        if (!$user->two_factor_enabled) {
+        if (! $user->two_factor_enabled) {
             return redirect()->route('settings.index', ['tab' => 'team'])->with('error', __('This user does not have 2FA enabled.'));
         }
 
@@ -589,6 +611,7 @@ class SettingsController extends Controller
         AuditLog::log('settings.distribution_updated', $tenant);
 
         $label = BusinessModeService::isRealEstate() ? 'Lead routing' : 'Distribution';
+
         return redirect()->route('settings.index', ['tab' => 'distribution'])->with('success', "{$label} settings updated.");
     }
 
@@ -667,14 +690,14 @@ class SettingsController extends Controller
     public function addCustomOption(Request $request)
     {
         $request->validate([
-            'field_type' => 'required|in:' . implode(',', array_keys(CustomFieldService::getFieldTypes())),
+            'field_type' => 'required|in:'.implode(',', array_keys(CustomFieldService::getFieldTypes())),
             'option_name' => 'required|string|max:100',
         ]);
 
         $tenant = auth()->user()->tenant;
         $result = CustomFieldService::addOption($request->field_type, $request->option_name, $tenant);
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return redirect()->route('settings.index', ['tab' => 'custom-fields'])->with('error', $result['message']);
         }
 
@@ -693,7 +716,7 @@ class SettingsController extends Controller
         $tenant = auth()->user()->tenant;
         $removed = CustomFieldService::removeOption($request->field_type, $request->slug, $tenant);
 
-        if (!$removed) {
+        if (! $removed) {
             return redirect()->route('settings.index', ['tab' => 'custom-fields'])->with('error', 'System defaults cannot be removed.');
         }
 
@@ -785,12 +808,13 @@ class SettingsController extends Controller
     {
         $tenant = auth()->user()->tenant;
         $tenant->update([
-            'api_enabled' => !$tenant->api_enabled,
+            'api_enabled' => ! $tenant->api_enabled,
         ]);
 
         AuditLog::log('settings.api_toggled', $tenant);
 
         $status = $tenant->api_enabled ? 'enabled' : 'disabled';
+
         return redirect()->route('settings.index', ['tab' => 'api'])->with('success', "API access {$status}.");
     }
 
@@ -839,21 +863,23 @@ class SettingsController extends Controller
     public function toggleAi()
     {
         $tenant = auth()->user()->tenant;
-        $tenant->update(['ai_enabled' => !$tenant->ai_enabled]);
+        $tenant->update(['ai_enabled' => ! $tenant->ai_enabled]);
 
         AuditLog::log('settings.ai_toggled', $tenant);
 
         $status = $tenant->ai_enabled ? 'enabled' : 'disabled';
+
         return redirect()->route('settings.index', ['tab' => 'ai'])->with('success', "AI features {$status}.");
     }
 
     public function toggleAiBriefings()
     {
         $tenant = auth()->user()->tenant;
-        $tenant->update(['ai_briefings_enabled' => !$tenant->ai_briefings_enabled]);
+        $tenant->update(['ai_briefings_enabled' => ! $tenant->ai_briefings_enabled]);
 
         $status = $tenant->ai_briefings_enabled ? __('enabled') : __('disabled');
-        return redirect()->route('settings.index', ['tab' => 'ai'])->with('success', __('Auto AI Briefings') . " {$status}.");
+
+        return redirect()->route('settings.index', ['tab' => 'ai'])->with('success', __('Auto AI Briefings')." {$status}.");
     }
 
     /**
@@ -872,7 +898,7 @@ class SettingsController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Hash::check($request->password, auth()->user()->password)) {
+        if (! Hash::check($request->password, auth()->user()->password)) {
             return redirect()->route('settings.index', ['tab' => 'team'])->with('error', __('Incorrect password. Impersonation denied.'));
         }
 
@@ -925,7 +951,7 @@ class SettingsController extends Controller
         try {
             DB::connection()->getPdo();
         } catch (\Exception $e) {
-            $health['db_connection'] = 'FAILED: ' . $e->getMessage();
+            $health['db_connection'] = 'FAILED: '.$e->getMessage();
         }
 
         // Active plugins with versions
@@ -970,6 +996,7 @@ class SettingsController extends Controller
 
         try {
             $this->languageFileService->save($code, $request->translations);
+
             return response()->json(['success' => true, 'message' => 'Language file saved.']);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -987,6 +1014,7 @@ class SettingsController extends Controller
 
         try {
             $this->languageFileService->upload($request->file('language_file'));
+
             return response()->json(['success' => true, 'message' => 'Language file uploaded successfully.']);
         } catch (\InvalidArgumentException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
@@ -1010,6 +1038,7 @@ class SettingsController extends Controller
             'buyer_matched',
             'team_member_invited',
             'sequence_email',
+            'lease_expiry_reminder',
         ];
 
         $preferences = [];
@@ -1052,14 +1081,14 @@ class SettingsController extends Controller
         ], fn ($v) => $v !== null && $v !== '');
 
         // If password field was left empty, keep the existing encrypted password
-        if (!$request->filled('mail_password') && $tenant->mail_settings) {
+        if (! $request->filled('mail_password') && $tenant->mail_settings) {
             $existing = $tenant->mail_settings;
-            if (!empty($existing['mail_password'])) {
+            if (! empty($existing['mail_password'])) {
                 $settings['mail_password'] = $existing['mail_password'];
             }
         }
 
-        $tenant->update(['mail_settings' => !empty($settings) ? $settings : null]);
+        $tenant->update(['mail_settings' => ! empty($settings) ? $settings : null]);
 
         AuditLog::log('settings.mail_updated', $tenant);
 
@@ -1106,6 +1135,7 @@ class SettingsController extends Controller
             return response()->json(['success' => true, 'email' => $user->email]);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Test email failed', ['error' => $e->getMessage()]);
+
             return response()->json(['success' => false, 'message' => __('Failed to send test email. Check your SMTP host, port, and credentials.')], 422);
         }
     }
@@ -1137,10 +1167,11 @@ class SettingsController extends Controller
             abort(403);
         }
         $webhook->update([
-            'is_active' => !$webhook->is_active,
+            'is_active' => ! $webhook->is_active,
             'failure_count' => 0, // reset on manual toggle
         ]);
-        return redirect()->route('settings.index', ['tab' => 'webhooks'])->with('success', 'Webhook ' . ($webhook->is_active ? 'enabled' : 'disabled') . '.');
+
+        return redirect()->route('settings.index', ['tab' => 'webhooks'])->with('success', 'Webhook '.($webhook->is_active ? 'enabled' : 'disabled').'.');
     }
 
     public function destroyWebhook(\App\Models\Webhook $webhook)
@@ -1149,6 +1180,7 @@ class SettingsController extends Controller
             abort(403);
         }
         $webhook->delete();
+
         return redirect()->route('settings.index', ['tab' => 'webhooks'])->with('success', 'Webhook deleted.');
     }
 
@@ -1178,7 +1210,7 @@ class SettingsController extends Controller
             return back()->with('error', __('You must type RESET to confirm the factory reset.'));
         }
 
-        if (!$request->filled('password') || !Hash::check($request->password, auth()->user()->password)) {
+        if (! $request->filled('password') || ! Hash::check($request->password, auth()->user()->password)) {
             return back()->with('error', __('Incorrect password. Factory reset denied.'));
         }
 
@@ -1270,7 +1302,7 @@ class SettingsController extends Controller
         $baseName = $name;
         $counter = 1;
         while (Role::where('name', $name)->exists()) {
-            $name = $baseName . '_' . $counter++;
+            $name = $baseName.'_'.$counter++;
         }
 
         $role = Role::create([
@@ -1333,7 +1365,7 @@ class SettingsController extends Controller
         $request->validate([
             'defaults' => 'required|array',
             'defaults.*' => 'array',
-            'defaults.*.*' => 'string|in:' . implode(',', array_keys(\App\Services\DashboardWidgetService::WIDGETS)),
+            'defaults.*.*' => 'string|in:'.implode(',', array_keys(\App\Services\DashboardWidgetService::WIDGETS)),
         ]);
 
         // Only accept known role names as keys

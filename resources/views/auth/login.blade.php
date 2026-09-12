@@ -53,6 +53,6 @@
     </div>
 </div>
 <div class="text-center text-secondary mt-3">
-    {{ __("Don't have account yet?") }} <a href="{{ route('register') }}">{{ __('Sign up') }}</a>
+    {{ __('Need an account?') }} <a href="https://redbrickworks.com" target="_blank" rel="noopener">{{ __('Contact us') }}</a>
 </div>
 @endsection

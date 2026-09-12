@@ -6,6 +6,37 @@
 @section('content')
 <div class="row justify-content-center">
     <div class="col-lg-9">
+        @if($source->column_map && count($source->column_map))
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between w-100 align-items-center">
+                    <h3 class="card-title mb-0">{{ __('Quick Re-import') }}</h3>
+                    <span class="badge bg-azure-lt">{{ $source->name }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    {{ __('Upload the refreshed sheet — it is parsed with your saved mapping (delimiter, header, columns) and run immediately. Existing units are updated in place, nothing is duplicated, and any listed unit the sheet shows as leased goes to the decision queue instead of being unlisted.') }}
+                </p>
+                <form method="POST" action="{{ route('availability-sources.import-direct', $source) }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-7">
+                            <input type="file" name="file" class="form-control" accept=".xlsx,.csv,.txt" required>
+                            @error('file') <div class="text-danger small">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-5 d-flex gap-2">
+                            <button class="btn btn-primary">{{ __('Re-import Now') }}</button>
+                            @if($source->latestRun)
+                            <span class="text-muted small align-self-center">{{ __('Last: ') }}{{ $source->latestRun->created_at->format('d M H:i') }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @endif
+
         <div class="card mb-3">
             <div class="card-header">
                 <div class="d-flex justify-content-between w-100 align-items-center">

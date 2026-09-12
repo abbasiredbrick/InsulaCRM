@@ -35,6 +35,7 @@
             <a href="{{ route('notifications.index', ['filter' => 'deals']) }}" class="btn btn-sm {{ $currentFilter === 'deals' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $modeTerms['deal_label'] ?? __('Deals') }}s</a>
             <a href="{{ route('notifications.index', ['filter' => 'tasks']) }}" class="btn btn-sm {{ $currentFilter === 'tasks' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Tasks') }}</a>
             <a href="{{ route('notifications.index', ['filter' => 'team']) }}" class="btn btn-sm {{ $currentFilter === 'team' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Team') }}</a>
+            <a href="{{ route('notifications.index', ['filter' => 'availability']) }}" class="btn btn-sm {{ $currentFilter === 'availability' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Availability') }}</a>
         </div>
     </div>
     <div class="list-group list-group-flush">

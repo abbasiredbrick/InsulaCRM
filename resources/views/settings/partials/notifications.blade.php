@@ -37,6 +37,14 @@
             'label' => __('Sequence Emails'),
             'description' => __('Send drip sequence emails to leads when a step has action type "email".'),
         ],
+        'lease_expiry_reminder' => [
+            'label' => __('Lease Expiry Reminders'),
+            'description' => __('Notify agents and their managers 45 days before a lease contract expires, so the client can renew or move.'),
+        ],
+        'availability_conflict' => [
+            'label' => __('Listed Unit Decisions'),
+            'description' => __($businessMode === 'realestate' ? "Notify the agent and admins when a PM availability sheet shows a currently-listed unit as leased, so they can decide to keep it listed or unlist it." : 'Notify agents when a PM availability sheet shows a currently-listed unit as leased.'),
+        ],
     ];
 @endphp
 

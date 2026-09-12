@@ -4,6 +4,20 @@
 @section('page-title', __('Availability Lists'))
 
 @section('content')
+@if($pendingReviews->isNotEmpty())
+<div class="alert alert-warning">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ __(':count listed unit(s) need a decision', ['count' => $pendingReviews->count()]) }}</strong>
+            <div class="text-secondary small">
+                {{ __('Their PM availability lists no longer show them as available (leased or unpublished). They were kept listed (not unlisted) so the expensive madhmoun listing permit is not wasted — decide to keep or unlist, and divert incoming leads meanwhile.') }}
+            </div>
+        </div>
+        <a href="{{ route('availability-sources.reviews') }}" class="btn btn-sm btn-outline-warning text-nowrap">{{ __('Review & Decide') }}</a>
+    </div>
+</div>
+@endif
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <p class="text-muted mb-0">{{ __('Property-management companies (AMS, etc.) share availability sheets in Excel, CSV, PDFs or emails. Import each one here and it keeps units in sync — new units are added, changed units updated, and units that leave the sheet are marked unlisted.') }}</p>
@@ -50,7 +64,8 @@
                                 <div class="text-muted small">
                                     {{ __('+') }}{{ $source->latestRun->created_rows }} {{ __('new') }} ·
                                     {{ $source->latestRun->updated_rows }} {{ __('updated') }} ·
-                                    {{ $source->latestRun->missing_rows }} {{ __('unlisted') }}
+                                    {{ $source->latestRun->missing_rows }} {{ __('unlisted') }}@if($source->latestRun->conflict_rows)
+                                    · <span class="text-warning">{{ $source->latestRun->conflict_rows }} {{ __('for decision') }}</span>@endif
                                 </div>
                             @endif
                         @else
@@ -58,7 +73,14 @@
                         @endif
                     </td>
                     <td class="text-nowrap">
-                        <a href="{{ route('availability-sources.import', $source) }}" class="btn btn-sm btn-primary">{{ __('Import List') }}</a>
+                        @if($source->url)
+                            <form method="POST" action="{{ route('availability-sources.sync-url', $source) }}" class="d-inline">
+                                @csrf
+                                <button class="btn btn-sm btn-primary" title="{{ __('Fetch the published availability link — existing units update in place') }}">{{ __('Sync now') }}</button>
+                            </form>
+                        @else
+                            <a href="{{ route('availability-sources.import', $source) }}" class="btn btn-sm btn-primary" title="{{ __('Upload a refreshed sheet — existing units update in place') }}">{{ __('Re-import') }}</a>
+                        @endif
                         <a href="{{ route('availability-sources.edit', $source) }}" class="btn btn-sm btn-outline-secondary">{{ __('Mapping') }}</a>
                     </td>
                 </tr>

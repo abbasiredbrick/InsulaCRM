@@ -41,15 +41,15 @@ class DealController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhereHas('lead', function ($lq) use ($search) {
-                      $lq->where(function ($inner) use ($search) {
-                          $inner->where('first_name', 'like', "%{$search}%")
+                    ->orWhereHas('lead', function ($lq) use ($search) {
+                        $lq->where(function ($inner) use ($search) {
+                            $inner->where('first_name', 'like', "%{$search}%")
                                 ->orWhere('last_name', 'like', "%{$search}%");
-                      });
-                  })
-                  ->orWhereHas('lead.property', function ($pq) use ($search) {
-                      $pq->where('address', 'like', "%{$search}%");
-                  });
+                        });
+                    })
+                    ->orWhereHas('lead.property', function ($pq) use ($search) {
+                        $pq->where('address', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -60,7 +60,7 @@ class DealController extends Controller
         $agents = collect();
         if (auth()->user()->isAdmin()) {
             $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'agent', 'acquisition_agent', 'disposition_agent', 'listing_agent', 'buyers_agent']))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'acquisition_agent', 'disposition_agent', 'listing_agent', 'buyers_agent']))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }
@@ -73,7 +73,7 @@ class DealController extends Controller
         $this->authorize('changeStage', $deal);
 
         $request->validate([
-            'stage' => 'required|in:' . implode(',', array_keys(Deal::stages())),
+            'stage' => 'required|in:'.implode(',', array_keys(Deal::stages())),
         ]);
 
         $oldStage = $deal->stage;
@@ -95,13 +95,18 @@ class DealController extends Controller
             'agent_id' => auth()->id(),
             'type' => 'stage_change',
             'subject' => 'Deal stage changed',
-            'body' => 'Stage changed from "' . Deal::stageLabel($oldStage) . '" to "' . Deal::stageLabel($request->stage) . '"',
+            'body' => 'Stage changed from "'.Deal::stageLabel($oldStage).'" to "'.Deal::stageLabel($request->stage).'"',
             'logged_at' => now(),
         ]);
 
         event(new DealStageChanged($deal, $oldStage));
         AuditLog::log('deal.stage_changed', $deal, ['stage' => $oldStage], ['stage' => $request->stage]);
         Hooks::doAction('deal.stage_changed', $deal, $oldStage);
+
+        // Convert the deal's lead into a Client (Buyer) when the deal is won
+        if ($request->stage === 'closed_won' && $oldStage !== 'closed_won') {
+            app(\App\Services\LeadToClientService::class)->convertFromWonDeal($deal);
+        }
 
         \App\Services\WebhookService::dispatch('deal.stage_changed', [
             'deal_id' => $deal->id,
@@ -267,12 +272,12 @@ class DealController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('title', 'like', "%{$search}%")
-                  ->orWhereHas('lead', function ($lq) use ($search) {
-                      $lq->where(function ($inner) use ($search) {
-                          $inner->where('first_name', 'like', "%{$search}%")
+                    ->orWhereHas('lead', function ($lq) use ($search) {
+                        $lq->where(function ($inner) use ($search) {
+                            $inner->where('first_name', 'like', "%{$search}%")
                                 ->orWhere('last_name', 'like', "%{$search}%");
-                      });
-                  });
+                        });
+                    });
             });
         }
 
@@ -290,7 +295,7 @@ class DealController extends Controller
                     : '';
                 fputcsv($handle, [
                     $deal->title,
-                    $deal->lead ? $deal->lead->first_name . ' ' . $deal->lead->last_name : '',
+                    $deal->lead ? $deal->lead->first_name.' '.$deal->lead->last_name : '',
                     Deal::stageLabel($deal->stage),
                     $deal->contract_price,
                     $deal->{$feeColumn},
@@ -300,7 +305,7 @@ class DealController extends Controller
                 ]);
             }
             fclose($handle);
-        }, 'deals-export-' . now()->format('Y-m-d') . '.csv', [
+        }, 'deals-export-'.now()->format('Y-m-d').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
@@ -332,13 +337,13 @@ class DealController extends Controller
         $this->authorize('update', $deal);
 
         $request->validate([
-            'status' => 'nullable|in:' . implode(',', array_keys(TransactionChecklist::STATUSES)),
+            'status' => 'nullable|in:'.implode(',', array_keys(TransactionChecklist::STATUSES)),
             'deadline' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
 
         $data = $request->only(['status', 'deadline', 'notes']);
-        if (($data['status'] ?? null) === 'completed' && !$item->completed_at) {
+        if (($data['status'] ?? null) === 'completed' && ! $item->completed_at) {
             $data['completed_at'] = now();
         }
         if (($data['status'] ?? null) !== 'completed') {
@@ -346,6 +351,7 @@ class DealController extends Controller
         }
 
         $item->update($data);
+
         return response()->json(['success' => true, 'item' => $item->fresh()]);
     }
 
@@ -363,7 +369,7 @@ class DealController extends Controller
         $item = TransactionChecklist::create([
             'tenant_id' => auth()->user()->tenant_id,
             'deal_id' => $deal->id,
-            'item_key' => 'custom_' . time(),
+            'item_key' => 'custom_'.time(),
             'label' => $request->label,
             'deadline' => $request->deadline,
             'sort_order' => $maxOrder + 1,
@@ -378,6 +384,7 @@ class DealController extends Controller
         $this->authorize('update', $deal);
 
         $item->delete();
+
         return response()->json(['success' => true]);
     }
 
@@ -394,7 +401,7 @@ class DealController extends Controller
             'buyer_agent_email' => 'nullable|email|max:255',
             'offer_price' => 'required|numeric|min:0',
             'earnest_money' => 'nullable|numeric|min:0',
-            'financing_type' => 'nullable|in:' . implode(',', array_keys(DealOffer::FINANCING_TYPES)),
+            'financing_type' => 'nullable|in:'.implode(',', array_keys(DealOffer::FINANCING_TYPES)),
             'contingencies' => 'nullable|array',
             'contingencies.*' => 'string',
             'expiration_date' => 'nullable|date',
@@ -420,7 +427,7 @@ class DealController extends Controller
             'subject' => __('Offer received'),
             'body' => __(':buyer offered :price', [
                 'buyer' => $request->buyer_name,
-                'price' => '$' . number_format($request->offer_price, 2),
+                'price' => '$'.number_format($request->offer_price, 2),
             ]),
             'logged_at' => now(),
         ]);
@@ -434,7 +441,7 @@ class DealController extends Controller
         $this->authorize('update', $deal);
 
         $request->validate([
-            'status' => 'nullable|in:' . implode(',', array_keys(DealOffer::STATUSES)),
+            'status' => 'nullable|in:'.implode(',', array_keys(DealOffer::STATUSES)),
             'counter_price' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
@@ -468,7 +475,7 @@ class DealController extends Controller
         $this->authorize('update', $deal);
 
         $offer->delete();
+
         return response()->json(['success' => true]);
     }
-
 }

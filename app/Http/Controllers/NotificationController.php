@@ -42,12 +42,13 @@ class NotificationController extends Controller
 
         if ($filter === 'unread') {
             $query = auth()->user()->unreadNotifications();
-        } elseif (in_array($filter, ['leads', 'deals', 'tasks', 'team'])) {
+        } elseif (in_array($filter, ['leads', 'deals', 'tasks', 'team', 'availability'])) {
             $typeMap = [
                 'leads' => ['App\\Notifications\\LeadAssigned', 'App\\Notifications\\BuyerMatchFound', 'App\\Notifications\\LeadLostForReview', 'App\\Notifications\\LeadReassigned'],
                 'deals' => ['App\\Notifications\\DealStageChanged', 'App\\Notifications\\DueDiligenceWarning'],
                 'tasks' => ['App\\Notifications\\SequenceStepEmail'],
-                'team'  => ['App\\Notifications\\TeamMemberInvited', 'App\\Notifications\\TeamLeadActivity'],
+                'team' => ['App\\Notifications\\TeamMemberInvited', 'App\\Notifications\\TeamLeadActivity'],
+                'availability' => ['App\\Notifications\\AvailabilityConflictAlert'],
             ];
             if (isset($typeMap[$filter])) {
                 $query->whereIn('type', $typeMap[$filter]);

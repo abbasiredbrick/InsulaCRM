@@ -3,7 +3,7 @@
 <meta name="theme-color" content="#0054a6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="InsulaCRM">
+<meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
 <link rel="apple-touch-icon" href="{{ asset('img/icon-192.png') }}">
 <meta name="mobile-web-app-capable" content="yes">
 
@@ -60,7 +60,7 @@ function showInstallBanner() {
         'font-size:0.875rem;max-width:480px;width:calc(100% - 2rem);animation:slideUp 0.3s ease;';
 
     banner.innerHTML = '<div style="flex:1;">' +
-        '<strong>Install InsulaCRM</strong><br>' +
+        '<strong>Install ' + '{{ config('app.name') }}' + '</strong><br>' +
         '<span style="opacity:0.85;font-size:0.8rem;">Add to your home screen for quick access</span>' +
         '</div>' +
         '<button id="pwa-install-btn" style="background:#fff;color:#0054a6;border:none;padding:0.375rem 1rem;' +

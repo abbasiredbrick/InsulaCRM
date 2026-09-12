@@ -1,7 +1,7 @@
 {
-    "name": "InsulaCRM",
-    "short_name": "InsulaCRM",
-    "description": "Real Estate Wholesaler CRM",
+    "name": "Keystone",
+    "short_name": "Keystone",
+    "description": "Keystone CRM",
     "start_url": "./dashboard",
     "scope": "./",
     "display": "standalone",

@@ -2,18 +2,25 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * Guests are served the landing page; authenticated users go to the dashboard.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_root_serves_landing_page_for_guests(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect();
+        $response->assertStatus(200);
+        $response->assertSee('redbrickworks.com');
+    }
+
+    public function test_root_redirects_authenticated_users_to_dashboard(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->get('/')->assertRedirect(route('dashboard'));
     }
 }

@@ -40,7 +40,7 @@ class DemoDataSeeder extends Seeder
 
         if ($isRealEstate) {
             // Seed real estate roles if they don't exist yet
-            foreach (['listing_agent' => 'Listing Agent', 'buyers_agent' => 'Buyers Agent'] as $name => $display) {
+            foreach (['listing_agent' => 'Listing Agent', 'buyers_agent' => 'Buyers Agent', 'marketing' => 'Marketing'] as $name => $display) {
                 Role::firstOrCreate(['name' => $name], ['display_name' => $display, 'is_system' => true]);
             }
             $listingAgentRole = Role::where('name', 'listing_agent')->first();
@@ -230,15 +230,15 @@ class DemoDataSeeder extends Seeder
                     $leadData['notes'] = $faker->randomElement($sourceNotes);
                     // Assign realistic temperature based on source
                     $sourceTemperatureWeights = [
-                        'open_house'  => ['hot' => 40, 'warm' => 50, 'cold' => 10],
-                        'sign_call'   => ['hot' => 35, 'warm' => 50, 'cold' => 15],
-                        'referral'    => ['hot' => 30, 'warm' => 55, 'cold' => 15],
+                        'open_house' => ['hot' => 40, 'warm' => 50, 'cold' => 10],
+                        'sign_call' => ['hot' => 35, 'warm' => 50, 'cold' => 15],
+                        'referral' => ['hot' => 30, 'warm' => 55, 'cold' => 15],
                         'past_client' => ['hot' => 25, 'warm' => 60, 'cold' => 15],
-                        'sphere'      => ['hot' => 20, 'warm' => 55, 'cold' => 25],
-                        'zillow'      => ['hot' => 15, 'warm' => 45, 'cold' => 40],
+                        'sphere' => ['hot' => 20, 'warm' => 55, 'cold' => 25],
+                        'zillow' => ['hot' => 15, 'warm' => 45, 'cold' => 40],
                         'realtor_com' => ['hot' => 15, 'warm' => 45, 'cold' => 40],
-                        'website'     => ['hot' => 10, 'warm' => 40, 'cold' => 50],
-                        'social_media'=> ['hot' => 10, 'warm' => 35, 'cold' => 55],
+                        'website' => ['hot' => 10, 'warm' => 40, 'cold' => 50],
+                        'social_media' => ['hot' => 10, 'warm' => 35, 'cold' => 55],
                     ];
                     $weights = $sourceTemperatureWeights[$leadData['lead_source']] ?? ['hot' => 20, 'warm' => 50, 'cold' => 30];
                     $pool = [];
@@ -405,7 +405,7 @@ class DemoDataSeeder extends Seeder
                 $dealData['mls_number'] = $faker->numerify('#######');
                 $dealData['listing_date'] = $faker->dateTimeBetween($dealCreated, min(Carbon::parse($dealCreated)->addDays(7), now()));
                 // Use property address for title, clear wholesale fields
-                $dealData['title'] = $lead->property->address . ' Transaction';
+                $dealData['title'] = $lead->property->address.' Transaction';
                 $dealData['assignment_fee'] = null;
             }
 
@@ -443,7 +443,7 @@ class DemoDataSeeder extends Seeder
                     BuyerTransaction::create([
                         'tenant_id' => $tenantId,
                         'buyer_id' => $buyer->id,
-                        'property_address' => $faker->numberBetween(100, 9999) . ' ' . $faker->randomElement($streetNames) . ' ' . $faker->randomElement($streetTypes) . ', ' . $faker->randomElement($cities),
+                        'property_address' => $faker->numberBetween(100, 9999).' '.$faker->randomElement($streetNames).' '.$faker->randomElement($streetTypes).', '.$faker->randomElement($cities),
                         'purchase_price' => $faker->numberBetween(40000, 350000),
                         'close_date' => $closeDate,
                         'days_to_close' => $daysToClose,
@@ -505,7 +505,7 @@ class DemoDataSeeder extends Seeder
                 ['order' => 2, 'delay_days' => 2, 'action_type' => 'call', 'message_template' => 'Follow-up call to discuss listing opportunity for {address}'],
                 ['order' => 3, 'delay_days' => 5, 'action_type' => 'email', 'message_template' => "Subject: Free Market Analysis for {address}\n\nHi {first_name},\n\nI'd like to offer you a complimentary Comparable Market Analysis for your property. This will give you an accurate picture of your home's current value. Would you like to schedule a time to meet?\n\nBest,\n{agent_name}"],
                 ['order' => 4, 'delay_days' => 10, 'action_type' => 'email', 'message_template' => 'Market update and listing strategy for {address}'],
-                ['order' => 5, 'delay_days' => 15, 'action_type' => 'call', 'message_template' => "Hi {first_name}, just following up on the market analysis for your property. I have some great insights to share. Please call me back at your convenience."],
+                ['order' => 5, 'delay_days' => 15, 'action_type' => 'call', 'message_template' => 'Hi {first_name}, just following up on the market analysis for your property. I have some great insights to share. Please call me back at your convenience.'],
             ];
         } else {
             $steps = [
@@ -542,7 +542,9 @@ class DemoDataSeeder extends Seeder
         $allBuyers = Buyer::withoutGlobalScopes()->where('tenant_id', $tenantId)->get();
 
         foreach ($dispositionDeals as $deal) {
-            if ($allBuyers->isEmpty()) break;
+            if ($allBuyers->isEmpty()) {
+                break;
+            }
             $matchCount = min(rand(3, 5), $allBuyers->count());
             $matchedBuyers = $allBuyers->random($matchCount);
             foreach ($matchedBuyers as $buyer) {
@@ -581,9 +583,13 @@ class DemoDataSeeder extends Seeder
 
             foreach ($showingDeals as $idx => $deal) {
                 $lead = Lead::withoutGlobalScopes()->find($deal->lead_id);
-                if (!$lead) continue;
+                if (! $lead) {
+                    continue;
+                }
                 $property = Property::withoutGlobalScopes()->where('lead_id', $lead->id)->first();
-                if (!$property) continue;
+                if (! $property) {
+                    continue;
+                }
 
                 $showingDate = Carbon::now()->subWeeks(3)->addDays($idx);
                 $isPast = $showingDate->isPast();
@@ -614,13 +620,15 @@ class DemoDataSeeder extends Seeder
             for ($oh = 0; $oh < $openHouseCount; $oh++) {
                 $ohLead = $openHouseLeads[$oh * 5]; // spread across the slice
                 $ohProperty = Property::withoutGlobalScopes()->where('lead_id', $ohLead->id)->first();
-                if (!$ohProperty) continue;
+                if (! $ohProperty) {
+                    continue;
+                }
 
                 $eventDate = Carbon::now()->subWeeks(2)->addDays($oh * 4); // spread from -2 weeks to +2 weeks
                 $isPast = $eventDate->isPast();
                 $startTime = $faker->randomElement(['10:00', '13:00']);
                 $endHour = ((int) substr($startTime, 0, 2)) + 2;
-                $endTime = str_pad($endHour, 2, '0', STR_PAD_LEFT) . ':00';
+                $endTime = str_pad($endHour, 2, '0', STR_PAD_LEFT).':00';
 
                 $openHouse = OpenHouse::create([
                     'tenant_id' => $tenantId,
@@ -753,11 +761,11 @@ class DemoDataSeeder extends Seeder
                     $offerPrice = round($basePrice * $faker->randomFloat(2, 0.90, 1.05), 2);
 
                     // Determine status: one accepted for offer_received deals, rest mixed
-                    if ($deal->stage === 'offer_received' && !$hasAccepted && $o === $offerCount - 1) {
+                    if ($deal->stage === 'offer_received' && ! $hasAccepted && $o === $offerCount - 1) {
                         // Last offer is accepted if none accepted yet
                         $offerStatus = 'accepted';
                         $hasAccepted = true;
-                    } elseif ($deal->stage === 'offer_received' && !$hasAccepted && $faker->boolean(30)) {
+                    } elseif ($deal->stage === 'offer_received' && ! $hasAccepted && $faker->boolean(30)) {
                         $offerStatus = 'accepted';
                         $hasAccepted = true;
                     } else {

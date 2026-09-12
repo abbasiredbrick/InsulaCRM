@@ -94,7 +94,7 @@ class IntegrationTest extends TestCase
 
     public function test_integration_manager_returns_totp_by_default(): void
     {
-        $manager = new IntegrationManager();
+        $manager = new IntegrationManager;
         $provider = $manager->get2faProvider();
 
         $this->assertEquals('totp', $provider->driver());
@@ -103,7 +103,7 @@ class IntegrationTest extends TestCase
 
     public function test_integration_manager_lists_available_2fa_drivers(): void
     {
-        $manager = new IntegrationManager();
+        $manager = new IntegrationManager;
         $drivers = $manager->getAvailableDrivers('2fa');
 
         $this->assertArrayHasKey('totp', $drivers);
@@ -234,5 +234,47 @@ class IntegrationTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('2FA');
+    }
+
+    public function test_admin_can_reset_team_member_password(): void
+    {
+        $this->actingAsAdmin();
+        $agent = $this->createUserWithRole('agent');
+
+        $response = $this->put(route('settings.resetPasswordAgent', $agent), [
+            'password' => 'NewSecret123!',
+            'password_confirmation' => 'NewSecret123!',
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('NewSecret123!', $agent->fresh()->password));
+    }
+
+    public function test_admin_cannot_reset_password_with_short_or_mismatched_value(): void
+    {
+        $this->actingAsAdmin();
+        $agent = $this->createUserWithRole('agent');
+
+        $response = $this->put(route('settings.resetPasswordAgent', $agent), [
+            'password' => 'short',
+            'password_confirmation' => 'different',
+        ]);
+
+        $response->assertSessionHasErrors(['password']);
+        $this->assertNotEquals(\Illuminate\Support\Facades\Hash::make('short'), $agent->fresh()->password);
+    }
+
+    public function test_non_admin_cannot_reset_team_member_password(): void
+    {
+        $this->actingAsAdmin();
+        $agent = $this->actingAsRole('agent');
+
+        $response = $this->put(route('settings.resetPasswordAgent', $this->adminUser), [
+            'password' => 'NewSecret123!',
+            'password_confirmation' => 'NewSecret123!',
+        ]);
+
+        $response->assertStatus(403);
     }
 }

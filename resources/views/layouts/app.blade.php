@@ -184,6 +184,24 @@
                                 <span class="nav-link-title">{{ __('Open Houses') }}</span>
                             </a>
                         </li>
+                        <li class="nav-item {{ request()->is('leases*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('leases.index') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M5 11l-1.5 6.5a1 1 0 0 0 1 1.5h5.5a1 1 0 0 0 1 -1.5l-1.5 -6.5"/><path d="M17 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M19 11l-1.5 6.5a1 1 0 0 0 1 1.5h5.5a1 1 0 0 0 1 -1.5l-1.5 -6.5"/><path d="M5 19h14"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('Leases') }}</span>
+                            </a>
+                        </li>
+                        @if(auth()->user()->hasRole('marketing') || auth()->user()->isAdmin() || auth()->user()->isAgent())
+                        <li class="nav-item {{ request()->is('market*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('market.index') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 4h4l3 3h6a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"/><path d="M9 8v.01"/><circle cx="12" cy="13" r="1"/><circle cx="16" cy="15" r="1"/><path d="M5 21a4 4 0 0 1 4 -4"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('Market') }}</span>
+                            </a>
+                        </li>
+                        @endif
                         @endif
 
                         @unless(auth()->user()->isFieldScout())

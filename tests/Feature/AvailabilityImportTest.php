@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\AvailabilityImportRun;
+use App\Models\AvailabilityReview;
 use App\Models\AvailabilitySource;
 use App\Models\Property;
+use App\Notifications\AvailabilityConflictAlert;
 use App\Services\AvailabilityIngestService;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AvailabilityImportTest extends TestCase
@@ -57,7 +61,7 @@ class AvailabilityImportTest extends TestCase
 
     public function test_parses_tab_aligned_text_rows(): void
     {
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText($this->amsText(), [
             'delimiter' => 'tab',
             'has_header' => false,
@@ -76,7 +80,7 @@ class AvailabilityImportTest extends TestCase
     public function test_ingest_creates_units_with_normalized_values(): void
     {
         $source = $this->createAmsSource();
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText($this->amsText(), $source->parse_options);
 
         $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
@@ -120,7 +124,7 @@ class AvailabilityImportTest extends TestCase
     public function test_re_import_updates_instead_of_duplicating(): void
     {
         $source = $this->createAmsSource();
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText($this->amsText(), $source->parse_options);
 
         $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
@@ -135,7 +139,7 @@ class AvailabilityImportTest extends TestCase
     public function test_units_missing_from_latest_sheet_become_leased(): void
     {
         $source = $this->createAmsSource();
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $full = $service->parseText($this->amsText(), $source->parse_options);
 
         $service->ingest($source, $full['rows'], $this->tenant->id, $this->adminUser->id);
@@ -161,7 +165,7 @@ class AvailabilityImportTest extends TestCase
     public function test_previously_available_unit_becomes_leased_when_sheet_says_rented(): void
     {
         $source = $this->createAmsSource();
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText($this->amsText(), $source->parse_options);
 
         $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
@@ -182,7 +186,7 @@ class AvailabilityImportTest extends TestCase
     public function test_new_unit_first_appearing_as_leased_is_created_leased(): void
     {
         $source = $this->createAmsSource();
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
 
         $service->ingest($source, $service->parseText(implode("\n", [
             "Bey View Tower\t1405\t1 BR - City View\t90,000\t4,500\t2,000\tLeased\t1 Parking\t",
@@ -203,7 +207,7 @@ class AvailabilityImportTest extends TestCase
             'under offer' => 'reserved',
         ]]);
 
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText(implode("\n", array_merge(
             array_slice(explode("\n", $this->amsText()), 0, 2),
             ["Bey View Tower\t900\t2 BR - Canal View\t190,000\t9,500\t2,000\tUnder Offer\t1 Parking\t"]
@@ -287,7 +291,7 @@ class AvailabilityImportTest extends TestCase
         $this->get(route('availability-sources.index'))
             ->assertOk()
             ->assertSee('AMS Properties')
-            ->assertSee('Import List');
+            ->assertSee('Re-import');
     }
 
     public function test_unparseable_file_yields_error_on_edit_page(): void
@@ -324,7 +328,7 @@ class AvailabilityImportTest extends TestCase
             'default_tawtheeq_fee' => 150,
         ]);
 
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText(implode("\n", [
             "406\t2 BR - Sea View\tBalcony\t97,000\t5,000\t1050\t150",
             "1903\t2 BR - Sea View\t\t119,000\t5,950\t\t", // empty → source defaults
@@ -382,7 +386,7 @@ class AvailabilityImportTest extends TestCase
             ],
         ]);
 
-        $service = new AvailabilityIngestService();
+        $service = new AvailabilityIngestService;
         $table = $service->parseText(
             "2506\t2 BR + Maids - Sea View\t\t119,000\t5,950\t1,050\t150",
             $source->parse_options
@@ -400,5 +404,487 @@ class AvailabilityImportTest extends TestCase
 
         // sheet listed it → refetched to ready_to_list, not unlisted
         $this->assertSame('ready_to_list', $units->first()->availability);
+    }
+
+    // ── Listed units flagged as leased by the PM sheet ─────────────────────
+
+    protected function publishedListedUnit(): Property
+    {
+        $source = $this->createAmsSource();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $service->parseText($this->amsText(), $source->parse_options)['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1301')->first();
+        $unit->update(['availability' => 'listed']);
+
+        return $unit;
+    }
+
+    /**
+     * The full AMS sheet with unit 1301 now showing "Rented".
+     */
+    protected function rentedSheet(): array
+    {
+        $service = new AvailabilityIngestService;
+        $source = AvailabilitySource::first();
+        $rows = $service->parseText($this->amsText(), $source->parse_options)['rows'];
+
+        foreach ($rows as &$row) {
+            if (($row['col1'] ?? '') === '1301') {
+                $row['col6'] = 'Rented';
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function test_listed_unit_pm_says_rented_stays_listed_and_needs_a_decision(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+
+        $result = $service->ingest($source, $this->rentedSheet(), $this->tenant->id, $this->adminUser->id);
+
+        $unit->refresh();
+        $this->assertSame('listed', $unit->availability);
+        $this->assertSame(1, $result['conflicts']);
+        $this->assertSame(0, $result['missing']);
+        $this->assertSame(5, $result['updated']);
+
+        $this->assertDatabaseHas('availability_reviews', [
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $unit->id,
+            'reason' => 'sheet_says_leased',
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'type' => AvailabilityConflictAlert::class,
+            'notifiable_id' => $this->adminUser->id,
+        ]);
+    }
+
+    public function test_listed_unit_missing_from_sheet_stays_listed_and_needs_a_decision(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+        $full = $service->parseText($this->amsText(), $source->parse_options);
+
+        // The short sheet no longer contains unit 1301 (listed) or 2310 (ready_to_list).
+        $result = $service->ingest($source, array_slice($full['rows'], 3), $this->tenant->id, $this->adminUser->id);
+
+        $unit->refresh();
+        $this->assertSame('listed', $unit->availability);
+        $this->assertSame(1, $result['conflicts']);
+
+        $this->assertDatabaseHas('availability_reviews', [
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $unit->id,
+            'reason' => 'missing_from_sheet',
+            'status' => 'pending',
+        ]);
+
+        // The non-listed missing unit still auto-leases as before.
+        $other = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '2310')->first();
+        $this->assertSame('leased', $other->availability);
+    }
+
+    public function test_ready_to_list_missing_unit_still_becomes_leased(): void
+    {
+        $this->publishedListedUnit(); // sets 1301 to listed
+        $source = AvailabilitySource::first();
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '2310')->first();
+        $this->assertSame('ready_to_list', $unit->availability);
+
+        $service = new AvailabilityIngestService;
+        $full = $service->parseText($this->amsText(), $source->parse_options);
+        $service->ingest($source, array_slice($full['rows'], 3), $this->tenant->id, $this->adminUser->id);
+
+        $unit->refresh();
+        $this->assertSame('leased', $unit->availability);
+    }
+
+    public function test_re_import_does_not_create_duplicate_pending_reviews(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+        $rows = $this->rentedSheet();
+
+        $service->ingest($source, $rows, $this->tenant->id, $this->adminUser->id);
+        $service->ingest($source, $rows, $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(1, AvailabilityReview::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('property_id', $unit->id)
+            ->count());
+    }
+
+    public function test_resolve_keep_listed_keeps_the_unit_listed(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $this->rentedSheet(), $this->tenant->id, $this->adminUser->id);
+
+        $review = AvailabilityReview::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('property_id', $unit->id)->first();
+
+        $this->post(route('availability-sources.reviews.resolve', $review), ['action' => 'keep_listed'])
+            ->assertRedirect(route('availability-sources.reviews'));
+
+        $unit->refresh();
+        $review->refresh();
+
+        $this->assertSame('listed', $unit->availability);
+        $this->assertSame('keep_listed', $review->status);
+        $this->assertSame($this->adminUser->id, $review->decided_by);
+        $this->assertNotNull($review->decided_at);
+    }
+
+    public function test_resolve_unlist_sets_the_unit_unlisted(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $this->rentedSheet(), $this->tenant->id, $this->adminUser->id);
+
+        $review = AvailabilityReview::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('property_id', $unit->id)->first();
+
+        $this->post(route('availability-sources.reviews.resolve', $review), ['action' => 'unlist'])
+            ->assertRedirect(route('availability-sources.reviews'));
+
+        $unit->refresh();
+        $review->refresh();
+
+        $this->assertSame('unlisted', $unit->availability);
+        $this->assertSame('unlist', $review->status);
+        $this->assertNotNull($review->decided_at);
+    }
+
+    public function test_reviews_page_lists_pending_decisions(): void
+    {
+        $unit = $this->publishedListedUnit();
+        $source = AvailabilitySource::first();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $this->rentedSheet(), $this->tenant->id, $this->adminUser->id);
+
+        $this->get(route('availability-sources.reviews'))
+            ->assertOk()
+            ->assertSee('1301')
+            ->assertSee('Keep Listed')
+            ->assertSee('Unlist');
+
+        $this->get(route('availability-sources.index'))
+            ->assertOk()
+            ->assertSee('need a decision');
+    }
+
+    public function test_quick_reimport_uploads_file_and_updates_in_place_without_duplicates(): void
+    {
+        $source = $this->createAmsSource();
+
+        $this->post(route('availability-sources.import-direct', $source), [
+            'file' => UploadedFile::fake()->createWithContent('ams.txt', $this->amsText()),
+        ])->assertRedirect(route('availability-sources.index'));
+
+        $this->assertSame(5, Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->count());
+
+        $this->post(route('availability-sources.import-direct', $source), [
+            'file' => UploadedFile::fake()->createWithContent('ams.txt', $this->amsText()),
+        ])->assertRedirect(route('availability-sources.index'));
+
+        $this->assertSame(5, Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->count());
+
+        $runs = AvailabilityImportRun::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_id', $source->id)->orderBy('id')->get();
+
+        $this->assertCount(2, $runs);
+        $this->assertSame('completed', $runs->last()->status);
+        $this->assertSame(0, $runs->last()->created_rows);
+        $this->assertSame(5, $runs->last()->updated_rows);
+    }
+
+    public function test_quick_reimport_records_conflict_rows_and_keeps_listed_unit(): void
+    {
+        $source = $this->createAmsSource();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $service->parseText($this->amsText(), $source->parse_options)['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1301')->first();
+        $unit->update(['availability' => 'listed']);
+
+        $this->post(route('availability-sources.import-direct', $source), [
+            'file' => UploadedFile::fake()->createWithContent('ams.txt', implode("\n", [
+                "Bey View Tower\t1301\t4 BR + Maids room 352 Sq Mtr / 3744 Sq Foot\t240,000\t12,000\t20,000\tRented\t2 Parkings\t",
+            ])),
+        ])->assertRedirect(route('availability-sources.index'));
+
+        $unit->refresh();
+        $this->assertSame('listed', $unit->availability);
+
+        $this->assertDatabaseHas('availability_import_runs', [
+            'tenant_id' => $this->tenant->id,
+            'source_id' => $source->id,
+            'status' => 'completed',
+            'conflict_rows' => 1,
+        ]);
+    }
+
+    // ── URL-published availability (e.g. RDK portfolio JSON) ───────────────
+
+    /**
+     * Mirrors the RDK portfolio shape (https://rdk.ae/Listing/data.json): a
+     * hidden unit, an inactive property's unit, and a no-tower property.
+     */
+    protected function rdkPayload(): array
+    {
+        return [
+            'properties' => [
+                ['id' => 1, 'name' => 'RDK Towers Najmat', 'city' => 'Abu Dhabi', 'active' => true],
+                ['id' => 2, 'name' => 'GP50 Abu Dhabi', 'city' => 'Abu Dhabi', 'active' => false],
+                ['id' => 3, 'name' => 'Marriott Residences', 'city' => 'Dubai', 'active' => true],
+            ],
+            'units' => [
+                ['id' => 1, 'pid' => 1, 'tower' => 'I', 'unit' => '206', 'type' => '1BR', 'desc' => 'Standard Layout', 'view' => 'Canal', 'rent' => 100000, 'display' => 'Show'],
+                ['id' => 2, 'pid' => 1, 'tower' => 'I', 'unit' => '211', 'type' => '1BR', 'desc' => 'Guest Washroom', 'view' => 'Partial Sea', 'rent' => 95000, 'display' => 'Show'],
+                ['id' => 3, 'pid' => 1, 'tower' => 'I', 'unit' => '306', 'type' => 'STUDIO', 'desc' => 'Standard Layout', 'view' => 'Canal', 'rent' => 90000, 'display' => 'Hide'],
+                ['id' => 4, 'pid' => 2, 'tower' => 'A', 'unit' => '101', 'type' => '2BR', 'desc' => 'City View', 'view' => 'City', 'rent' => 180000, 'display' => 'Show'],
+                ['id' => 5, 'pid' => 3, 'tower' => '', 'unit' => 'RA-02', 'type' => '7BR VILLA', 'desc' => '7BHK - DRIVER ROOM - STORAGE', 'view' => 'Community', 'rent' => 230000, 'display' => 'Show'],
+            ],
+        ];
+    }
+
+    protected function urlSource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'RDK Properties',
+            'url' => 'https://rdk.ae/Listing/data.json',
+            'default_city' => 'Abu Dhabi',
+            'missing_status' => 'unlisted',
+            'column_map' => [
+                'Unit' => 'unit_no',
+                'Tower' => 'building',
+                'Property' => 'community',
+                'City' => 'city',
+                'Type' => 'features',
+                'Remarks' => 'remarks',
+                'Rent' => 'rent',
+            ],
+        ]);
+    }
+
+    protected function fakeRdk(array ...$payloads): void
+    {
+        $call = 0;
+        Http::fake(function ($request) use ($payloads, &$call) {
+            $payload = $payloads[min($call, count($payloads) - 1)];
+
+            $call++;
+
+            return Http::response(json_encode($payload), 200);
+        });
+    }
+
+    public function test_fetch_url_parses_rdk_portfolio_and_only_reads_published_units(): void
+    {
+        $this->fakeRdk($this->rdkPayload());
+        $service = new AvailabilityIngestService;
+
+        $table = $service->fetchUrl('https://rdk.ae/Listing/data.json');
+
+        $this->assertSame(['Unit', 'Tower', 'Property', 'City', 'Type', 'Remarks', 'Rent'], $table['header']);
+        $this->assertCount(3, $table['rows']);
+
+        $byUnit = collect($table['rows'])->keyBy('Unit');
+        $this->assertArrayNotHasKey('306', $byUnit->all()); // hidden unit
+        $this->assertArrayNotHasKey('101', $byUnit->all()); // inactive property
+        $this->assertSame('RDK Towers Najmat Tower I', $byUnit['206']['Tower']);
+        $this->assertSame('Abu Dhabi', $byUnit['206']['City']);
+        $this->assertSame('1BR', $byUnit['206']['Type']);
+        $this->assertSame('100000', $byUnit['206']['Rent']);
+        $this->assertSame('Marriott Residences', $byUnit['RA-02']['Tower']);
+        $this->assertSame('View: Community. 7BHK - DRIVER ROOM - STORAGE', $byUnit['RA-02']['Remarks']);
+        $this->assertSame('Dubai', $byUnit['RA-02']['City']);
+    }
+
+    public function test_sync_url_creates_units_in_place_and_records_a_url_run(): void
+    {
+        $source = $this->urlSource();
+        $this->fakeRdk($this->rdkPayload());
+
+        $this->post(route('availability-sources.sync-url', $source))
+            ->assertRedirect(route('availability-sources.index'));
+
+        $this->assertSame(3, Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->count());
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '206')->first();
+        $this->assertSame('RDK Towers Najmat Tower I', $unit->sub_community);
+        $this->assertSame('RDK Towers Najmat', $unit->community);
+        $this->assertSame('Abu Dhabi', $unit->city);
+        $this->assertSame(1, (int) $unit->bedrooms);
+        $this->assertSame(100000.0, (float) $unit->rent_price);
+        $this->assertSame('ready_to_list', $unit->availability);
+
+        $this->assertDatabaseHas('availability_import_runs', [
+            'tenant_id' => $this->tenant->id,
+            'source_id' => $source->id,
+            'format' => 'url',
+            'status' => 'completed',
+            'created_rows' => 3,
+        ]);
+    }
+
+    public function test_sync_url_keeps_listed_units_and_unlists_others_when_they_stop_being_published(): void
+    {
+        $source = $this->urlSource();
+
+        // RDK publishes 206, 211 … then stops publishing both (206 was listed
+        // on portals, 211 was just ready), and a new unit 212 replaces them.
+        $first = $this->rdkPayload();
+        $second = $this->rdkPayload();
+        $second['units'] = array_values(array_filter($second['units'], fn ($u) => $u['id'] !== 1 && $u['id'] !== 2));
+        $second['units'][] = ['id' => 6, 'pid' => 1, 'tower' => 'I', 'unit' => '212', 'type' => '2BR', 'desc' => '', 'view' => 'Sea', 'rent' => 140000, 'display' => 'Show'];
+        $this->fakeRdk($first, $second);
+
+        $this->post(route('availability-sources.sync-url', $source));
+
+        $listed = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '206')->first();
+        $listed->update(['availability' => 'listed']);
+        $plain = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '211')->first();
+        $this->assertSame('ready_to_list', $plain->availability);
+
+        $this->post(route('availability-sources.sync-url', $source))
+            ->assertRedirect(route('availability-sources.index'));
+
+        // 206 was listed on portals → stays listed pending a decision.
+        $listed->refresh();
+        $this->assertSame('listed', $listed->availability);
+        $this->assertDatabaseHas('availability_reviews', [
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $listed->id,
+            'reason' => 'missing_from_sheet',
+            'status' => 'pending',
+        ]);
+
+        // 211 was only ready-to-list → hidden in RDK means unlisted, not leased.
+        $plain->refresh();
+        $this->assertSame('unlisted', $plain->availability);
+        $this->assertStringContainsString('Marked unlisted per RDK Properties', $plain->notes);
+
+        // 212 came on the market.
+        $this->assertDatabaseHas('properties', [
+            'tenant_id' => $this->tenant->id,
+            'source_unit_ref' => '212',
+            'availability' => 'ready_to_list',
+        ]);
+
+        $this->assertDatabaseHas('availability_import_runs', [
+            'tenant_id' => $this->tenant->id,
+            'source_id' => $source->id,
+            'status' => 'completed',
+            'created_rows' => 1,
+            'missing_rows' => 1,
+            'conflict_rows' => 1,
+        ]);
+    }
+
+    public function test_url_source_can_still_mark_missing_units_as_leased(): void
+    {
+        $source = $this->urlSource();
+        $source->update(['missing_status' => 'leased']);
+
+        $first = $this->rdkPayload();
+        $second = $this->rdkPayload();
+        $second['units'] = array_values(array_filter($second['units'], fn ($u) => $u['id'] !== 2));
+        $second['units'][] = ['id' => 6, 'pid' => 1, 'tower' => 'I', 'unit' => '212', 'type' => '2BR', 'desc' => '', 'view' => 'Sea', 'rent' => 140000, 'display' => 'Show'];
+        $this->fakeRdk($first, $second);
+
+        $this->post(route('availability-sources.sync-url', $source));
+
+        $plain = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '211')->first();
+        $this->assertSame('ready_to_list', $plain->availability);
+
+        $this->post(route('availability-sources.sync-url', $source));
+
+        $plain->refresh();
+        $this->assertSame('leased', $plain->availability);
+    }
+
+    public function test_sync_url_fails_cleanly_when_no_url_or_fetch_fails(): void
+    {
+        $source = $this->createAmsSource();
+
+        $this->post(route('availability-sources.sync-url', $source))
+            ->assertSessionHasErrors('url');
+
+        $urlSource = $this->urlSource();
+        Http::fake(['https://rdk.ae/Listing/data.json' => Http::response('', 500)]);
+        $this->post(route('availability-sources.sync-url', $urlSource))
+            ->assertSessionHasErrors('url');
+
+        // a failed run is recorded, not silently swallowed
+        $this->assertDatabaseHas('availability_import_runs', [
+            'tenant_id' => $this->tenant->id,
+            'source_id' => $urlSource->id,
+            'status' => 'failed',
+        ]);
+    }
+
+    public function test_store_prefills_mapping_and_missing_status_for_url_sources(): void
+    {
+        $this->post(route('availability-sources.store'), [
+            'name' => 'RDK Properties',
+            'url' => 'https://rdk.ae/Listing/data.json',
+        ])->assertRedirect();
+
+        $source = AvailabilitySource::where('name', 'RDK Properties')->first();
+        $this->assertNotNull($source);
+        $this->assertSame('unlisted', $source->missing_status);
+        $this->assertSame('unit_no', $source->column_map['Unit']);
+        $this->assertSame('city', $source->column_map['City']);
+    }
+
+    public function test_row_city_overrides_the_source_default_city(): void
+    {
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Mix City',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false],
+            'column_map' => [
+                'col0' => 'unit_no',
+                'col1' => 'building',
+                'col2' => 'city',
+                'col3' => 'rent',
+            ],
+        ]);
+
+        $service = new AvailabilityIngestService;
+        $rows = $service->parseText(implode("\n", [
+            "501\tBurj X\tDubai\t250,000",
+            "502\tBurj Y\t\t150,000",
+        ]), $source->parse_options)['rows'];
+
+        $service->ingest($source, $rows, $this->tenant->id, $this->adminUser->id);
+
+        $dubai = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '501')->first();
+        $this->assertSame('Dubai', $dubai->city);
+
+        $fallback = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '502')->first();
+        $this->assertSame('Abu Dhabi', $fallback->city);
     }
 }

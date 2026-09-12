@@ -11,6 +11,7 @@ class AvailabilitySource extends Model
         'tenant_id',
         'name',
         'contact_info',
+        'url',
         'default_building',
         'default_category',
         'default_city',
@@ -20,6 +21,7 @@ class AvailabilitySource extends Model
         'column_map',
         'parse_options',
         'status_map',
+        'missing_status',
         'last_imported_at',
     ];
 
@@ -29,6 +31,7 @@ class AvailabilitySource extends Model
             'column_map' => 'array',
             'parse_options' => 'array',
             'status_map' => 'array',
+            'missing_status' => 'string',
             'default_deposit' => 'decimal:2',
             'default_admin_fee' => 'decimal:2',
             'default_tawtheeq_fee' => 'decimal:2',

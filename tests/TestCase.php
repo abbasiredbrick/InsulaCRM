@@ -13,13 +13,14 @@ abstract class TestCase extends BaseTestCase
     use RefreshDatabase;
 
     protected Tenant $tenant;
+
     protected User $adminUser;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        if (!file_exists(storage_path('installed.lock'))) {
+        if (! file_exists(storage_path('installed.lock'))) {
             file_put_contents(storage_path('installed.lock'), now()->toIso8601String());
             $this->installedLockCreated = true;
         }
@@ -29,7 +30,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function tearDown(): void
     {
-        if (!empty($this->installedLockCreated) && file_exists(storage_path('installed.lock'))) {
+        if (! empty($this->installedLockCreated) && file_exists(storage_path('installed.lock'))) {
             unlink(storage_path('installed.lock'));
         }
 
@@ -38,7 +39,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function seedRoles(): void
     {
-        $roles = ['admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent', 'listing_agent', 'buyers_agent'];
+        $roles = ['admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent', 'listing_agent', 'buyers_agent', 'marketing'];
         foreach ($roles as $name) {
             Role::updateOrCreate(['name' => $name], [
                 'display_name' => ucwords(str_replace('_', ' ', $name)),
@@ -89,12 +90,13 @@ abstract class TestCase extends BaseTestCase
     protected function actingAsAdmin(array $tenantOverrides = []): self
     {
         $this->createTenantWithAdmin($tenantOverrides);
+
         return $this->actingAs($this->adminUser);
     }
 
     protected function actingAsRole(string $roleName, array $tenantOverrides = []): User
     {
-        if (!isset($this->tenant)) {
+        if (! isset($this->tenant)) {
             $this->createTenantWithAdmin($tenantOverrides);
         }
 
@@ -114,7 +116,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function createDeal(array $overrides = []): \App\Models\Deal
     {
-        if (!isset($overrides['lead_id'])) {
+        if (! isset($overrides['lead_id'])) {
             $overrides['lead_id'] = $this->createLead()->id;
         }
 
@@ -126,7 +128,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function createProperty(array $overrides = []): \App\Models\Property
     {
-        if (!isset($overrides['lead_id'])) {
+        if (! isset($overrides['lead_id'])) {
             $overrides['lead_id'] = $this->createLead()->id;
         }
 

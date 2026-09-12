@@ -22,6 +22,11 @@
                             <label class="form-label">{{ __('Contact info') }}</label>
                             <input type="text" name="contact_info" class="form-control" value="{{ old('contact_info', $source->contact_info) }}">
                         </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('Public availability link') }}</label>
+                            <input type="url" name="url" class="form-control" value="{{ old('url', $source->url) }}" placeholder="{{ __('https://rdk.ae/Listing/data.json') }}">
+                            <div class="form-hint">{{ __('When set, a "Sync now" button appears below — it fetches the URL, imports only the published units, updates in place and handles decisions the same way as file imports.') }}</div>
+                        </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('Default building') }}</label>
                             <input type="text" name="default_building" class="form-control" value="{{ old('default_building', $source->default_building) }}">
@@ -73,6 +78,14 @@
                                 <input class="form-check-input" type="checkbox" name="has_header" value="1" {{ old('has_header', $source->parse_options['has_header'] ?? false) ? 'checked' : '' }}>
                                 <span class="form-check-label">{{ __('First row is a header row') }}</span>
                             </label>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('When a tracked unit leaves the list') }}</label>
+                            <select name="missing_status" class="form-select">
+                                <option value="leased" {{ old('missing_status', $source->missing_status ?: 'leased') === 'leased' ? 'selected' : '' }}>{{ __('Mark as leased (rented)') }}</option>
+                                <option value="unlisted" {{ old('missing_status', $source->missing_status ?: 'leased') === 'unlisted' ? 'selected' : '' }}>{{ __('Mark as unlisted (off the market)') }}</option>
+                            </select>
+                            <div class="form-hint">{{ __('Sheets: dropped = rented. Published links (e.g. RDK): hidden = off the market, use Unlisted.') }}</div>
                         </div>
                     </div>
                 </div>
@@ -146,6 +159,20 @@
     </div>
 
     <div class="col-lg-5">
+        @if($source->url)
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">{{ __('Sync from URL') }}</h3></div>
+                <div class="card-body">
+                    <div class="text-muted small mb-3">
+                        {{ __('Fetches :url and imports the units it currently publishes — nothing is duplicated, updated units change in place, and listed units it no longer shows go to the decision queue instead of being unlisted.', ['url' => $source->url]) }}
+                    </div>
+                    <form method="POST" action="{{ route('availability-sources.sync-url', $source) }}">
+                        @csrf
+                        <button class="btn btn-primary w-100">{{ __('Sync now') }}</button>
+                    </form>
+                </div>
+            </div>
+        @endif
         <div class="card mb-3">
             <div class="card-header"><h3 class="card-title">{{ __('How it works') }}</h3></div>
             <div class="card-body text-muted small">
@@ -153,7 +180,7 @@
                     <li>{{ __('Create one source per PM company (AMS, etc.).') }}</li>
                     <li>{{ __('Map their column layout once. Column names can be the actual header (e.g. "Unit No.") or positions (col0, col1…) when the sheet has no header.') }}</li>
                     <li>{{ __('Each time a refreshed list arrives (daily/every two days), go to Import List, upload the file or paste the text, review a preview, and run it.') }}</li>
-                    <li>{{ __('Rents, deposits, fees, availability and dates update in place. Units that disappear from the sheet are automatically marked unlisted so they stop showing as available.') }}</li>
+                    <li>{{ __('Rents, deposits, fees, availability and dates update in place. Units that disappear from the sheet are automatically marked unlisted so they stop showing as available — except units you have listed live on the portals, which keep their listing until an agent/manager decides to keep or unlist them (the madhmoun permit is costly to re-issue).') }}</li>
                 </ol>
             </div>
         </div>

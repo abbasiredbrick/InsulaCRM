@@ -12,6 +12,7 @@
     'amenities' => 'Amenities / facilities',
     'remarks' => 'Remarks & commission',
     'community' => 'Community / area',
+    'city' => 'City',
     'bedrooms' => 'Bedrooms',
     'bathrooms' => 'Bathrooms',
     'square_footage' => 'Square footage',

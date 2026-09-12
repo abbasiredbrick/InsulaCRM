@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('notifications:send-digest')->dailyAt('07:00');
         $schedule->command('digest:morning-summary')->dailyAt('07:30');
         $schedule->command('digest:expiring-contingencies')->dailyAt('08:00');
+        $schedule->command('leases:remind-expiring')->dailyAt('08:30');
         $schedule->command('digest:inactive-clients')->weeklyOn(1, '09:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {
@@ -58,7 +59,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->report(function (\Throwable $e) {
             try {
-                if (!app()->bound('db') || !Illuminate\Support\Facades\Schema::hasTable('error_logs')) {
+                if (! app()->bound('db') || ! Illuminate\Support\Facades\Schema::hasTable('error_logs')) {
                     return;
                 }
 

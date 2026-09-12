@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#0054a6">
-    <title>Offline - InsulaCRM</title>
+    <title>Offline - {{ config('app.name') }}</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -100,7 +100,7 @@
 </head>
 <body>
     <div class="offline-card">
-        <div class="brand">InsulaCRM</div>
+        <div class="brand">{{ config('app.name') }}</div>
 
         <div class="offline-icon">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -120,6 +120,6 @@
         <button class="btn-retry" onclick="window.location.reload()">Try Again</button>
     </div>
 
-    <div class="footer-text">InsulaCRM - Real Estate CRM</div>
+    <div class="footer-text">{{ config('app.name') }}</div>
 </body>
 </html>

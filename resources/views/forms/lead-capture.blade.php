@@ -88,7 +88,7 @@
                 </form>
             </div>
         </div>
-        <p class="text-center text-secondary mt-3" style="font-size: 0.75rem;">{{ __('Powered by InsulaCRM') }}</p>
+        <p class="text-center text-secondary mt-3" style="font-size: 0.75rem;">{{ __('Powered by {{ config('app.name') }}') }}</p>
     </div>
 </body>
 </html>

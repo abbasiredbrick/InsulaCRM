@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Models\AvailabilityReview;
 use App\Models\AvailabilitySource;
 use App\Models\Property;
+use App\Models\User;
+use App\Notifications\AvailabilityConflictAlert;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use ZipArchive;
 
@@ -36,7 +40,7 @@ class AvailabilityIngestService
         $grid = [];
         foreach ($lines as $line) {
             $cells = match ($delimiter) {
-                'tab' => str_getcsv($line, "\t"),
+                'tab' => str_getcsv($line, "\t", '"', '\\'),
                 'comma' => str_getcsv($line),
                 'semicolon' => str_getcsv($line, ';'),
                 default => preg_split('/[ \t]{2,}/', trim($line)) ?: [],
@@ -56,7 +60,7 @@ class AvailabilityIngestService
      */
     public function parseXlsx(string $path, array $parseOptions): array
     {
-        if (!class_exists(ZipArchive::class)) {
+        if (! class_exists(ZipArchive::class)) {
             throw new RuntimeException('PHP zip extension is required to read Excel files.');
         }
 
@@ -127,7 +131,7 @@ class AvailabilityIngestService
             }
         }
 
-        if (!$grid) {
+        if (! $grid) {
             throw new RuntimeException('Excel file contains no data.');
         }
 
@@ -137,11 +141,11 @@ class AvailabilityIngestService
     public function parseCsv(string $path, array $parseOptions): array
     {
         $handle = fopen($path, 'r');
-        if (!$handle) {
+        if (! $handle) {
             throw new RuntimeException('Unable to read file.');
         }
 
-        $delimiter = $parseOptions['delimiter'] ?? $this->detectDelimiter($path);
+        $delimiter = $this->normalizeDelimiter($parseOptions['delimiter'] ?? null, $path);
         $grid = [];
         while (($line = fgetcsv($handle, 0, $delimiter)) !== false) {
             $cells = array_map(fn ($c) => trim((string) $c), $line);
@@ -156,12 +160,134 @@ class AvailabilityIngestService
     }
 
     /**
+     * Fetch a PM's published availability from a public URL.
+     *
+     * Supports RDK-style portfolio JSON ({properties, units} — only the
+     * published "Show" units are imported) and falls back to CSV/TSV text for
+     * other sources that publish their list as a file.
+     *
+     * @return array{header: array<int, string>, rows: array<int, array<string, string>>}
+     */
+    public function fetchUrl(string $url): array
+    {
+        $response = Http::timeout(30)->get($url);
+
+        if ($response->failed()) {
+            throw new RuntimeException("Could not fetch availability URL ({$url}): HTTP {$response->status()}.");
+        }
+
+        $body = $response->body();
+        $decoded = json_decode($body, true);
+
+        if (is_array($decoded)) {
+            if (isset($decoded['units'], $decoded['properties']) && is_array($decoded['units'])) {
+                return $this->rdkJsonToRows($decoded);
+            }
+
+            if ($this->looksLikeRowList($decoded)) {
+                $header = array_keys($decoded[0]);
+                $rows = [];
+                foreach ($decoded as $item) {
+                    $row = [];
+                    foreach ($header as $column) {
+                        $value = $item[$column] ?? '';
+                        $row[$column] = is_scalar($value) ? trim((string) $value) : '';
+                    }
+                    $rows[] = $row;
+                }
+
+                return ['header' => $header, 'rows' => $rows];
+            }
+
+            throw new RuntimeException('Availability URL returned JSON, but not a recognised listings shape.');
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'avail_url_');
+        file_put_contents($tmp, $body);
+
+        try {
+            return $this->parseCsv($tmp, ['delimiter' => 'auto']);
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
+    /**
+     * Turn an RDK portfolio payload (https://rdk.ae/Listing/data.json) into
+     * rows. Only units published as available ("display": "Show") inside an
+     * active property appear — "Hide" units are inventory, not availability.
+     *
+     * @return array{header: array<int, string>, rows: array<int, array<string, string>>}
+     */
+    public function rdkJsonToRows(array $data): array
+    {
+        $properties = [];
+        foreach ($data['properties'] ?? [] as $property) {
+            if (is_array($property) && isset($property['id'])) {
+                $properties[(string) $property['id']] = $property;
+            }
+        }
+
+        $header = ['Unit', 'Tower', 'Property', 'City', 'Type', 'Remarks', 'Rent'];
+        $rows = [];
+
+        foreach ($data['units'] ?? [] as $unit) {
+            if (! is_array($unit)) {
+                continue;
+            }
+            if (($unit['display'] ?? 'Hide') !== 'Show') {
+                continue;
+            }
+
+            $property = $properties[(string) ($unit['pid'] ?? '')] ?? null;
+            if ($property && ($property['active'] ?? true) === false) {
+                continue;
+            }
+
+            $name = trim((string) ($property['name'] ?? ''));
+            $tower = trim((string) ($unit['tower'] ?? ''));
+            $building = trim($name.($tower !== '' ? ' Tower '.$tower : ''));
+
+            $view = trim((string) ($unit['view'] ?? ''));
+            $desc = trim((string) ($unit['desc'] ?? ''));
+            $remarks = trim(($view !== '' ? 'View: '.$view : '').($desc !== '' ? (($view !== '' ? '. ' : '').$desc) : ''));
+
+            $rent = (int) ($unit['rent'] ?? 0);
+
+            $rows[] = [
+                'Unit' => trim((string) ($unit['unit'] ?? '')),
+                'Tower' => $building,
+                'Property' => $name,
+                'City' => trim((string) ($property['city'] ?? '')),
+                'Type' => trim((string) ($unit['type'] ?? '')),
+                'Remarks' => $remarks,
+                'Rent' => $rent > 0 ? (string) $rent : '',
+            ];
+        }
+
+        if ($rows === []) {
+            throw new RuntimeException('The availability URL lists no published ("Show") units.');
+        }
+
+        return ['header' => $header, 'rows' => $rows];
+    }
+
+    protected function looksLikeRowList(array $decoded): bool
+    {
+        if ($decoded === [] || ! array_is_list($decoded) || ! is_array($decoded[0])) {
+            return false;
+        }
+
+        return $decoded[0] !== [];
+    }
+
+    /**
      * Apply a saved column map + normalizers and upsert into the property inventory,
      * reconciling units that disappeared from the sheet.
      *
      * @return array<string, mixed>
      */
-    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null): array
+    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null, ?int $runId = null): array
     {
         $columnMap = $source->column_map ?: [];
         $parseOptions = $source->parse_options ?: [];
@@ -172,12 +298,13 @@ class AvailabilityIngestService
         $updated = 0;
         $skipped = 0;
         $total = 0;
+        $conflicts = 0;
         $seenRefs = [];
         $skippedExamples = [];
 
         DB::transaction(function () use (
-            $rows, $columnMap, $statusMap, $city, $source, $tenantId, $userId,
-            &$created, &$updated, &$skipped, &$total, &$seenRefs, &$skippedExamples
+            $rows, $columnMap, $parseOptions, $statusMap, $city, $source, $tenantId, $runId,
+            &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples
         ) {
             foreach ($rows as $row) {
                 $total++;
@@ -185,32 +312,45 @@ class AvailabilityIngestService
                 $featuresRaw = '';
                 $amenitiesRaw = '';
                 $remarksRaw = '';
+                $rentRaw = '';
 
                 foreach ($columnMap as $header => $field) {
                     if (isset($row[$header])) {
-                        $raw = $row[$header];
+                        $raw = trim((string) $row[$header]);
+                        if ($raw === '') {
+                            continue;
+                        }
                         if ($field === 'features') {
-                            $featuresRaw = $raw;
+                            $featuresRaw = trim(($featuresRaw !== '' ? $featuresRaw.' / ' : '').$raw);
+
                             continue;
                         }
                         if ($field === 'amenities') {
-                            $amenitiesRaw = $raw;
+                            $amenitiesRaw = trim(($amenitiesRaw !== '' ? $amenitiesRaw.' / ' : '').$raw);
+
                             continue;
                         }
                         if ($field === 'remarks') {
-                            $remarksRaw = $raw;
+                            $remarksRaw = trim(($remarksRaw !== '' ? $remarksRaw.' / ' : '').$raw);
+
                             continue;
+                        }
+                        if ($field === 'rent' || $field === 'rent_price') {
+                            $rentRaw = $raw;
                         }
                         $data[$field] = $this->normalizeField($field, $raw);
                     }
                 }
 
                 $unitNo = trim((string) ($data['unit_no'] ?? ''));
+                if ($unitNo !== '' && preg_match('/\b(unit\s*no|no\.?\s*of\s*b|number|s\.?\s*no|sr\.?\s*no)\b/i', $unitNo) && ! preg_match('/[0-9]/', $unitNo)) {
+                    $unitNo = '';
+                }
                 $looksLikeUnit = $unitNo !== '' && (
                     preg_match('/[0-9]/', $unitNo)
                     || preg_match('/^(villa|plot|office|retail|shop|showroom|unit|penthouse)/i', $unitNo)
                 );
-                if (!$looksLikeUnit) {
+                if (! $looksLikeUnit) {
                     $skipped++;
                     if (count($skippedExamples) < 5) {
                         $skippedExamples[] = implode(' | ', array_values(array_filter(array_map(
@@ -218,6 +358,7 @@ class AvailabilityIngestService
                             $row
                         ))));
                     }
+
                     continue;
                 }
                 $building = trim((string) ($data['building'] ?? $data['sub_community'] ?? ''));
@@ -229,16 +370,19 @@ class AvailabilityIngestService
                 }
 
                 $features = $this->featuresFromRaw($featuresRaw);
-                $category = $data['property_category'] ?? ($source->default_category ?: $this->detectCategory($featuresRaw . ' ' . $building));
+                if (($features['bedrooms'] ?? null) === null && $rentRaw !== '' && preg_match('/\b(\d+)\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)/i', $rentRaw, $m)) {
+                    $features['bedrooms'] = (int) $m[1];
+                }
+                $category = $data['property_category'] ?? ($source->default_category ?: $this->detectCategory($featuresRaw.' '.$building));
                 $category = $category ?: 'apartment';
 
                 $rawStatus = (string) ($data['status'] ?? $data['source_status'] ?? '');
-                $availability = $statusMap[$this->normalizeWord($rawStatus)] ?? 'ready_to_list';
+                $availability = $this->resolveAvailability($statusMap, $rawStatus);
 
                 $handover = null;
                 $keyNotes = [];
                 foreach (['key_date', 'handover_date'] as $fd) {
-                    if (!empty($data[$fd])) {
+                    if (! empty($data[$fd])) {
                         $parsed = $this->parseFlexibleDate($data[$fd]);
                         if ($parsed) {
                             $handover = $parsed;
@@ -261,9 +405,24 @@ class AvailabilityIngestService
                 $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? $source->default_deposit ?? null;
                 $adminFee = $data['admin_fee'] ?? $source->default_admin_fee ?? null;
                 $rentPrice = $data['rent'] ?? $data['rent_price'] ?? null;
+                $perSqm = (bool) ($parseOptions['rent_is_per_sqm'] ?? false);
+                if ($rentPrice !== null && ($perSqm || ($rentRaw !== '' && preg_match('/\bper\s*sq/', strtolower($rentRaw))))) {
+                    $sqm = ($squareFootage !== null && $squareFootage > 0) ? $squareFootage / 10.7639 : null;
+                    if ($sqm !== null && $sqm > 0) {
+                        $rentPrice = (int) round($rentPrice * $sqm);
+                    }
+                }
+                if ($rentPrice === null && $remarkLine !== '') {
+                    $rentPrice = $this->rentFromRemarks($remarkLine);
+                }
                 $tawtheeqFee = $data['tawtheeq'] ?? $data['tawtheeq_fee'] ?? $source->default_tawtheeq_fee ?? null;
 
                 $notesParts = ["Source: {$source->name} availability sheet."];
+
+                $city = trim((string) ($data['city'] ?? ''));
+                if ($city === '') {
+                    $city = $source->default_city ?: 'Abu Dhabi';
+                }
                 if ($rawStatus !== '') {
                     $notesParts[] = "Status on sheet: {$rawStatus}.";
                 }
@@ -295,13 +454,13 @@ class AvailabilityIngestService
                 if ($deposit !== null || $adminFee !== null || $tawtheeqFee !== null) {
                     $bits = [];
                     if ($deposit !== null) {
-                        $bits[] = "Deposit: AED " . number_format($deposit);
+                        $bits[] = 'Deposit: AED '.number_format($deposit);
                     }
                     if ($adminFee !== null) {
-                        $bits[] = "Admin fee: AED " . number_format($adminFee);
+                        $bits[] = 'Admin fee: AED '.number_format($adminFee);
                     }
                     if ($tawtheeqFee !== null) {
-                        $bits[] = "Tawtheeq: AED " . number_format($tawtheeqFee);
+                        $bits[] = 'Tawtheeq: AED '.number_format($tawtheeqFee);
                     }
                     $descriptionParts[] = implode(' | ', $bits);
                 }
@@ -329,6 +488,8 @@ class AvailabilityIngestService
                     'sub_community' => $building,
                     'city' => $city,
                     'unit_no' => $unitNo,
+                    'floor_no' => $data['floor_no'] ?? null,
+                    'plot_no' => $data['plot_no'] ?? null,
                     'bedrooms' => $bedrooms !== null ? (int) $bedrooms : null,
                     'square_footage' => $squareFootage,
                     'furnishing' => $furnishing,
@@ -356,7 +517,7 @@ class AvailabilityIngestService
 
                 // Link a pre-existing unit (created manually / from another source)
                 // so re-imports update it instead of creating a duplicate.
-                if (!$existing) {
+                if (! $existing) {
                     $existing = Property::withoutGlobalScopes()
                         ->where('tenant_id', $tenantId)
                         ->where('intent', 'rent')
@@ -371,11 +532,30 @@ class AvailabilityIngestService
                 }
 
                 if ($existing) {
-                    // Reflect the PM sheet exactly: a unit the sheet marks leased/sold
-                    // becomes leased/sold here, even if it was previously available.
-                    $record['availability'] = $availability;
-                    $existing->update($record);
-                    $updated++;
+                    // A currently-listed unit the sheet now leases must NOT be
+                    // pulled off the portals automatically (madhmoun/marmoom
+                    // permits are costly to re-issue). Flag it for a human
+                    // decision and keep it listed so leads keep flowing in and
+                    // can be diverted to other units meanwhile.
+                    $leaseConflict = $existing->availability === 'listed' && $availability === 'leased';
+
+                    if ($leaseConflict) {
+                        $record['availability'] = 'listed';
+                        $record['notes'] = trim(($record['notes'] ?? '').' '.sprintf(
+                            'PM sheet marks this unit as leased per %s update on %s — kept listed pending a decision.',
+                            $source->name,
+                            now()->format('d.m.Y')
+                        ));
+                        $existing->update($record);
+                        $updated++;
+
+                        $this->flagConflict($existing, $source, 'sheet_says_leased', $runId);
+                        $conflicts++;
+                    } else {
+                        $record['availability'] = $availability;
+                        $existing->update($record);
+                        $updated++;
+                    }
                 } else {
                     // New units get the exact status shared by the PM.
                     $record['availability'] = $availability;
@@ -394,17 +574,36 @@ class AvailabilityIngestService
                 ->get();
 
             foreach ($linked as $property) {
-                $key = ($property->sub_community ?? '') . '|' . ($property->source_unit_ref ?? '');
-                if (!isset($seenRefs[$key]) && $property->availability_synced_at !== null) {
-                    // The unit is no longer in the PM sheet → treat it as leased,
-                    // exactly mirroring what the PM shared.
-                    $append = 'Leased per ' . $source->name . ' availability update on ' . now()->format('d.m.Y') . '.';
-                    $property->update([
-                        'availability' => 'leased',
-                        'notes' => trim(($property->notes ?? '') . ' ' . $append),
-                    ]);
-                    $missing++;
+                $key = ($property->sub_community ?? '').'|'.($property->source_unit_ref ?? '');
+                if (isset($seenRefs[$key]) || $property->availability_synced_at === null) {
+                    continue;
                 }
+
+                // Listed units that dropped off the sheet keep their portal
+                // listing until someone decides what to do with them — the
+                // re-listing permit is expensive to regenerate.
+                if ($property->availability === 'listed') {
+                    $this->flagConflict($property, $source, 'missing_from_sheet', $runId);
+                    $conflicts++;
+
+                    continue;
+                }
+
+                // Otherwise mirror what the PM shared: not on the sheet → apply
+                // the source's "missing" status (leased by default, unlisted for
+                // URL-published lists whose "hide" just means not published).
+                $missingStatus = $source->missing_status ?: 'leased';
+                if (! in_array($missingStatus, ['listed', 'ready_to_list', 'reserved', 'leased', 'sold', 'unlisted', 'draft'], true)) {
+                    $missingStatus = 'leased';
+                }
+                $append = $missingStatus === 'leased'
+                    ? 'Leased per '.$source->name.' availability update on '.now()->format('d.m.Y').'.'
+                    : 'Marked '.$missingStatus.' per '.$source->name.' availability update on '.now()->format('d.m.Y').'.';
+                $property->update([
+                    'availability' => $missingStatus,
+                    'notes' => trim(($property->notes ?? '').' '.$append),
+                ]);
+                $missing++;
             }
         }
 
@@ -415,9 +614,95 @@ class AvailabilityIngestService
             'created' => $created,
             'updated' => $updated,
             'missing' => $missing,
+            'conflicts' => $conflicts,
             'skipped' => $skipped,
             'skipped_examples' => $skippedExamples,
         ];
+    }
+
+    // ── Listed-unit conflict review ─────────────────────────────────────────
+
+    /**
+     * Record (once) that a listed unit needs an unlist / keep-listed decision,
+     * then notify the assigned agent and admins the first time only.
+     */
+    protected function flagConflict(Property $property, AvailabilitySource $source, string $reason, ?int $runId): void
+    {
+        $review = AvailabilityReview::withoutGlobalScopes()
+            ->where('tenant_id', $property->tenant_id)
+            ->where('property_id', $property->id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($review) {
+            $review->update([
+                'run_id' => $runId,
+                'notes' => trim(($review->notes ?? '').' '.sprintf(
+                    'Again flagged on %s (%s).',
+                    now()->format('d.m.Y'),
+                    AvailabilityReview::REASONS[$reason] ?? $reason
+                )),
+            ]);
+
+            return;
+        }
+
+        AvailabilityReview::create([
+            'tenant_id' => $property->tenant_id,
+            'property_id' => $property->id,
+            'source_id' => $source->id,
+            'run_id' => $runId,
+            'reason' => $reason,
+            'availability_before' => $property->availability ?? 'listed',
+            'status' => 'pending',
+            'notes' => sprintf(
+                'Flagged on %s: %s.',
+                now()->format('d.m.Y'),
+                AvailabilityReview::REASONS[$reason] ?? $reason
+            ),
+        ]);
+
+        $this->notifyConflict($property, $source);
+    }
+
+    protected function notifyConflict(Property $property, AvailabilitySource $source): void
+    {
+        $tenant = $property->tenant;
+        if (! $tenant || ! $tenant->wantsNotification('availability_conflict')) {
+            return;
+        }
+
+        $review = AvailabilityReview::withoutGlobalScopes()
+            ->where('tenant_id', $property->tenant_id)
+            ->where('property_id', $property->id)
+            ->latest('id')
+            ->first();
+
+        if (! $review) {
+            return;
+        }
+
+        $recipients = collect();
+
+        if ($property->assigned_agent_id && $property->assignedAgent) {
+            $recipients->push($property->assignedAgent);
+        }
+
+        $admins = User::where('tenant_id', $property->tenant_id)
+            ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+            ->get();
+
+        $recipients = $recipients->merge($admins)->unique('id')->filter(
+            fn ($user) => $user instanceof User
+        );
+
+        foreach ($recipients as $recipient) {
+            try {
+                $recipient->notify(new AvailabilityConflictAlert($review, $source->name));
+            } catch (\Throwable $e) {
+                Log::error("AvailabilityConflictAlert failed for user {$recipient->id}: {$e->getMessage()}");
+            }
+        }
     }
 
     // ── Normalizers ─────────────────────────────────────────────────────────
@@ -444,9 +729,36 @@ class AvailabilityIngestService
 
     protected function moneyNumeric(string $value): ?float
     {
+        $multiplier = 1;
+
+        if (preg_match('/(\d)\s*[Mm]/', $value)) {
+            $multiplier = 1_000_000;
+        } elseif (preg_match('/(\d)\s*[Kk]/', $value)) {
+            $multiplier = 1_000;
+        }
+
+        if (preg_match('/^([\d]+(?:[.,][\d]{3})*(?:[.,][\d]+)?)\s+\d+\s*(?:BR|BHK|BD|BED(?:ROOM)?S?)/i', $value, $m)) {
+            $value = $m[1];
+        }
+
         $value = preg_replace('/[^0-9.]/', '', $value);
         $value = rtrim((string) $value, '.');
-        return $value === '' || $value === '.' ? null : (float) $value;
+
+        if ($value === '' || $value === '.') {
+            return null;
+        }
+
+        return (float) $value * $multiplier;
+    }
+
+    protected function rentFromRemarks(string $value): ?float
+    {
+        if (preg_match('/^\s*(?:d|aed|dh|dhs|dirham|درهم)\s*([\d][\d,]*(?:\.\d+)?)/i', $value, $m)
+            || preg_match('/\brent(?:al)?\s*(?:of\s*|\:)?\s*(?:d|aed|dh|dhs)?\s*([\d][\d,]*(?:\.\d+)?)/i', $value, $m)) {
+            return $this->moneyNumeric($m[1]);
+        }
+
+        return null;
     }
 
     protected function parkingCount(string $value): ?int
@@ -464,12 +776,18 @@ class AvailabilityIngestService
         if (preg_match('/^(\d+)/', $value, $m)) {
             return (int) $m[1];
         }
+
         return null;
     }
 
     protected function intOrNull(string $value): ?int
     {
+        $value = trim($value);
+        if (preg_match('/^(\d+)\s*\+/', $value, $m)) {
+            return (int) $m[1];
+        }
         $value = preg_replace('/[^0-9]/', '', $value);
+
         return $value === '' ? null : (int) $value;
     }
 
@@ -477,11 +795,16 @@ class AvailabilityIngestService
     {
         if (preg_match('/([\d]+(?:[.,][\d]+)?)\s*(sqm|square\s*m(?:eter|etre)s?|sq\s*m|m²)/i', $value, $m)) {
             $num = (float) str_replace(',', '', $m[1]);
+
             return (int) round($num * 10.7639);
         }
         if (preg_match('/([\d]+(?:[.,][\d]+)?)\s*(sq\.?\s*ft|square\s*feet?|sq\s*foot|foot|sqft|sqf)/i', $value, $m)) {
             return (int) round((float) str_replace(',', '', $m[1]));
         }
+        if (preg_match('/^\s*([\d]+(?:[.,][\d]+)?)\s*$/', $value, $m)) {
+            return (int) round((float) str_replace(',', '', $m[1]) * 10.7639);
+        }
+
         return null;
     }
 
@@ -494,6 +817,7 @@ class AvailabilityIngestService
         if (str_contains($value, 'furnished')) {
             return 'furnished';
         }
+
         return null;
     }
 
@@ -518,6 +842,7 @@ class AvailabilityIngestService
         if (str_contains($value, 'retail') || str_contains($value, 'shop')) {
             return 'shop';
         }
+
         return 'apartment';
     }
 
@@ -533,7 +858,11 @@ class AvailabilityIngestService
         $summary = preg_replace('/\s{2,}/', ' ', $raw) ?: $raw;
 
         $bedrooms = null;
-        if (preg_match('/\b(\d+)\s*(?:BR|BD|bed(?:room)?s?)\b/i', $raw, $m)) {
+        if (preg_match('/\b(\d+)\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)/i', $raw, $m)) {
+            $bedrooms = (int) $m[1];
+        } elseif (preg_match('/\b(\d+)\s*PH(?:[\/+.\s-]|$)/i', $raw, $m)) {
+            $bedrooms = (int) $m[1];
+        } elseif (preg_match('/\b(\d+)\s*\+/i', $raw, $m)) {
             $bedrooms = (int) $m[1];
         } elseif (preg_match('/\bstudio\b/i', $raw)) {
             $bedrooms = 0;
@@ -556,7 +885,7 @@ class AvailabilityIngestService
             $bedrooms === null => '',
             $bedrooms === 0 => 'Studio ',
             $bedrooms === 1 => '1BR ',
-            default => $bedrooms . 'BR ',
+            default => $bedrooms.'BR ',
         };
         $label = Property::CATEGORIES[$category] ?? ucwords(str_replace('_', ' ', $category));
 
@@ -573,8 +902,14 @@ class AvailabilityIngestService
             'upcomingsoon' => 'ready_to_list',
             'underoffer' => 'reserved',
             'reserved' => 'reserved',
+            'booked' => 'reserved',
+            'hold' => 'reserved',
+            'undermaintenance' => 'reserved',
+            'unavailable' => 'reserved',
+            'notavailable' => 'reserved',
             'rented' => 'leased',
             'leased' => 'leased',
+            'let' => 'leased',
             'sold' => 'sold',
             'withdrawn' => 'unlisted',
             'offmarket' => 'unlisted',
@@ -588,6 +923,26 @@ class AvailabilityIngestService
         return $defaults;
     }
 
+    protected function resolveAvailability(array $statusMap, string $rawStatus): string
+    {
+        $norm = $this->normalizeWord($rawStatus);
+        if ($norm !== '' && isset($statusMap[$norm])) {
+            return $statusMap[$norm];
+        }
+
+        $tokens = array_values(array_filter(preg_split('/[^a-z]+/i', strtolower(trim($rawStatus)))));
+        $joined = '';
+        $fallback = null;
+        foreach ($tokens as $token) {
+            $joined .= $token;
+            if (isset($statusMap[$joined])) {
+                $fallback = $statusMap[$joined];
+            }
+        }
+
+        return $fallback ?? 'ready_to_list';
+    }
+
     protected function isUpcoming(string $rawStatus): bool
     {
         return str_contains(strtolower($rawStatus), 'upcoming')
@@ -599,6 +954,7 @@ class AvailabilityIngestService
     protected function normalizeWord(string $value): string
     {
         $value = strtolower(trim($value));
+
         return (string) preg_replace('/[^a-z]/', '', $value);
     }
 
@@ -618,6 +974,7 @@ class AvailabilityIngestService
                 // try next format
             }
         }
+
         return null;
     }
 
@@ -626,7 +983,7 @@ class AvailabilityIngestService
     protected function detectDelimiter(string $path): string
     {
         $handle = fopen($path, 'r');
-        if (!$handle) {
+        if (! $handle) {
             return ',';
         }
         $line = (string) (fgets($handle, 4096) ?: '');
@@ -637,7 +994,23 @@ class AvailabilityIngestService
             $candidates[$delimiter] = substr_count($line, $delimiter);
         }
         arsort($candidates);
+
         return array_key_first($candidates) ?: ',';
+    }
+
+    /**
+     * Turn a stored delimiter name (or auto-detection) into the single
+     * character fgetcsv() needs.
+     */
+    protected function normalizeDelimiter(?string $delimiter, string $path): string
+    {
+        return match ($delimiter) {
+            'tab' => "\t",
+            'comma' => ',',
+            'semicolon' => ';',
+            'multi_space', null, 'auto' => $this->detectDelimiter($path),
+            default => $delimiter,
+        };
     }
 
     protected function gridToRows(array $grid, array $parseOptions): array
@@ -655,7 +1028,7 @@ class AvailabilityIngestService
         } else {
             $header = [];
             for ($i = 0; $i < $max; $i++) {
-                $header[] = 'col' . $i;
+                $header[] = 'col'.$i;
             }
         }
 

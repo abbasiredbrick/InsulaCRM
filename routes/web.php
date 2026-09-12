@@ -1,72 +1,73 @@
 <?php
 
-use App\Http\Controllers\Auth\ForgotPasswordController;
-use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\Auth\RegisterController;
-use App\Http\Controllers\Auth\ResetPasswordController;
-use App\Http\Controllers\BuyerController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DncController;
-use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ActivityController;
-use App\Http\Controllers\DealController;
-use App\Http\Controllers\LeadController;
-use App\Http\Controllers\ListController;
-use App\Http\Controllers\PluginController;
-use App\Http\Controllers\PropertyController;
-use App\Http\Controllers\SequenceController;
-use App\Http\Controllers\TaskController;
-use App\Http\Controllers\InstallController;
-use App\Http\Controllers\AuditLogController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ActivityInboxController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiLogController;
-use App\Http\Controllers\CalendarController;
-use App\Http\Controllers\LeadKanbanController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SearchController;
-use App\Http\Controllers\TagController;
-use App\Http\Controllers\TwoFactorController;
-use App\Http\Controllers\UpdateController;
-use App\Http\Controllers\IntegrationController;
-use App\Http\Controllers\SsoController;
-use App\Http\Controllers\EmailTemplateController;
-use App\Http\Controllers\OnboardingController;
-use App\Http\Controllers\ThemeController;
-use App\Http\Controllers\ApiDocsController;
-use App\Http\Controllers\PdfExportController;
-use App\Http\Controllers\GdprController;
-use App\Http\Controllers\CalendarSyncController;
-use App\Http\Controllers\ErrorLogController;
-use App\Http\Controllers\KnowledgeBaseController;
-use App\Http\Controllers\Api\WebFormController;
 use App\Http\Controllers\Api\PortalWebhookController;
-use App\Http\Controllers\PortalIntegrationController;
+use App\Http\Controllers\Api\WebFormController;
+use App\Http\Controllers\ApiDocsController;
+use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\Auth\ForgotPasswordController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\BuyerController;
 use App\Http\Controllers\BuyerPortalController;
 use App\Http\Controllers\BuyerPortalSettingsController;
-use App\Http\Controllers\WebhookRecipeController;
-use App\Http\Controllers\ShowingController;
-use App\Http\Controllers\OpenHouseController;
-use App\Http\Controllers\ListingDashboardController;
-use App\Http\Controllers\ListingController;
-use App\Http\Controllers\ListingsController;
-use App\Http\Controllers\CampaignController;
-use App\Http\Controllers\WorkflowController;
-use App\Http\Controllers\DocumentTemplateController;
-use App\Http\Controllers\DocumentGeneratorController;
-use App\Http\Controllers\GoalController;
-use App\Http\Controllers\BuyerVerificationController;
 use App\Http\Controllers\BuyerTransactionController;
+use App\Http\Controllers\BuyerVerificationController;
+use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CalendarSyncController;
+use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ComparableSaleController;
-use App\Http\Controllers\ActivityInboxController;
-use App\Http\Controllers\SavedViewController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DealController;
 use App\Http\Controllers\DispositionRoomController;
+use App\Http\Controllers\DncController;
+use App\Http\Controllers\DocumentGeneratorController;
+use App\Http\Controllers\DocumentTemplateController;
+use App\Http\Controllers\EmailTemplateController;
+use App\Http\Controllers\ErrorLogController;
+use App\Http\Controllers\GdprController;
+use App\Http\Controllers\GoalController;
+use App\Http\Controllers\InstallController;
+use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\KnowledgeBaseController;
+use App\Http\Controllers\LeadController;
+use App\Http\Controllers\LeadKanbanController;
+use App\Http\Controllers\LeaseController;
+use App\Http\Controllers\ListController;
+use App\Http\Controllers\ListingController;
+use App\Http\Controllers\ListingDashboardController;
+use App\Http\Controllers\ListingsController;
+use App\Http\Controllers\MarketController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\OpenHouseController;
+use App\Http\Controllers\PdfExportController;
+use App\Http\Controllers\PluginController;
+use App\Http\Controllers\PortalIntegrationController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SavedViewController;
+use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SequenceController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ShowingController;
+use App\Http\Controllers\SsoController;
+use App\Http\Controllers\TagController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\UpdateController;
+use App\Http\Controllers\WebhookRecipeController;
+use App\Http\Controllers\WorkflowController;
 use Illuminate\Support\Facades\Route;
 
-// Redirect root to dashboard or login
+// Root: landing page for guests, dashboard for authenticated users
 Route::get('/', function () {
-    return auth()->check() ? redirect('/dashboard') : redirect('/login');
+    return auth()->check() ? redirect('/dashboard') : view('landing');
 });
 
 // Installer routes
@@ -93,6 +94,17 @@ Route::post('/portal/webhooks/{portal}', [PortalWebhookController::class, 'recei
     ->middleware('throttle:120,1')
     ->whereIn('portal', ['bayut', 'propertyfinder'])
     ->name('portal.webhooks.receive');
+
+// TEMPORARY one-time migration runner — REMOVE AFTER USE
+Route::get('/insula-migrate/{token}', function (string $token) {
+    if (! hash_equals('eed8cb9caa426e62d6249ac6f9eb096c', $token)) {
+        abort(404);
+    }
+
+    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+
+    return response('<pre>'.e(\Illuminate\Support\Facades\Artisan::output()).'</pre>');
+});
 
 // Public buyer portal (no auth)
 Route::get('/p/{slug}', [BuyerPortalController::class, 'show'])->name('buyer-portal.show');
@@ -124,8 +136,6 @@ Route::match(['get', 'post'], '/sso/{driver}/callback', [SsoController::class, '
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
-    Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('/register', [RegisterController::class, 'register'])->middleware('throttle:5,1');
     Route::get('/forgot-password', [ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
     Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLinkEmail'])->name('password.email')->middleware('throttle:5,1');
     Route::get('/reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
@@ -185,6 +195,28 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::delete('/open-house-attendees/{attendee}', [OpenHouseController::class, 'removeAttendee'])->name('open-houses.removeAttendee');
     });
 
+    // ── Leases (real estate agent mode) ──────────────────────────
+    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+        Route::get('/leases', [LeaseController::class, 'index'])->name('leases.index');
+        Route::get('/leases/create', [LeaseController::class, 'create'])->name('leases.create');
+        Route::post('/leases', [LeaseController::class, 'store'])->name('leases.store');
+        Route::post('/leases/{lease}/renew', [LeaseController::class, 'renew'])->name('leases.renew');
+        Route::post('/leases/{lease}/start-new-search', [LeaseController::class, 'startNewSearch'])->name('leases.startNewSearch');
+    });
+
+    // ── Market / Cold Calls (real estate agent mode) ────────────
+    Route::middleware(['role:admin,agent,marketing', 'mode:realestate'])->group(function () {
+        Route::get('/market', [MarketController::class, 'index'])->name('market.index');
+        Route::get('/market/import', [MarketController::class, 'create'])->name('market.create');
+        Route::post('/market/import', [MarketController::class, 'import'])->name('market.import');
+        Route::get('/market/{marketContact}', [MarketController::class, 'show'])->name('market.show');
+        Route::patch('/market/{marketContact}', [MarketController::class, 'update'])->name('market.update');
+        Route::post('/market/{marketContact}/status', [MarketController::class, 'updateStatus'])->name('market.status');
+        Route::post('/market/{marketContact}/convert-property', [MarketController::class, 'convertToProperty'])->name('market.convert-property');
+        Route::post('/market/{marketContact}/convert-lead', [MarketController::class, 'convertToLead'])->name('market.convert-lead');
+        Route::delete('/market/{marketContact}', [MarketController::class, 'destroy'])->name('market.destroy');
+    });
+
     // ── Listings (real estate agent mode) ───────────────────────────
     // '/listings' = Listed Units board; '/listings/mandates' = sales deal pipeline.
     Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
@@ -233,10 +265,18 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
             ->name('availability-sources.import-parse');
         Route::get('/availability-sources/{source}/review', [\App\Http\Controllers\AvailabilitySourceController::class, 'importReview'])
             ->name('availability-sources.review');
+        Route::post('/availability-sources/{source}/import-direct', [\App\Http\Controllers\AvailabilitySourceController::class, 'importDirect'])
+            ->name('availability-sources.import-direct');
+        Route::post('/availability-sources/{source}/sync-url', [\App\Http\Controllers\AvailabilitySourceController::class, 'syncUrl'])
+            ->name('availability-sources.sync-url');
         Route::post('/availability-sources/{source}/run', [\App\Http\Controllers\AvailabilitySourceController::class, 'importRun'])
             ->name('availability-sources.run');
         Route::post('/availability-sources/{source}/cancel', [\App\Http\Controllers\AvailabilitySourceController::class, 'importCancel'])
             ->name('availability-sources.cancel');
+        Route::get('/availability-sources/reviews', [\App\Http\Controllers\AvailabilitySourceController::class, 'reviews'])
+            ->name('availability-sources.reviews');
+        Route::post('/availability-sources/reviews/{review}/resolve', [\App\Http\Controllers\AvailabilitySourceController::class, 'resolve'])
+            ->name('availability-sources.reviews.resolve');
     });
 
     // ── Lead ↔ Inventory linking (lead is the entry point) ────────
@@ -507,6 +547,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::put('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.updateGeneral');
         Route::post('/settings/invite-agent', [SettingsController::class, 'inviteAgent'])->name('settings.inviteAgent');
         Route::patch('/settings/agents/{user}/toggle', [SettingsController::class, 'toggleAgent'])->name('settings.toggleAgent');
+        Route::put('/settings/agents/{user}/reset-password', [SettingsController::class, 'resetPasswordAgent'])->name('settings.resetPasswordAgent');
         Route::delete('/settings/agents/{user}/reset-2fa', [SettingsController::class, 'reset2fa'])->name('settings.reset2fa');
         Route::delete('/settings/agents/{user}', [SettingsController::class, 'destroyAgent'])->name('settings.destroyAgent');
         Route::put('/settings/business-mode', [SettingsController::class, 'updateBusinessMode'])->name('settings.updateBusinessMode');
@@ -674,8 +715,3 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     Route::get('/help', [KnowledgeBaseController::class, 'index'])->name('help.index');
     Route::get('/help/{slug}', [KnowledgeBaseController::class, 'show'])->name('help.show');
 });
-
-
-
-
-

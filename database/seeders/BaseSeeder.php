@@ -22,6 +22,7 @@ class BaseSeeder extends Seeder
             'agent' => 'Agent',
             'listing_agent' => 'Listing Agent',
             'buyers_agent' => 'Buyers Agent',
+            'marketing' => 'Marketing',
         ];
 
         foreach ($roles as $name => $displayName) {
@@ -74,6 +75,11 @@ class BaseSeeder extends Seeder
                 'deals.view', 'deals.create', 'deals.edit', 'deals.export',
                 'buyers.view', 'buyers.create', 'buyers.edit', 'buyers.export',
                 'properties.view',
+                'calendar.view', 'profile.edit',
+            ],
+            'marketing' => [
+                'leads.view', 'leads.create', 'leads.edit', 'leads.export',
+                'properties.view', 'properties.create', 'properties.edit',
                 'calendar.view', 'profile.edit',
             ],
         ];

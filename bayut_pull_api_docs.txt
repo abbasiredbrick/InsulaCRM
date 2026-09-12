@@ -1,0 +1,978 @@
+
+===== PAGE 1 =====
+Bayut
+ 
+
+===== PAGE 2 =====
+ 
+Pull  API  Leads  Documentation   
+Overview  1 
+Endpoint  2 
+Authorization  2 
+CURL  Request  2 
+Query  Params  3 
+Get  Leads  4 
+●  Email  Listing  Lead  4 
+●  Email  Agent  Lead  5 
+●  Email  Agency  Lead  6 
+●  WhatsApp  Listing  Leads  7 
+●  WhatsApp  Agent  Leads  8 ●  
+Call  Logs ●  
+Story  Lead 
+Get  Views  10 
+●  WhatsApp  Listing  Views  11 
+●  WhatsApp  Agent  Views  12 
+●  SMS  Listing  Views  14 ●  SMS  Agent  Views 16 ●  Phone  Listing  Views  17 ●  Phone  Agent  Views  18 ●  Phone  Agency  Views          
+
+
+===== PAGE 3 =====
+None
+ 
+Overview  
+This  document  provides  details  on  the  API  endpoint  used  to  pull  lead  data  from  Bayut.  It  includes  
+the
+ 
+endpoint
+ 
+URL,
+ 
+authorization
+ 
+requirements,
+ 
+query
+ 
+parameters,
+ 
+and
+ 
+sample
+ 
+responses.
+  
+The
+ 
+provided
+ 
+document
+ 
+offers
+ 
+a
+ 
+comprehensive
+ 
+guide
+ 
+to
+ 
+the
+ 
+API
+ 
+endpoint
+ 
+designed
+ 
+to
+ 
+retrieve
+ 
+lead
+ 
+data
+ 
+from
+ 
+bayut.
+ 
+This
+ 
+encompasses
+ 
+a
+ 
+range
+ 
+of
+ 
+essential
+ 
+details,
+ 
+including:
+ 
+●  Endpoint  URL:  The  specific  web  address  to  which  API  requests  should  be  directed.  ●  Authorization  Requirements:  The  necessary  credentials  or  permissions  needed  to  
+access
+ 
+the
+ 
+API
+ 
+and
+ 
+retrieve
+ 
+data.
+ ●  Query  Parameters:  The  parameters  that  can  be  included  in  the  API  request  to  filter  or  
+refine
+ 
+the
+ 
+data
+ 
+returned.
+ ●  Sample  Responses:  Examples  of  the  data  that  can  be  expected  in  response  to  API  
+requests,
+ 
+aiding
+ 
+in
+ 
+understanding
+ 
+the
+ 
+structure
+ 
+and
+ 
+format
+ 
+of
+ 
+the
+ 
+returned
+ 
+information.
+ 
+By  providing  this  information,  the  document  enables  developers  to  effectively  integrate  the  bayut  
+lead
+ 
+data
+ 
+into
+ 
+their
+ 
+own
+ 
+applications
+ 
+or
+ 
+systems.
+   
+Endpoint  
+ 
+www.bayut.com/api-v7/stats/website-client-leads 
+This  API  allows  clients  to  fetch  lead  data  based  on  speciﬁc  query  parameters.  
+ 
+Authorization  
+Each  client  is  provided  with  a  unique  API  key,  which  must  be  passed  as  a  bearer  token  in  the  
+authorization
+ 
+header.
+ 
+ 
+ 
+ 
+
+
+===== PAGE 4 =====
+None
+ CURL  Request  
+curl --location 'www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-0
+3-10%2000%3A00%3A00&target=listing&type=email&is_trulead=1' \ --header 'Authorization: Bearer <API KEY>'  
+ 
+Query  Params  
+ 
+ 
+ 
+ 
+       
+ 
+  
+ 
+  
+Parameter  Description  Possible  Values  
+type The  type  of  lead  whatsapp,  sms,  phone,  email 
+timestamp The  date  and  time  of  the  request  
+Format:  YYYY-MM-DD  HH:MM:SS 
+target The  entity  for  which  leads  are  fetched  
+listing,  agent,  agency 
+is_trulead Whether  its  lead  or  just  views  count   
+0,  1 
+
+
+===== PAGE 5 =====
+None
+None
+ 
+Get  Leads  
+The  below  examples  demonstrate  API  responses  for  leads  based  on  specific  lead  types  and  
+targets.
+ 
+Email  Listing  Lead  
+URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=listing&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|dffb56c2-3fa0515851b",          "source":  "bayut",          "date_time":  "2025-04-04  12:01:29",          "listing_details":  {              "listing_id":  1060074,              "listing_reference":  "axc-999922236",              "current_type":  "Apartment"          },          "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }   },   {          "lead_id":  "email|30c58fd4-73c4392636",          "source":  "bayut",          "date_time":  "2025-04-03  21:48:54",          "listing_details":  {              "listing_id":  102222746,              "listing_reference":  "axc-32222231",              "current_type":  "Apartment"          },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."  
+
+
+===== PAGE 6 =====
+None
+None
+ 
+       }  
+  
+},
+ ]
+ 
+  
+ 
+Email  Agent  Lead  
+URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agent&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|be0a8a6b-87d3-4961-ec28a607bf",          "source":  "bayut",          "date_time":  "2025-04-07  04:17:28",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",         "name":  "John  Doe",          "email":  "john.doe@agent.com"       },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }  },  
+   
+ 
+{
+         "lead_id":  "email|6a2643cc-1c02-4f39-b265-ddf1914a9e2e",          "source":  "bayut",          "date_time":  "2025-04-04  04:18:07",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "inquirer_details":  {          "name":  "Jane  Austin",  
+
+
+===== PAGE 7 =====
+None
+None
+ 
+        "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }   },  ]  
+Email  Agency  Lead  
+URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agency&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|ea72c332-b0aa-4c46-b7cc-ad913ca09354",          "source":  "bayut",          "date_time":  "2025-03-27  13:17:02",          "agency_details":  {              "url":  "https://www.bayut.com/companies/explorer-real-estate-8266/",              "name":  "Explor  Real  Estate"          },   "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  agency  &  properties."         }      },      {          "lead_id":  "email|636dee16-de90-4fc4-b447-dbfd353e0434",          "source":  "bayut",          "date_time":  "2025-03-27  12:05:51",          "agency_details":  {              "url":  "https://www.bayut.com/companies/explor-estate-8266/,               "name":  "Explor  Real  Estate"          },        "inquirer_details":  {          "name":  "Jane  Austin",  
+
+
+===== PAGE 8 =====
+None
+None
+ 
+        "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "message  from  lead  user"        }      },  ]  
+ 
+WhatsApp  Listing  Leads  
+URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=listing&type=whatsapp&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "whatsapp|30c58fd4-73c4392636",          "source":  "bayut",          "date_time":  "2025-04-03  21:48:54",          "listing_details":  {              "listing_id":  102222746,              "listing_reference":  "axc-32222231",              "current_type":  "Apartment"          },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",          "message":  "I  am  interested  in  this  property."         },   "delivery_notifications":  [       {                  "status":  "read",                  "created_at":  "2025-04-04  16:50:08"              },              {                  "status":  "sent",                  "created_at":  "2025-04-04  16:43:08"  
+
+
+===== PAGE 9 =====
+None
+None
+ 
+            },              {                  "status":  "delivered",                  "created_at":  "2025-04-04  16:43:09"              }          ]  
+  
+},
+ ]
+ 
+WhatsApp  Agent  Leads  
+URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agent&type=whatsapp&is_trulead=1
+ 
+ Response   
+[{          "date_time":  "2025-10-08  05:47:13",          "source":  "bayut",          "lead_id":  "whatsapp|c943d6ac-8e96-4b24-8256-ee8cc819dbee",         "visitor_intent":  "Buying/Renting",          "agent_details":  {              "url":  
+"https://www.bayut.com/brokers/marcela-herrera-1033197.html",
+             "name":  "Marcela  Herrera",              "email":  "marcela@drivenproperties.com"          },          "inquirer_details":  {              "name":  "Anastasiia",              "cell":  "+38073211XXX",              "email":  "",              "message":  "test  message"          },          "delivery_notifications":  [              {                  "status":  "sent",                  "created_at":  "2025-10-08  05:48:21"  
+
+
+===== PAGE 10 =====
+None
+None
+ 
+            },              {                  "status":  "delivered",                  "created_at":  "2025-10-08  05:48:21"              }          ]      }     ]
+ 
+ 
+Get  Views  
+This  API  endpoint  retrieves  the  number  of  views  generated  from  different  lead  types.  Below  are  
+examples
+ 
+of
+ 
+how
+ 
+to
+ 
+retrieve
+ 
+views
+ 
+for
+ 
+specific
+ 
+lead
+ 
+types
+ 
+and
+ 
+targets.
+ 
+WhatsApp  Listing  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=listing&type=whatsapp&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "whatsapp|30c58fd4-73c439263",          "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  8716595,              "listing_reference":  "axc-39999364",        "current_type":  "Apartment"          },          "whatsapp_views":  8      },      {  
+
+
+===== PAGE 11 =====
+None
+None
+ 
+        "lead_id":  "whatsapp|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "whatsapp_views":  24      },  ]  
+  
+WhatsApp  Agent  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agent&type=whatsapp&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "whatsapp|30c58fd4-73c439263",          "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "whatsapp_views":  8      },      {          "lead_id":  "whatsapp|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",  
+
+
+===== PAGE 12 =====
+None
+None
+ 
+        "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "whatsapp_views":  24      },  ]  
+ 
+ 
+ 
+SMS  Listing  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=listing&type=sms&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+ 
+        "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "sms_views":  8      },      {          "lead_id":  "sms|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",           "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",  
+
+
+===== PAGE 13 =====
+None
+None
+ 
+      "current_type":  "Apartment"          },          "sms_views":  24      },  ]  
+ 
+SMS  Agent  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agent&type=sms&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+         "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "sms_views":  8      },      {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+         "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "sms_views":  24      },  ]  
+
+
+===== PAGE 14 =====
+None
+None
+   
+ 
+    
+Phone  Listing  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=listing&type=phone&is_trulead=0
+ 
+ Response  
+[       {          "lead_id": "phone|a74c138f-43b5-0e3",
+ 
+        "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "phone_views":  8      },      {          "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",           "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "phone_views":  24      },  
+
+
+===== PAGE 15 =====
+None
+None
+ 
+]  
+  
+ 
+  
+Phone  Agent  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agent&type=phone&is_trulead=0
+ 
+ Response  
+[       {           "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "phone_views":  8      },      {        "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.bayut.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "phone_views":  24  
+
+
+===== PAGE 16 =====
+None
+None
+ 
+    },  ]  
+ 
+ 
+ 
+Phone  Agency  Views  
+ URL  
+www.bayut.com/api-v7/stats/website-client-leads?timestamp=2025-03-10%200
+0%3A00%3A00&target=agency&type=phone&is_trulead=0
+ 
+ Response  
+[       {        "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-03-28  17:51:46",           "agency_details":  {              "url":  "https://www.bayut.com/companies/explor-estate-8556/,              "name":  "Explor  Real  Estate"          },          "phone_views":  8      },      {          "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",           "agency_details":  {              "url":  "https://www.bayut.com/companies/explor-estate-8556/,              "name":  "Explor  Real  Estate"          },          "phone_views":  24      },  
+
+
+===== PAGE 17 =====
+None
+JSON
+ 
+]  
+ 
+Call  Logs  
+URL 
+www.bayut.com/api-v7/s tats/website-client-leads?type=call_logs&timestamp=2023-0
+4-26 00:00:00 
+Response
+ 
+[     {         "call_log_id":1234567,         "listing_reference":"",        "lead_id":"",        "object_type_id":  1,         "object_id":  1234567,         "stats_ip_id":  1234567,         "date":  "2023-04-26",         "time":  "15:26:23",         "role_id":  11,         "caller_number":  "+97112345678",         "proxy_number":  "+97112345678",         "receiver_numbers_list":  "+971123456789#35,+971123456789#35",         "receiver_number":  "+971123456789",         "call_status":  "connected",         "call_total_duration":  "0:03:23",         "call_connected_duration":  "00:02:54",         "call_time":  "2023-04-26  15:26:17",         "call_pickup_time":  "2023-04-26  15:26:23",         "call_recordingurl":  "https://sr.knowlarity.com/vr/fetchsound/?callid=<call-id>",         "caller_location":  "United  Arab  Emirates",         "source":  "knowlarity",         "is_object_fecthed":  0,         "reference_log_id":  123456789,  
+
+
+===== PAGE 18 =====
+None
+JSON
+ 
+       "call_type":  "in"     }  ]  
+Call  Logs  
+URL 
+www.bayut.com/api-v7/s tats/website-client-leads?type=call_logs&timestamp=2023-0
+4-26 00:00:00 
+Response
+ 
+[     {         "call_log_id":1234567,         "listing_reference":"",        "lead_id":"",        "object_type_id":  1,         "object_id":  1234567,         "stats_ip_id":  1234567,         "date":  "2023-04-26",         "time":  "15:26:23",         "role_id":  11,         "caller_number":  "+97112345678",         "proxy_number":  "+97112345678",         "receiver_numbers_list":  "+971123456789#35,+971123456789#35",         "receiver_number":  "+971123456789",         "call_status":  "connected",         "call_total_duration":  "0:03:23",         "call_connected_duration":  "00:02:54",         "call_time":  "2023-04-26  15:26:17",         "call_pickup_time":  "2023-04-26  15:26:23",         "call_recordingurl":  "https://sr.knowlarity.com/vr/fetchsound/?callid=<call-id>",         "caller_location":  "United  Arab  Emirates",         "source":  "knowlarity",         "is_object_fecthed":  0,  
+
+
+===== PAGE 19 =====
+None
+JSON
+ 
+       "reference_log_id":  123456789,         "call_type":  "in"     }  ]  
+Story  Lead  
+URL 
+www.bayut.com/api-v7/s tats/website-client-leads?type=story_leads&timestamp=2023
+-04-26 00:00:00 
+Response
+ 
+[    {          "lead_id":  "phone|8f9b7366-17e4-4f23-896c-f10b1a7b2f76",          "source":  "bayut",          "lead_target":  "story",          "date_time":  "2025-10-04  12:28:55",          "inquirer_details":  {              "name":  "",              "cell":  "",              "email":  "",              "message":  ""          },          "story_details":  {              "story_id":  9081,              "listing_details":  {                  "listing_id":  12152371,                  "listing_reference":  "DP-S-52056",                  "current_type":  "Apartment",                  "listing_url":  "https://www.bayut.com/property/details-12152371.html"              },              "project_details":  {                  "project_name_en":  "Swimming  Pool  View  |  Mid  Floor  |  
+Furnished",  
+
+
+===== PAGE 20 =====
+ 
+                "project_name_ar":  null,                  "developer_name_en":  "Driven  Properties",                  "developer_name_ar":  
+"
+درﻓﻦ
+ 
+ﻟﻠﻌﻘﺎرات
+",                  project_property_types_name_en":  "",                  "project_property_types_name_ar":  "",                  "project_image_path":  "https://images.bayut.com/thumbnails/783479847-240x180.jpeg",                  "project_lpv_url_en":  null,                  "project_lpv_url_ar":  null              }          }      }  ]  
+ 
+
+
+===== PAGE 21 =====
+ 
+dubizzle  
+
+===== PAGE 22 =====
+ 
+Pull  API  Leads  Documentation  -  dubizzle  
+Overview  1 
+Endpoint  2 
+Authorization  2 
+CURL  Request  2 
+Query  Params  3 
+Get  Leads  4 
+●  Email  Listing  Lead  4 
+●  Email  Agent  Lead  5 
+●  Email  Agency  Lead  6 
+●  WhatsApp  Listing  Leads  7 
+●  WhatsApp  Agent  Leads  8 
+●  Call  Logs 9 
+Get  Views  10 
+●  WhatsApp  Listing  Views  11 
+●  WhatsApp  Agent  Views  12 
+●  SMS  Listing  Views  14 ●  SMS  Agent  Views 16 ●  Phone  Listing  Views  17 ●  Phone  Agent  Views  18 ●  Phone  Agency  Views  19          
+
+
+===== PAGE 23 =====
+None
+ 
+Overview  
+This  document  provides  details  on  the  API  endpoint  used  to  pull  lead  data  fromDubizzle.  It  
+includes
+ 
+the
+ 
+endpoint
+ 
+URL,
+ 
+authorization
+ 
+requirements,
+ 
+query
+ 
+parameters,
+ 
+and
+ 
+sample
+ 
+responses.The
+ 
+provided
+ 
+document
+ 
+offers
+ 
+a
+ 
+comprehensive
+ 
+guide
+ 
+to
+ 
+the
+ 
+API
+ 
+endpoint
+ 
+designed
+ 
+to
+ 
+retrieve
+ 
+lead
+ 
+data
+ 
+from
+ 
+dubizzle.
+ 
+This
+ 
+encompasses
+ 
+a
+ 
+range
+ 
+of
+ 
+essential
+ 
+details,
+ 
+including:
+ 
+●  Endpoint  URL:  The  specific  web  address  to  which  API  requests  should  be  directed.  ●  Authorization  Requirements:  The  necessary  credentials  or  permissions  needed  to  
+access
+ 
+the
+ 
+API
+ 
+and
+ 
+retrieve
+ 
+data.
+ ●  Query  Parameters:  The  parameters  that  can  be  included  in  the  API  request  to  filter  or  
+refine
+ 
+the
+ 
+data
+ 
+returned.
+ ●  Sample  Responses:  Examples  of  the  data  that  can  be  expected  in  response  to  API  
+requests,
+ 
+aiding
+ 
+in
+ 
+understanding
+ 
+the
+ 
+structure
+ 
+and
+ 
+format
+ 
+of
+ 
+the
+ 
+returned
+ 
+information.
+ 
+By  providing  this  information,  the  document  enables  developers  to  effectively  integrate  the  
+Dubizzle
+ 
+lead
+ 
+data
+ 
+into
+ 
+their
+ 
+own
+ 
+applications
+ 
+or
+ 
+systems.
+   
+Endpoint  
+ 
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads 
+This  API  allows  clients  to  fetch  lead  data  based  on  speciﬁc  query  parameters.  
+ 
+Authorization  
+Each  client  is  provided  with  a  unique  API  key,  which  must  be  passed  as  a  bearer  token  in  the  
+authorization
+ 
+header.
+ 
+
+
+===== PAGE 24 =====
+None
+ 
+ 
+CURL  Request  
+curl --location 'https://dubizzle.com/profolio/api-v7/stats/website-client-leads?
+timestamp=2025-03-10%2000%3A00%3A00&target=listing&type=email&is_
+trulead=1' \ --header 'Authorization: Bearer <API KEY>'  
+ 
+Query  Params  
+ 
+ 
+ 
+ 
+      
+ 
+       
+Parameter  Description  Possible  Values  
+type The  type  of  lead  whatsapp,  sms,  phone,  email 
+timestamp The  date  and  time  of  the  request  
+Format:  YYYY-MM-DD  HH:MM:SS 
+target The  entity  for  which  leads  are  fetched  
+listing,  agent,  agency 
+is_trulead Whether  its  lead  or  just  views  count   
+0,  1 
+
+
+===== PAGE 25 =====
+None
+None
+  
+Get  Leads  
+The  below  examples  demonstrate  API  responses  for  leads  based  on  specific  lead  types  and  
+targets.
+ 
+Email  Listing  Lead  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=listing&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|dffb56c2-3fa0515851b",          "source":  "dubizzle",          "date_time":  "2025-04-04  12:01:29",          "listing_details":  {              "listing_id":  1060074,              "listing_reference":  "axc-999922236",              "current_type":  "Apartment"          },          "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }   },   {  
+      
+  "lead_id":  "email|30c58fd4-73c4392636",          "source":  "dubizzle",          "date_time":  "2025-04-03  21:48:54",          "listing_details":  {              "listing_id":  102222746,              "listing_reference":  "axc-32222231",  
+
+
+===== PAGE 26 =====
+None
+None
+ 
+            "current_type":  "Apartment"          },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }  
+  
+},
+ ]
+ 
+  
+ 
+Email  Agent  Lead  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agent&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|be0a8a6b-87d3-4961-9647-bbec28a607bf",          "source":  "dubizzle",          "date_time":  "2025-04-07  04:17:28",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",         "name":  "John  Doe",          "email":  "john.doe@agent.com"       },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",  
+ 
+ 
+"email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }  
+
+
+===== PAGE 27 =====
+None
+None
+ 
+},  
+   
+ 
+{
+         "lead_id":  "email|6a2643cc-1c02-4f39-b265-ddf1914a9e2e",          "source":  "dubizzle",          "date_time":  "2025-04-04  04:18:07",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  properties."         }   },  ]  
+  
+Email  Agency  Lead  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agency&type=email&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "email|ea72c332-b0aa-4c46-b7cc-ad913ca09354",          "source":  "dubizzle",          "date_time":  "2025-03-27  13:17:02",          "agency_details":  {              "url":  
+"https://www.dubizzle.com/companies/explorer-real-estate-8266/",
+ 
+
+
+===== PAGE 28 =====
+ 
+            "name":  "Explor  Real  Estate"          },   "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "I  would  like  to  find  out  more  about  your  agency  &  
+properties."
+        }      },      {          "lead_id":  "email|636dee16-de90-4fc4-b447-dbfd353e0434",          "source":  "dubizzle",          "date_time":  "2025-03-27  12:05:51",          "agency_details":  {              "url":  "https://www.dubizzle.com/companies/explor-estate-8266/,               "name":  "Explor  Real  Estate"          },        "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",    "email":  "jane.test@gmail.com",          "message":  "message  from  lead  user"  
+     
+ }      },  ]  
+ 
+ 
+        
+
+
+===== PAGE 29 =====
+None
+None
+ 
+WhatsApp  Listing  Leads  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=listing&type=whatsapp&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "whatsapp|30c58fd4-73c439263",          "source":  "dubizzle",          "date_time":  "2025-04-03  21:48:54",          "listing_details":  {              "listing_id":  102222746,              "listing_reference":  "axc-32222231",              "current_type":  "Apartment"          },           "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",          "message":  "I  am  interested  in  this  property."         },   "delivery_notifications":  [       {                  "status":  "read",                  "created_at":  "2025-04-04  16:50:08"              },              {                  "status":  "sent",                  "created_at":  "2025-04-04  16:43:08"              },              {                  "status":  "delivered",                  "created_at":  "2025-04-04  16:43:09"              }          ]  
+  
+},
+ ]
+ 
+
+
+===== PAGE 30 =====
+None
+None
+ 
+WhatsApp  Agent  Leads  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agent&type=whatsapp&is_trulead=1
+ 
+ Response   
+[   {          "lead_id":  "whatsapp|30c58fd4-73c4392636",          "source":  "dubizzle",          "date_time":  "2025-04-03  21:48:54",           "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "inquirer_details":  {          "name":  "Jane  Austin",          "cell":  "971581222111",          "message":  "I  would  like  to  find  out  more  about  your  properties."         },   "delivery_notifications":  [       {                  "status":  "read",                  "created_at":  "2025-04-04  16:50:08"              },              {                  "status":  "sent",                  "created_at":  "2025-04-04  16:43:08"              },              {                  "status":  "delivered",                  "created_at":  "2025-04-04  16:43:09"              }          ]  
+  
+},
+ ]
+  
+ 
+
+
+===== PAGE 31 =====
+None
+None
+   
+Get  Views  
+This  API  endpoint  retrieves  the  number  of  views  generated  from  different  lead  types.  Below  are  
+examples
+ 
+of
+ 
+how
+ 
+to
+ 
+retrieve
+ 
+views
+ 
+for
+ 
+specific
+ 
+lead
+ 
+types
+ 
+and
+ 
+targets.
+ 
+WhatsApp  Listing  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=listing&type=whatsapp&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "empg|hha|ae|b-8717775|whatsapp|28622724",          "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  8716595,              "listing_reference":  "axc-39999364",        "current_type":  "Apartment"          },          "whatsapp_views":  8      },      {          "lead_id":  "whatsapp|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "whatsapp_views":  24      },  ]  
+
+
+===== PAGE 32 =====
+None
+None
+ 
+WhatsApp  Agent  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agent&type=whatsapp&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "empg|hha|ae|b-8717775|whatsapp|28622724",          "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "whatsapp_views":  8      },      {          "lead_id":  "whatsapp|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "whatsapp_views":  24      },  ]  
+       
+
+
+===== PAGE 33 =====
+None
+None
+ 
+SMS  Listing  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=listing&type=sms&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+ 
+        "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "sms_views":  8      },      {          "lead_id":  "sms|0535a76a-9e5b-455ca",          "date_time":  "2024-10-06  02:22:49",           "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "sms_views":  24      },  ]  
+ 
+ 
+  
+
+
+===== PAGE 34 =====
+None
+None
+ 
+SMS  Agent  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agent&type=sms&is_trulead=0
+ 
+ Response  
+[       {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+         "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "sms_views":  8      },      {          "lead_id":  "sms|59b12188-523-bf4a39a"
+,
+         "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "sms_views":  24      },  ]  
+ 
+ 
+    
+
+
+===== PAGE 35 =====
+None
+None
+ 
+ 
+ 
+Phone  Listing  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=listing&type=phone&is_trulead=0
+ 
+ Response  
+[       {          "lead_id": "phone|a74c138f-43b5-0e3",
+ 
+        "date_time":  "2024-03-28  17:51:46",          "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "phone_views":  8      },      {          "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",           "listing_details":  {              "listing_id":  9304727,              "listing_reference":  "axc-349",        "current_type":  "Apartment"          },          "phone_views":  24      },  ]  
+     
+
+
+===== PAGE 36 =====
+None
+None
+  
+Phone  Agent  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agent&type=phone&is_trulead=0
+ 
+ Response  
+[       {           "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-03-28  17:51:46",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "phone_views":  8      },      {        "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",          "agent_details":  {          "url":  "https://www.dubizzle.com/brokers/john-doe-575554.html",          "name":  "John  Doe",          "email":  "john.doe@agent.com"       },          "phone_views":  24      },  ]  
+ 
+
+
+===== PAGE 37 =====
+None
+None
+ 
+ 
+ 
+ 
+Phone  Agency  Views  
+ URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?timestam
+p=2025-03-10%2000%3A00%3A00&target=agency&type=phone&is_trulead=0
+ 
+ Response  
+[       {        "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-03-28  17:51:46",           "agency_details":  {              "url":  "https://www.dubizzle.com/companies/explor-estate-8556/,              "name":  "Explor  Real  Estate"          },          "phone_views":  8      },      {          "lead_id":  "phone|a74c138f-43b5-4a31-8e12-57e3",          "date_time":  "2024-10-06  02:22:49",           "agency_details":  {              "url":  "https://www.dubizzle.com/companies/explor-estate-8556/,              "name":  "Explor  Real  Estate"          },          "phone_views":  24      },  ]  
+ 
+
+
+===== PAGE 38 =====
+None
+None
+ 
+ 
+ 
+ 
+  
+Call  Logs  
+URL  
+https://dubizzle.com/profolio/api-v7/stats/website-client-leads?type=call_logs&
+timestamp=2024-04-26 00:00:00 
+Response   
+[     {         "call_log_id": "phone|12345679-560c-4948-a12b-60ca8360f4ea",         "listing_reference": "ABC-123",         "lead_id": "phone|12345679-560c-4948-a12b-60ca8360f4ea",         "object_type_id": 1,         "object_id": 1234,         "stats_ip_id": "phone|12345679-560c-4948-a12b-60ca8360f4ea",         "date": "2024-05-15",         "time": "14:57:07",         "role_id": 11,         "caller_number": "+97112345678",         "proxy_number": "+97112345678",         "receiver_numbers_list": "+971123456789#35,+971123456789#35",         "receiver_number": "+97112345678",         "call_status": "connected",         "call_total_duration": "00:05:23",         "call_connected_duration": "00:05:10",         "call_time": "2023-04-26  15:26:23",         "call_pickup_time": "2023-04-26  15:26:23", 
+
+
+===== PAGE 39 =====
+ 
+        "call_recordingurl": "https://sr.knowlarity.com/vr/fetchsound/?callid=b2447b38-1d17-4175-8958-9bd166
+63013e",         "caller_location": "United  Arab  Emirates",         "source": "knowlarity",         "is_object_fecthed": 0,         "reference_log_id": 123456789,         "call_type": "in"     }  ] 
+ 
