@@ -11,7 +11,7 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var CACHE_VERSION = 'v1.1.0';
+var CACHE_VERSION = 'v1.2.0';
 var STATIC_CACHE = 'insulacrm-static-' + CACHE_VERSION;
 var DYNAMIC_CACHE = 'insulacrm-dynamic-' + CACHE_VERSION;
 

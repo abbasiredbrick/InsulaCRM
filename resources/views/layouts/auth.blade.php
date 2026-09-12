@@ -15,7 +15,7 @@
         <div class="container container-tight py-4">
             <div class="text-center mb-4">
                 <a href="{{ url('/') }}">
-                    <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}" style="max-height: 60px; max-width: 280px;">
+                    <img src="{{ asset('images/logo.png') . '?v=keystone' }}" alt="{{ config('app.name') }}" style="max-height: 60px; max-width: 280px;">
                 </a>
             </div>
             @yield('content')

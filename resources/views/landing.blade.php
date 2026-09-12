@@ -19,7 +19,7 @@
                 </div>
             </div>
             <div class="col-lg-5">
-                <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}" class="landing-logo">
+                <img src="{{ asset('images/logo.png') . '?v=keystone' }}" alt="{{ config('app.name') }}" class="landing-logo">
             </div>
         </div>
     </div>

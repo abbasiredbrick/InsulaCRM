@@ -12,7 +12,7 @@
         <div class="container container-tight py-4">
             <div class="text-center mb-4">
                 <a href="{{ url('/') }}">
-                    <img src="{{ asset('images/logo.png') }}" alt="{{ config('app.name') }}" style="max-height: 48px; max-width: 220px;">
+                    <img src="{{ asset('images/logo.png') . '?v=keystone' }}" alt="{{ config('app.name') }}" style="max-height: 48px; max-width: 220px;">
                 </a>
             </div>
             <div class="card card-md">

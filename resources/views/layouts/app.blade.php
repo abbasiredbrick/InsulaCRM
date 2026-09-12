@@ -97,7 +97,7 @@
                 </button>
                 <h1 class="navbar-brand navbar-brand-autodark" style="margin-bottom: 0;">
                     <a href="{{ route('dashboard') }}" style="display:inline-block; background:#fff; border-radius:8px; padding:6px 10px; box-shadow:0 1px 3px rgba(0,0,0,.4);">
-                        <img src="{{ asset('images/logo-white.png') }}" alt="{{ config('app.name') }}" style="display:block; max-height: 60px; max-width: 260px;">
+                        <img src="{{ asset('images/logo-white.png') . '?v=keystone' }}" alt="{{ config('app.name') }}" style="display:block; max-height: 60px; max-width: 260px;">
                     </a>
                 </h1>
                 <div class="collapse navbar-collapse" id="sidebar-menu">
