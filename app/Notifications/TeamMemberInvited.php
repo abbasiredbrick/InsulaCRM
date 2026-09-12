@@ -37,7 +37,7 @@ class TeamMemberInvited extends Notification implements ShouldQueue
         $roleLabel = ucwords(str_replace('_', ' ', $this->roleName));
 
         return (new MailMessage)
-            ->subject("Welcome to {$tenantName} on InsulaCRM")
+            ->subject("Welcome to {$tenantName} on ".config('app.name'))
             ->greeting("Hello {$notifiable->name},")
             ->line("You have been added as a team member on **{$tenantName}**.")
             ->line("**Role:** {$roleLabel}")
