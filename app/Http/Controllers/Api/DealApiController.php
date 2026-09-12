@@ -61,8 +61,9 @@ class DealApiController extends Controller
         $rules = [
             'lead_id' => 'required|integer',
             'agent_id' => 'nullable|integer',
+            'deal_type' => 'nullable|in:rent,sale',
             'title' => 'nullable|string|max:255',
-            'stage' => 'nullable|in:'.implode(',', array_keys(Deal::stages())),
+            'stage' => 'nullable|in:'.implode(',', array_keys(Deal::leasingStages() + Deal::saleStages())),
             'contract_price' => 'nullable|numeric|min:0',
             'earnest_money' => 'nullable|numeric|min:0',
             'contract_date' => 'nullable|date',
@@ -95,7 +96,17 @@ class DealApiController extends Controller
 
         $data = $validator->validated();
         $data['tenant_id'] = $tenant->id;
-        $data['stage'] = $data['stage'] ?? \App\Services\BusinessModeService::getDefaultStage();
+
+        // Resolve deal type (rent = leasing, sale = sales) from payload or lead intent
+        if (! isset($data['deal_type']) || $data['deal_type'] === null) {
+            $leadType = \App\Models\Lead::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->id)
+                ->where('id', $data['lead_id'])
+                ->value('deal_type');
+            $data['deal_type'] = $leadType === 'rent' ? 'rent' : 'sale';
+        }
+
+        $data['stage'] = $data['stage'] ?? array_key_first(Deal::stagesForType($data['deal_type']));
         $data['stage_changed_at'] = now();
 
         // Verify lead belongs to tenant

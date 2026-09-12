@@ -16,7 +16,7 @@ class DealRequest extends FormRequest
     {
         return [
             'title' => 'sometimes|required|string|max:255',
-            'stage' => 'sometimes|required|in:' . implode(',', array_keys(Deal::stages())),
+            'stage' => 'sometimes|required|in:' . implode(',', array_keys(Deal::leasingStages() + Deal::saleStages())),
             'contract_price' => 'nullable|numeric|min:0',
             'assignment_fee' => 'nullable|numeric|min:0',
             'earnest_money' => 'nullable|numeric|min:0',

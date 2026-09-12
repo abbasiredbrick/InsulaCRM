@@ -35,6 +35,32 @@ class Deal extends Model
     }
 
     /**
+     * Leasing deal stages — mirrors Lead::LEASING_STAGES for the Transaction pipeline.
+     */
+    public static function leasingStages(): array
+    {
+        return Lead::LEASING_STAGES;
+    }
+
+    /**
+     * Sale deal stages — realestate or wholesale depending on mode.
+     */
+    public static function saleStages(?Tenant $tenant = null): array
+    {
+        return \App\Services\BusinessModeService::getStages($tenant);
+    }
+
+    /**
+     * Get the appropriate stage set for a given deal type.
+     */
+    public static function stagesForType(string $dealType, ?Tenant $tenant = null): array
+    {
+        return $dealType === 'rent'
+            ? self::leasingStages()
+            : self::saleStages($tenant);
+    }
+
+    /**
      * Get translated stage labels for the current tenant's business mode.
      */
     public static function stageLabels(?Tenant $tenant = null): array
@@ -44,15 +70,29 @@ class Deal extends Model
 
     /**
      * Get translated label for a single stage.
+     *
+     * Falls back to the leasing / sale stage maps when the stage belongs to
+     * a different deal type pipeline than the tenant's default mode pipeline.
      */
     public static function stageLabel(string $stage, ?Tenant $tenant = null): string
     {
-        return \App\Services\BusinessModeService::getStageLabel($stage, $tenant);
+        $label = \App\Services\BusinessModeService::getStageLabel($stage, $tenant);
+
+        $modeStages = \App\Services\BusinessModeService::getStages($tenant);
+        if (isset($modeStages[$stage])) {
+            return $label;
+        }
+
+        $allStages = self::leasingStages() + self::saleStages($tenant);
+
+        return isset($allStages[$stage]) ? __($allStages[$stage]) : $label;
     }
 
     protected $fillable = [
         'tenant_id',
         'lead_id',
+        'lease_id',
+        'deal_type',
         'agent_id',
         'title',
         'stage',
@@ -77,6 +117,8 @@ class Deal extends Model
     protected function casts(): array
     {
         return [
+            'deal_type' => 'string',
+            'lease_id' => 'integer',
             'contract_price' => 'decimal:2',
             'assignment_fee' => 'decimal:2',
             'earnest_money' => 'decimal:2',
@@ -106,6 +148,11 @@ class Deal extends Model
     public function lead()
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    public function lease()
+    {
+        return $this->belongsTo(Lease::class);
     }
 
     public function agent()
@@ -165,5 +212,33 @@ class Deal extends Model
     {
         $days = $this->due_diligence_days_remaining;
         return $days !== null && $days <= 2 && $days >= 0;
+    }
+
+    /**
+     * Deal type for transaction pipelines: 'rent' (leasing) or 'sale'.
+     *
+     * Uses the stored deal_type first, then falls back to a linked lease
+     * (always renting) or the linked lead's deal intent.
+     */
+    public function dealType(): string
+    {
+        if ($this->deal_type && in_array($this->deal_type, ['rent', 'sale'], true)) {
+            return $this->deal_type;
+        }
+
+        if ($this->lease_id) {
+            return 'rent';
+        }
+
+        if ($this->relationLoaded('lead') && $this->lead) {
+            return $this->lead->dealType() === 'rent' ? 'rent' : 'sale';
+        }
+
+        return 'sale';
+    }
+
+    public function getIsLeasingAttribute(): bool
+    {
+        return $this->dealType() === 'rent';
     }
 }

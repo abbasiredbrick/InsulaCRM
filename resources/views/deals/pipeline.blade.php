@@ -20,15 +20,18 @@
 
     /* ── Stage rows (accordion) ───────────────────────── */
     .stage-row {
-        border: 1px solid #e6e7e9;
+        border: 1px solid var(--tblr-border-color);
         border-radius: 8px;
         margin-bottom: 8px;
-        background: #fff;
+        background: var(--tblr-bg-surface);
         transition: background 0.15s, box-shadow 0.15s;
     }
     .stage-row.drag-over {
         background: #e8f0fe;
         box-shadow: inset 0 0 0 2px #206bc4;
+    }
+    [data-bs-theme="dark"] .stage-row.drag-over {
+        background: rgba(32, 107, 196, 0.18);
     }
     .stage-header {
         display: flex;
@@ -39,12 +42,12 @@
         gap: 12px;
     }
     .stage-header:hover {
-        background: #f8f9fa;
+        background: var(--tblr-bg-surface-secondary);
         border-radius: 8px;
     }
     .stage-chevron {
         transition: transform 0.2s;
-        color: #adb5bd;
+        color: var(--tblr-muted);
         flex-shrink: 0;
     }
     .stage-row.expanded .stage-chevron {
@@ -61,7 +64,7 @@
         align-items: center;
         margin-left: auto;
         font-size: 0.8rem;
-        color: #667085;
+        color: var(--tblr-muted);
         flex-shrink: 0;
     }
     .stage-stats .badge {
@@ -85,14 +88,14 @@
         grid-column: 1 / -1;
         text-align: center;
         padding: 20px;
-        color: #adb5bd;
+        color: var(--tblr-muted);
         font-size: 0.85rem;
     }
 
     /* ── Deal cards ────────────────────────────────────── */
     .deal-card {
-        background: #f8f9fa;
-        border: 1px solid #e6e7e9;
+        background: var(--tblr-bg-surface-secondary);
+        border: 1px solid var(--tblr-border-color);
         border-radius: 6px;
         padding: 12px;
         position: relative;
@@ -100,7 +103,7 @@
     }
     .deal-card:hover {
         box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        background: #fff;
+        background: var(--tblr-bg-surface);
     }
     .deal-card.dragging {
         opacity: 0.4;
@@ -108,14 +111,14 @@
     }
     .deal-card-drag {
         cursor: grab;
-        color: #adb5bd;
+        color: var(--tblr-muted);
         position: absolute;
         top: 10px;
         right: 8px;
         padding: 2px;
         line-height: 1;
     }
-    .deal-card-drag:hover { color: #667085; }
+    .deal-card-drag:hover { color: var(--tblr-muted-darken, var(--tblr-muted)); }
     .deal-card-drag:active { cursor: grabbing; }
     .deal-card .move-dropdown { position: absolute; bottom: 4px; right: 4px; }
     .deal-card .move-dropdown .btn { padding: 2px 4px; line-height: 1; }
@@ -130,7 +133,7 @@
     }
     .deal-card-meta {
         font-size: 0.75rem;
-        color: #667085;
+        color: var(--tblr-muted);
         line-height: 1.5;
     }
 
@@ -141,7 +144,7 @@
         right: -450px;
         width: 450px;
         height: 100%;
-        background: #fff;
+        background: var(--tblr-bg-surface);
         box-shadow: -4px 0 20px rgba(0,0,0,0.15);
         z-index: 1050;
         transition: right 0.3s;
@@ -199,7 +202,7 @@
     }
     .quick-edit-form .form-label-sm {
         font-size: 0.75rem;
-        color: #667085;
+        color: var(--tblr-muted);
     }
 
     /* ── Stage SLA warnings ──────────────────────────── */
@@ -282,11 +285,27 @@
     </div>
 </div>
 
+{{-- Deal type tabs: All / Leasing / Sales --}}
+@if(($businessMode ?? 'wholesale') === 'realestate')
+<ul class="nav nav-pills mb-3 pipeline-type-tabs">
+    @foreach(['all' => 'All', 'rent' => 'Leasing', 'sale' => 'Sales'] as $key => $label)
+    <li class="nav-item">
+        <a class="nav-link {{ ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'active' : '' }}"
+           href="{{ url('/pipeline') . ($key === 'all' ? '' : '?deal_type=' . $key) }}"
+           style="{{ (($dealType ?? null) === null && $key === 'all') || ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'font-weight:600' : '' }}">
+            {{ __($label) }}
+            @if($key !== 'all')<span class="badge bg-secondary-lt ms-1">{{ $counts[$key] ?? 0 }}</span>@endif
+        </a>
+    </li>
+    @endforeach
+</ul>
+@endif
+
 <x-saved-views-bar entity-type="deals" />
 
 {{-- Accordion Pipeline --}}
 <div id="pipeline">
-    @foreach($stages as $stageKey => $stageLabel)
+    @foreach($stageLabels as $stageKey => $stageLabel)
     @php
         $stageDeals = $deals[$stageKey] ?? collect();
         $stageTotal = $stageDeals->sum('contract_price');
@@ -329,7 +348,12 @@
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="5" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="19" r="1"/></svg>
                     </div>
                     <div class="deal-card-body" data-deal-id="{{ $deal->id }}">
-                        <div class="deal-card-title">{{ $deal->lead->full_name ?? $deal->title }}</div>
+                        <div class="deal-card-title">
+                            @if(($businessMode ?? 'wholesale') === 'realestate')
+                            <span class="badge {{ $deal->dealType() === 'rent' ? 'bg-teal-lt' : 'bg-indigo-lt' }} me-1">{{ $deal->dealType() === 'rent' ? __('Leasing') : __('Sales') }}</span>
+                            @endif
+                            {{ $deal->lead->full_name ?? $deal->title }}
+                        </div>
                         <div class="deal-card-meta">
                             @if($deal->lead && $deal->lead->property)
                                 {{ $deal->lead->property->address ?? '' }}<br>
@@ -358,7 +382,7 @@
                             <span class="visually-hidden">{{ __('Move to') }}</span>
                         </button>
                         <div class="dropdown-menu dropdown-menu-end">
-                            @foreach($stages as $moveStageKey => $moveStageLabel)
+                            @foreach($stageLabels as $moveStageKey => $moveStageLabel)
                                 @if($moveStageKey !== $stageKey)
                                     <a href="#" class="dropdown-item move-deal-btn" data-deal-id="{{ $deal->id }}" data-stage="{{ $moveStageKey }}">{{ $moveStageLabel }}</a>
                                 @endif
@@ -745,6 +769,11 @@
         const params = new URLSearchParams();
         const search = searchInput ? searchInput.value.trim() : '';
         const agent = agentFilter ? agentFilter.value : '';
+        // Preserve the active deal type tab (all / rent / sale)
+        @if(($businessMode ?? 'wholesale') === 'realestate')
+        const dealType = {{ $dealType !== null ? "'".$dealType."'" : "''" }};
+        if (dealType) params.set('deal_type', dealType);
+        @endif
         if (search) params.set('search', search);
         if (agent) params.set('agent', agent);
         const qs = params.toString();

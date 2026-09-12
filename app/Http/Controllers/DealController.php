@@ -26,10 +26,21 @@ class DealController extends Controller
     {
         $this->authorize('viewAny', Deal::class);
 
-        $query = Deal::with(['lead.property', 'agent']);
+        $dealType = $request->input('deal_type');
+        $dealType = in_array($dealType, ['rent', 'sale'], true) ? $dealType : null;
+
+        $query = Deal::with(['lead.property', 'lease', 'agent']);
 
         if (auth()->user()->isAgent()) {
             $query->where('agent_id', auth()->id());
+        }
+
+        // Deal type filter: rent (leasing) / sale / all.
+        // Legacy deals have a NULL type and are treated as sales.
+        if ($dealType) {
+            $query->where($dealType === 'rent'
+                ? fn ($q) => $q->where('deal_type', 'rent')
+                : fn ($q) => $q->where('deal_type', 'sale')->orWhereNull('deal_type'));
         }
 
         // Filters
@@ -54,7 +65,13 @@ class DealController extends Controller
         }
 
         $deals = $query->get()->groupBy('stage');
-        $stages = Deal::stageLabels();
+
+        // Lease and sale pipelines share no stage keys, so a merged board is safe.
+        $stages = $dealType
+            ? \App\Models\Deal::stagesForType($dealType)
+            : (\App\Models\Deal::leasingStages() + \App\Models\Deal::saleStages());
+
+        $stageLabels = array_map(fn ($t) => __($t), $stages);
 
         // Agents for filter dropdown (admin only)
         $agents = collect();
@@ -65,7 +82,17 @@ class DealController extends Controller
                 ->get(['id', 'name']);
         }
 
-        return view('deals.pipeline', compact('deals', 'stages', 'agents'));
+        $countQuery = \App\Models\Deal::where('tenant_id', auth()->user()->tenant_id);
+        if (auth()->user()->isAgent()) {
+            $countQuery->where('agent_id', auth()->id());
+        }
+        $counts = [
+            'all' => (clone $countQuery)->count(),
+            'rent' => (clone $countQuery)->where('deal_type', 'rent')->count(),
+            'sale' => (clone $countQuery)->where(fn ($q) => $q->where('deal_type', 'sale')->orWhereNull('deal_type'))->count(),
+        ];
+
+        return view('deals.pipeline', compact('deals', 'stages', 'stageLabels', 'agents', 'dealType', 'counts'));
     }
 
     public function updateStage(Request $request, Deal $deal)
@@ -73,7 +100,7 @@ class DealController extends Controller
         $this->authorize('changeStage', $deal);
 
         $request->validate([
-            'stage' => 'required|in:'.implode(',', array_keys(Deal::stages())),
+            'stage' => 'required|in:'.implode(',', array_keys(Deal::stagesForType($deal->dealType()))),
         ]);
 
         $oldStage = $deal->stage;
@@ -264,6 +291,13 @@ class DealController extends Controller
             $query->where('agent_id', auth()->id());
         }
 
+        $dealType = $request->input('deal_type');
+        if ($dealType === 'rent') {
+            $query->where('deal_type', 'rent');
+        } elseif ($dealType === 'sale') {
+            $query->where(fn ($q) => $q->where('deal_type', 'sale')->orWhereNull('deal_type'));
+        }
+
         if ($request->filled('agent')) {
             $query->where('agent_id', $request->agent);
         }
@@ -286,7 +320,7 @@ class DealController extends Controller
             $terms = \App\Services\BusinessModeService::getTerminology();
             $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
             fputcsv($handle, [
-                __('Title'), __('Lead Name'), __('Stage'), __('Contract Price'),
+                __('Type'), __('Title'), __('Lead Name'), __('Stage'), __('Contract Price'),
                 $terms['money_label'], __('Agent'), __('Days in Stage'), __('Created Date'),
             ]);
             foreach ($query->with(['lead', 'agent'])->latest()->cursor() as $deal) {
@@ -294,6 +328,7 @@ class DealController extends Controller
                     ? (int) now()->diffInDays($deal->stage_changed_at, true)
                     : '';
                 fputcsv($handle, [
+                    $deal->dealType() === 'rent' ? __('Leasing') : __('Sales'),
                     $deal->title,
                     $deal->lead ? $deal->lead->first_name.' '.$deal->lead->last_name : '',
                     Deal::stageLabel($deal->stage),

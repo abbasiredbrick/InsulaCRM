@@ -95,17 +95,6 @@ Route::post('/portal/webhooks/{portal}', [PortalWebhookController::class, 'recei
     ->whereIn('portal', ['bayut', 'propertyfinder'])
     ->name('portal.webhooks.receive');
 
-// TEMPORARY one-time migration runner — REMOVE AFTER USE
-Route::get('/insula-migrate/{token}', function (string $token) {
-    if (! hash_equals('eed8cb9caa426e62d6249ac6f9eb096c', $token)) {
-        abort(404);
-    }
-
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-
-    return response('<pre>'.e(\Illuminate\Support\Facades\Artisan::output()).'</pre>');
-});
-
 // Public buyer portal (no auth)
 Route::get('/p/{slug}', [BuyerPortalController::class, 'show'])->name('buyer-portal.show');
 Route::post('/p/{slug}/register', [BuyerPortalController::class, 'register'])->middleware('throttle:10,1')->name('buyer-portal.register');
