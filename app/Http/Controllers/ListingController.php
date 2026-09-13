@@ -390,6 +390,11 @@ class ListingController extends Controller
         $all = $query->latest('updated_at')->get();
         $ready = $all->filter->isPortalReady();
 
+        $bayutIntegration = \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
         // Per-portal counters for the current view
         $portals = [
             'bayut'          => ['units' => $ready->filter(fn ($p) => $p->bayut_status !== 'live')->count(), 'live' => $all->where('bayut_status', 'live')->count()],
@@ -402,6 +407,10 @@ class ListingController extends Controller
             'ready' => $ready,
             'portals' => $portals,
             'wallet' => app(\App\Services\Portals\BayutCreditsService::class)->balance(auth()->user()->tenant),
+            'bayut_sync' => $bayutIntegration !== null ? [
+                'last_synced_at' => $bayutIntegration->last_synced_at,
+                'last_error'     => $bayutIntegration->last_error,
+            ] : null,
             'enabled_portals' => \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
                 ->where('is_active', true)
                 ->pluck('portal')
@@ -614,6 +623,43 @@ class ListingController extends Controller
         AuditLog::log('inventory.portal_pushed_' . $portal, $property, ['reference' => $result['reference'] ?? null]);
 
         return back()->with('success', __('Submitted to :portal.', ['portal' => $integration->portal_label]));
+    }
+
+    /**
+     * Refresh the live/removed portal status of every listed unit against Bayut.
+     */
+    public function syncPortalStatus(Request $request)
+    {
+        abort_unless(auth()->user()->isAdmin(), 403);
+
+        $integration = \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
+        if ($integration === null) {
+            return back()->with('error', __('No active Bayut integration to refresh. Set it up under Settings → Portal Integrations.'));
+        }
+
+        $result = (new \App\Services\Portals\BayutStatusSyncService($integration))->sync();
+
+        $integration->update([
+            'last_synced_at' => now(),
+            'last_error'     => $result['error'],
+        ]);
+
+        AuditLog::log('inventory.portal_status_sync', null, $result);
+
+        if ($result['error'] !== null) {
+            return back()->with('error', __('Bayut status refresh failed: :error', ['error' => $result['error']]));
+        }
+
+        return back()->with('success', __('Bayut status refresh complete: :checked checked, :live live, :updated status changes, :removed removed.', [
+            'checked' => $result['checked'],
+            'live'    => $result['live'],
+            'updated' => $result['updated'],
+            'removed' => $result['removed'],
+        ]));
     }
 
     // ── Helpers ─────────────────────────────────────────────

@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('deals:check-due-diligence')->daily();
         $schedule->command('leads:assign-unclaimed')->everyMinute();
         $schedule->command('portals:pull-bayut-leads')->everyThirtyMinutes();
+        $schedule->command('portals:sync-listing-status')->dailyAt('04:30');
         $schedule->command('backup:clean')->daily()->at('01:00');
         $schedule->command('ai:pipeline-digest')->dailyAt('07:00');
         $schedule->command('ai:suggest-follow-ups')->dailyAt('08:00');

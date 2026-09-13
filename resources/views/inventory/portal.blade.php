@@ -12,6 +12,16 @@
         @if(auth()->user()->isAdmin())
         <a href="{{ route('settings.index', ['tab' => 'portal-credits']) }}" class="btn btn-sm btn-outline-primary">{{ __('Manage Credits') }}</a>
         <a href="{{ route('portal-integrations.index') }}" class="btn btn-sm btn-outline-primary">{{ __('Portal Integrations') }}</a>
+        <form method="POST" action="{{ route('inventory.sync-portal-status') }}" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-outline-primary" @if(empty($bayut_sync)) disabled title="{{ __('No active Bayut integration.') }}" @endif>{{ __('Refresh Bayut Status') }}</button>
+        </form>
+        @if(!empty($bayut_sync) && $bayut_sync['last_synced_at'])
+        <span class="text-muted small ms-1">{{ __('Last sync:') }} {{ $bayut_sync['last_synced_at']->diffForHumans() }}</span>
+        @endif
+        @if(!empty($bayut_sync['last_error']))
+        <span class="text-danger small ms-2">{{ $bayut_sync['last_error'] }}</span>
+        @endif
         @endif
     </span>
 </div>

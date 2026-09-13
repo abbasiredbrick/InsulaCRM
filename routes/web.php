@@ -236,6 +236,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
             ->name('inventory.push');
+        Route::post('/inventory/sync-portal-status', [ListingController::class, 'syncPortalStatus'])->name('inventory.sync-portal-status');
     });
 
     // ── Availability sheet imports (PM companies) ─────────────
