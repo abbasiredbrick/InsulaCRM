@@ -104,6 +104,24 @@ class Tenant extends Model
         return strtoupper($this->leadReferenceSettings()['fallback_agent_code'] ?? \App\Services\AgentCodeService::FALLBACK_CODE);
     }
 
+    /**
+     * How inbound portal leads without a routeable agent are handled.
+     *
+     * unmatched: "distribute" pushes them into the tenant's routing pool,
+     *            "unassigned" leaves them for an agent to claim.
+     * notify_admins: when true, admins get an in-app alert for unassigned leads.
+     */
+    public function portalLeadSettings(): array
+    {
+        return array_merge(
+            [
+                'unmatched'     => 'unassigned',
+                'notify_admins' => true,
+            ],
+            $this->custom_options['portal_leads'] ?? []
+        );
+    }
+
     public function isWholesale(): bool
     {
         return ($this->business_mode ?? 'wholesale') === 'wholesale';

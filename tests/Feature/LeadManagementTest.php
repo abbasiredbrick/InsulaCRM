@@ -359,9 +359,9 @@ class LeadManagementTest extends TestCase
             'first_name' => $lead->first_name,
             'last_name' => $lead->last_name,
             'agent_id' => $this->adminUser->id,
-            'lead_source' => $lead->lead_source,
-            'status' => $lead->status,
-            'temperature' => $lead->temperature,
+            'lead_source' => 'website',
+            'status' => 'new',
+            'temperature' => 'warm',
             'deal_type' => 'sale',
         ]);
 

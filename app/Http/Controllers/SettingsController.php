@@ -637,6 +637,30 @@ class SettingsController extends Controller
         return redirect()->route('settings.index', ['tab' => 'lead-references'])->with('success', 'Lead reference settings updated.');
     }
 
+    /**
+     * Save how inbound portal leads without a routeable agent are handled.
+     */
+    public function updatePortalLeadSettings(Request $request)
+    {
+        $request->validate([
+            'unmatched' => 'required|in:distribute,unassigned',
+            'notify_admins' => 'boolean',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $options = $tenant->custom_options ?? [];
+        $options['portal_leads'] = [
+            'unmatched'     => $request->unmatched,
+            'notify_admins' => $request->boolean('notify_admins'),
+        ];
+
+        $tenant->update(['custom_options' => $options]);
+
+        AuditLog::log('settings.portal_leads_updated', $tenant, ['unmatched' => $options['portal_leads']['unmatched']]);
+
+        return redirect()->route('settings.index', ['tab' => 'distribution'])->with('success', 'Portal lead handling updated.');
+    }
+
     public function updateLeadSourceCosts(Request $request)
     {
         $request->validate([

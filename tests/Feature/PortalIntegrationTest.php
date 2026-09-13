@@ -69,6 +69,9 @@ class PortalIntegrationTest extends TestCase
     public function test_dubizzle_webhook_creates_lead_when_signature_is_valid(): void
     {
         $this->createIntegration('bayut', ['webhook_secret' => 'shh']);
+        $this->tenant->update(['custom_options' => array_merge($this->tenant->custom_options ?? [], [
+            'portal_leads' => ['unmatched' => 'distribute', 'notify_admins' => true],
+        ])]);
 
         $property = $this->createProperty([
             'intent' => 'rent',

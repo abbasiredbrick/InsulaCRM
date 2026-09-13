@@ -496,6 +496,36 @@
                     </div>
                     <button type="submit" class="btn btn-primary">{{ $businessMode === 'realestate' ? __('Save Routing Settings') : __('Save Distribution Settings') }}</button>
                 </form>
+
+                <hr class="my-4">
+
+                <h4 class="mb-3">{{ __('Portal Lead Handling') }}</h4>
+                <p class="text-secondary">{{ __('Controls what happens to inbound portal leads when their listing reference has no matching agent in this workspace.') }}</p>
+                <form action="{{ route('settings.updatePortalLeadSettings') }}" method="POST">
+                    @csrf
+                    @method('PUT')
+                    @php $portalSettings = $tenant->portalLeadSettings(); @endphp
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ __('Unmatched Portal Leads') }}</label>
+                            <select name="unmatched" class="form-select">
+                                <option value="unassigned" {{ $portalSettings['unmatched'] === 'unassigned' ? 'selected' : '' }}>{{ __('Leave unassigned (agents claim)') }}</option>
+                                <option value="distribute" {{ $portalSettings['unmatched'] === 'distribute' ? 'selected' : '' }}>{{ __('Auto-distribute using routing method above') }}</option>
+                            </select>
+                            <small class="text-secondary">{{ __('Unassigned keeps unmatched leads in a claim pool; distribute pushes them through the routing method above.') }}</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label d-block">{{ __('Admin Alerts') }}</label>
+                            <label class="form-check form-switch mt-1">
+                                <input type="hidden" name="notify_admins" value="0">
+                                <input type="checkbox" name="notify_admins" value="1" class="form-check-input" {{ $portalSettings['notify_admins'] ? 'checked' : '' }}>
+                                <span class="form-check-label">{{ __('Notify admins of unassigned portal leads') }}</span>
+                            </label>
+                            <small class="text-secondary">{{ __('Admins receive an in-app alert when a portal lead cannot be matched to an agent.') }}</small>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{{ __('Save Portal Lead Handling') }}</button>
+                </form>
             </div>
 
             <!-- Lead References Tab -->
