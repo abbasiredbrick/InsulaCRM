@@ -1,12 +1,14 @@
 @extends('layouts.auth')
 
+@php $appName = config('app.name'); @endphp
+
 @section('title', __('Server Requirements'))
 
 @section('content')
 <div class="card card-md">
     <div class="card-body">
         <h2 class="mb-2 text-dark">{{ __('Server Requirements') }}</h2>
-        <p class="text-secondary mb-4">{{ __('InsulaCRM checks your server to make sure everything is ready.') }}</p>
+        <p class="text-secondary mb-4">{{ __('' . $appName . ' checks your server to make sure everything is ready.') }}</p>
 
         @include('install._stepper', ['currentStep' => 2])
 

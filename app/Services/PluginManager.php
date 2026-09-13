@@ -173,7 +173,7 @@ class PluginManager
         $manifest = $this->getManifest($slug);
 
         if (! File::isDirectory($pluginDir) || ! $manifest) {
-            throw new RuntimeException('This plugin is not bundled with the current InsulaCRM release.');
+            throw new RuntimeException('This plugin is not bundled with the current ' . config('app.name') . ' release.');
         }
 
         if (empty($manifest['name']) || empty($manifest['slug']) || empty($manifest['version'])) {

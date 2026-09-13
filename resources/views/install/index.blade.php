@@ -1,5 +1,7 @@
 @extends('layouts.auth')
 
+@php $appName = config('app.name'); @endphp
+
 @section('title', __('Install'))
 
 @section('content')
@@ -25,7 +27,7 @@
 @endphp
 <div class="card card-md">
     <div class="card-body">
-        <h2 class="mb-2 text-center">{{ __('Welcome to InsulaCRM') }}</h2>
+        <h2 class="mb-2 text-center">{{ __('Welcome to ' . $appName . '') }}</h2>
         <p class="text-secondary text-center mb-4">{{ __('This wizard will guide you through the installation process.') }}</p>
 
         @include('install._stepper', ['currentStep' => 1])

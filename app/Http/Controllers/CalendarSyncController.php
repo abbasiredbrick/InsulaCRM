@@ -208,10 +208,10 @@ class CalendarSyncController extends Controller
         $lines = [];
         $lines[] = 'BEGIN:VCALENDAR';
         $lines[] = 'VERSION:2.0';
-        $lines[] = 'PRODID:-//InsulaCRM//Calendar//EN';
+        $lines[] = 'PRODID:-//' . $this->escapeIcalText(config('app.name')) . '//Calendar//EN';
         $lines[] = 'CALSCALE:GREGORIAN';
         $lines[] = 'METHOD:PUBLISH';
-        $lines[] = 'X-WR-CALNAME:InsulaCRM - ' . $this->escapeIcalText($user->name);
+        $lines[] = 'X-WR-CALNAME:' . $this->escapeIcalText(config('app.name')) . ' - ' . $this->escapeIcalText($user->name);
 
         foreach ($tasks as $task) {
             $lines[] = 'BEGIN:VEVENT';

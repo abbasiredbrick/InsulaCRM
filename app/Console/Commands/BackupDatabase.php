@@ -34,7 +34,7 @@ class BackupDatabase extends Command
             }
 
             // Header
-            fwrite($handle, "-- InsulaCRM Database Backup\n");
+            fwrite($handle, "-- " . config('app.name') . " Database Backup\n");
             fwrite($handle, "-- Generated: " . date('Y-m-d H:i:s') . "\n");
             fwrite($handle, "-- Database: {$dbName}\n");
             fwrite($handle, "-- Server: " . $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION) . "\n\n");

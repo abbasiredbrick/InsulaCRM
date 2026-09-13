@@ -30,7 +30,7 @@ class AppInstall extends Command
     public function handle(InstallerService $installer): int
     {
         if (! $this->option('force') && $this->isAlreadyInstalled()) {
-            $this->error('InsulaCRM already appears to be installed. Use --force only if you intend to rerun the installer logic.');
+            $this->error(config('app.name').' already appears to be installed. Use --force only if you intend to rerun the installer logic.');
 
             return self::FAILURE;
         }
@@ -99,7 +99,7 @@ class AppInstall extends Command
 
         $tenant = $result['tenant'];
         $this->newLine();
-        $this->info('InsulaCRM installation completed.');
+        $this->info(config('app.name').' installation completed.');
         $this->table(
             ['Item', 'Value'],
             [

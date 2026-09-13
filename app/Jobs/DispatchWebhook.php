@@ -35,7 +35,7 @@ class DispatchWebhook implements ShouldQueue
         $headers = [
             'Content-Type' => 'application/json',
             'X-Webhook-Event' => $this->event,
-            'User-Agent' => 'InsulaCRM-Webhook/1.0',
+            'User-Agent' => config('app.name') . '-Webhook/1.0',
         ];
 
         if ($this->webhook->secret) {

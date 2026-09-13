@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@php $appName = config('app.name'); @endphp
+
 @section('title', __('Settings'))
 @section('page-title', __('Settings'))
 
@@ -194,7 +196,7 @@
 
                 <h4 class="mb-1">{{ __('Business Mode') }}</h4>
                 <p class="text-secondary">
-                    {{ __('InsulaCRM ships two products in one. The mode decides which modules, pipeline stages, lead statuses and team roles exist for this workspace.') }}
+                    {{ __('' . $appName . ' ships two products in one. The mode decides which modules, pipeline stages, lead statuses and team roles exist for this workspace.') }}
                 </p>
 
                 <div class="row mb-3">
@@ -1381,7 +1383,7 @@ Content-Type: application/json</code></pre>
                         <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
                             <div>
                                 <h5 class="mb-1">{{ __('Safe Update Manager') }}</h5>
-                                <p class="text-secondary mb-0">{{ __('Upload an official InsulaCRM release ZIP, let the CRM create a database backup and a pre-update recovery snapshot automatically, then apply the patch from inside the product. Recovery snapshots are point-in-time restore points, not magic rollbacks, and they overwrite newer data created after the snapshot time if you restore them later.') }}</p>
+                                <p class="text-secondary mb-0">{{ __('Upload an official ' . $appName . ' release ZIP, let the CRM create a database backup and a pre-update recovery snapshot automatically, then apply the patch from inside the product. Recovery snapshots are point-in-time restore points, not magic rollbacks, and they overwrite newer data created after the snapshot time if you restore them later.') }}</p>
                             </div>
                             <div class="text-secondary small">
                                 <div>{{ __('Before patching') }}: {{ __('automatic database backup + recovery snapshot') }}</div>
@@ -1408,7 +1410,7 @@ Content-Type: application/json</code></pre>
                                         <button type="submit" class="btn btn-primary w-100">{{ __('Stage Update Package') }}</button>
                                     </div>
                                 </div>
-                                <small class="form-hint d-block mt-2">{{ __('Upload the official InsulaCRM release ZIP from GitHub or your website. The package is staged first so you can review it before applying it.') }}</small>
+                                <small class="form-hint d-block mt-2">{{ __('Upload the official ' . $appName . ' release ZIP from GitHub or your website. The package is staged first so you can review it before applying it.') }}</small>
                             </form>
                         @endif
 
@@ -2083,7 +2085,7 @@ Content-Type: application/json</code></pre>
                         <h3 class="card-title">{{ __('Custom Integrations') }}</h3>
                     </div>
                     <div class="card-body">
-                        <p class="text-secondary">{{ __('InsulaCRM supports custom integrations for authentication, SSO, and other services. Integrations can be added through:') }}</p>
+                        <p class="text-secondary">{{ __('' . $appName . ' supports custom integrations for authentication, SSO, and other services. Integrations can be added through:') }}</p>
                         <ul class="text-secondary">
                             <li><strong>{{ __('Plugins') }}</strong> — {{ __('Install a plugin that registers custom 2FA or SSO providers') }}</li>
                             <li><strong>{{ __('REST API') }}</strong> — {{ __('Connect external services via the API (Settings > API)') }}</li>

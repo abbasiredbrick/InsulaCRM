@@ -71,7 +71,7 @@ class KnowledgeBaseController extends Controller
 
     protected function getArticles(): array
     {
-        return [
+        $articles = [
             // ─── GETTING STARTED ─────────────────────────────────────────
             [
                 'name' => __('Getting Started'),
@@ -1775,6 +1775,17 @@ sudo systemctl restart httpd php-fpm</pre>
                 ],
             ],
         ];
+
+        $appName = config('app.name');
+        if ($appName !== 'InsulaCRM') {
+            array_walk_recursive($articles, function (&$value) use ($appName) {
+                if (is_string($value)) {
+                    $value = str_replace('InsulaCRM', $appName, $value);
+                }
+            });
+        }
+
+        return $articles;
     }
 }
 

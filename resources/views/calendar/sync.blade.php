@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@php $appName = config('app.name'); @endphp
+
 @section('title', __('Calendar Sync'))
 @section('page-title', __('Calendar Sync'))
 
@@ -19,7 +21,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted">
-                    {{ __('Generate a private iCal feed URL to subscribe to your InsulaCRM tasks and activities in your favorite calendar app.') }}
+                    {{ __('Generate a private iCal feed URL to subscribe to your ' . $appName . ' tasks and activities in your favorite calendar app.') }}
                 </p>
 
                 @if($hasToken && $feedUrl)
@@ -143,7 +145,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted">
-                    {{ __('Import events from an external iCal (.ics) URL. Each event will be created as a task in InsulaCRM.') }}
+                    {{ __('Import events from an external iCal (.ics) URL. Each event will be created as a task in ' . $appName . '.') }}
                 </p>
 
                 <form action="{{ route('calendar.sync.import') }}" method="POST">

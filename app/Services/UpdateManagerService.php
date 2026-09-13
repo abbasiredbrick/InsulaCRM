@@ -746,7 +746,7 @@ class UpdateManagerService
             }
         }
 
-        throw new RuntimeException('The release ZIP does not contain a valid InsulaCRM package root.');
+        throw new RuntimeException('The release ZIP does not contain a valid ' . config('app.name') . ' package root.');
     }
 
     private function readPackageVersion(string $packageRoot): string
