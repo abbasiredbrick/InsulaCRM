@@ -30,6 +30,9 @@
                             <a href="#tab-distribution" class="nav-link" data-bs-toggle="tab">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Lead Routing') : __('Distribution') }}</a>
                         </li>
                         <li class="nav-item">
+                            <a href="#tab-lead-references" class="nav-link" data-bs-toggle="tab">{{ __('Lead References') }}</a>
+                        </li>
+                        <li class="nav-item">
                             <a href="#tab-lead-costs" class="nav-link" data-bs-toggle="tab">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Source Budgeting') : __('Lead Source Costs') }}</a>
                         </li>
                         <li class="nav-item">
@@ -317,12 +320,13 @@
                 <div class="table-responsive">
                     <table class="table table-vcenter">
                         <thead>
-                            <tr><th>{{ __('Name') }}</th><th>{{ __('Email') }}</th><th>{{ __('Role') }}</th><th>{{ __('Status') }}</th><th>{{ __('2FA') }}</th><th>{{ __('Actions') }}</th></tr>
+                            <tr><th>{{ __('Name') }}</th><th>{{ __('Agent Code') }}</th><th>{{ __('Email') }}</th><th>{{ __('Role') }}</th><th>{{ __('Status') }}</th><th>{{ __('2FA') }}</th><th>{{ __('Actions') }}</th></tr>
                         </thead>
                         <tbody>
                             @foreach($agents as $agent)
                             <tr>
                                 <td>{{ $agent->name }}</td>
+                                <td><code>{{ $agent->agent_code ?? __('—') }}</code></td>
                                 <td>{{ $agent->email }}</td>
                                 <td><span class="badge bg-blue-lt">{{ __(ucwords(str_replace('_', ' ', $agent->role->name ?? '-'))) }}</span></td>
                                 <td>
@@ -491,6 +495,33 @@
                         <small class="text-secondary d-block">{{ __("When enabled, leads are routed to agents matching the lead's timezone.") }}</small>
                     </div>
                     <button type="submit" class="btn btn-primary">{{ $businessMode === 'realestate' ? __('Save Routing Settings') : __('Save Distribution Settings') }}</button>
+                </form>
+            </div>
+
+            <!-- Lead References Tab -->
+            <div class="tab-pane" id="tab-lead-references">
+                <p class="text-secondary mb-3">{{ __('Every lead gets a human-readable reference built from the formula below. The internal numeric ID stays hidden.') }}</p>
+                <div class="mb-3">
+                    <label class="form-label">{{ __('Reference Formula') }}</label>
+                    <code class="d-block p-2 bg-body-tertiary rounded fs-5">{{ \App\Services\LeadReferenceService::FORMULA }}</code>
+                    <small class="text-secondary">{{ __('Year-Month - Agent Code - Sequence, e.g.') }} <strong>2609-AJ07-0001</strong> {{ __('(year-month - agent code - sequence, reset monthly per agent).') }}</small>
+                </div>
+                <form action="{{ route('settings.updateLeadReferenceSettings') }}" method="POST">
+                    @csrf
+                    @method('PUT')
+                    <div class="row">
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label">{{ __('Fallback Agent Code') }}</label>
+                            <input type="text" name="fallback_agent_code" class="form-control" maxlength="8" value="{{ $tenant->defaultAgentCode() }}" placeholder="{{ \App\Services\AgentCodeService::FALLBACK_CODE }}">
+                            <small class="text-secondary">{{ __('Used when a lead has no assigned agent, e.g.') }} <code>{{ $tenant->defaultAgentCode() }}-202609-0001</code>.</small>
+                        </div>
+                        <div class="col-md-7 mb-3">
+                            <label class="form-label">{{ __('Next Reference Preview') }}</label>
+                            <input type="text" class="form-control" value="{{ app(\App\Services\LeadReferenceService::class)->preview($tenant->id) }}" disabled readonly>
+                            <small class="text-secondary">{{ __('Sample of the next generated reference for a lead without an agent.') }}</small>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{{ __('Save Lead Reference Settings') }}</button>
                 </form>
             </div>
 

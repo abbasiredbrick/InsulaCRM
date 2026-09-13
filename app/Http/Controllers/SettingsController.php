@@ -615,6 +615,28 @@ class SettingsController extends Controller
         return redirect()->route('settings.index', ['tab' => 'distribution'])->with('success', "{$label} settings updated.");
     }
 
+    /**
+     * Save the lead reference settings (fallback agent code for unassigned leads).
+     */
+    public function updateLeadReferenceSettings(Request $request)
+    {
+        $request->validate([
+            'fallback_agent_code' => 'required|string|max:8|regex:/^[A-Za-z0-9]+$/',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $options = $tenant->custom_options ?? [];
+        $options['lead_reference'] = [
+            'fallback_agent_code' => strtoupper(trim($request->fallback_agent_code)),
+        ];
+
+        $tenant->update(['custom_options' => $options]);
+
+        AuditLog::log('settings.lead_references_updated', $tenant, ['fallback_agent_code' => $options['lead_reference']['fallback_agent_code']]);
+
+        return redirect()->route('settings.index', ['tab' => 'lead-references'])->with('success', 'Lead reference settings updated.');
+    }
+
     public function updateLeadSourceCosts(Request $request)
     {
         $request->validate([

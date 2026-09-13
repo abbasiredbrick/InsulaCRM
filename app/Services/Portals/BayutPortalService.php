@@ -79,7 +79,7 @@ class BayutPortalService
     protected function payload(Property $property): array
     {
         return [
-            'reference'      => (string) $property->id,
+            'reference'      => $this->listingReference($property),
             'permit_number'  => $property->rera_permit_no,
             'purpose'        => $property->intent === 'sale' ? 'sell' : 'rent',
             'property'       => $this->category($property),
@@ -120,6 +120,17 @@ class BayutPortalService
         $error = 'Bayut Push API error (HTTP ' . $response->status() . '): ' . Str::limit((string) $response->body(), 500);
 
         return $this->error($error);
+    }
+
+    /**
+     * The Bayut listing reference includes the listing agent's code so that
+     * incoming leads carry their owner: {AGENTCODE}-{PROPERTYID} e.g. AJ07-416.
+     */
+    protected function listingReference(Property $property): string
+    {
+        $code = app(\App\Services\AgentCodeService::class)->codeForProperty($property);
+
+        return $code !== null ? $code . '-' . $property->id : (string) $property->id;
     }
 
     protected function category(Property $property): string

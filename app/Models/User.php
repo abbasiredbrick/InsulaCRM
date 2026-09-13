@@ -30,6 +30,7 @@ class User extends Authenticatable
         'email_mode',
         'dashboard_widgets',
         'notification_delivery',
+        'agent_code',
     ];
 
     protected $hidden = [
@@ -57,6 +58,12 @@ class User extends Authenticatable
         // TenantScope is not applied to User because the auth guard must load
         // the user before any scope can resolve auth()->user(), which would
         // cause infinite recursion and memory exhaustion.
+
+        static::creating(function (User $user) {
+            if (blank($user->agent_code)) {
+                $user->agent_code = app(\App\Services\AgentCodeService::class)->generate((string) $user->name);
+            }
+        });
     }
 
     public function tenant()

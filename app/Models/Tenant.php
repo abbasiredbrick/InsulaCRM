@@ -85,6 +85,25 @@ class Tenant extends Model
         return $prefs[$type] ?? true;
     }
 
+    /**
+     * Settings that govern the lead reference formula (e.g. fallback agent code).
+     */
+    public function leadReferenceSettings(): array
+    {
+        return array_merge(
+            ['fallback_agent_code' => \App\Services\AgentCodeService::FALLBACK_CODE],
+            $this->custom_options['lead_reference'] ?? []
+        );
+    }
+
+    /**
+     * The agent code used when a lead has no assigned agent.
+     */
+    public function defaultAgentCode(): string
+    {
+        return strtoupper($this->leadReferenceSettings()['fallback_agent_code'] ?? \App\Services\AgentCodeService::FALLBACK_CODE);
+    }
+
     public function isWholesale(): bool
     {
         return ($this->business_mode ?? 'wholesale') === 'wholesale';

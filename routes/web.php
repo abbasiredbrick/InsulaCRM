@@ -541,6 +541,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::delete('/settings/agents/{user}', [SettingsController::class, 'destroyAgent'])->name('settings.destroyAgent');
         Route::put('/settings/business-mode', [SettingsController::class, 'updateBusinessMode'])->name('settings.updateBusinessMode');
         Route::put('/settings/distribution', [SettingsController::class, 'updateDistribution'])->name('settings.updateDistribution');
+        Route::put('/settings/lead-references', [SettingsController::class, 'updateLeadReferenceSettings'])->name('settings.updateLeadReferenceSettings');
 
         // DNC Management
         Route::get('/settings/dnc', [DncController::class, 'index'])->name('dnc.index');

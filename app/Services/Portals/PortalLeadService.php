@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\PortalIntegration;
 use App\Models\Property;
+use App\Models\User;
 use App\Services\LeadDistributionService;
 use Illuminate\Support\Facades\Log;
 
@@ -23,6 +24,19 @@ class PortalLeadService
             return null;
         }
 
+        // Listing references embed the owning agent's code ({AGENTCODE}-{PROPERTYID}),
+        // so the lead can be routed straight to that agent.
+        $reference = $data['reference'] ?? null;
+        [$agentCode, $propertyId] = $this->parseListingReference($reference);
+
+        $routedAgent = $agentCode !== null
+            ? User::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->id)
+                ->where('agent_code', $agentCode)
+                ->where('is_active', true)
+                ->first()
+            : null;
+
         $existing = null;
         if ($phone !== null) {
             $existing = Lead::withoutGlobalScopes()
@@ -37,7 +51,8 @@ class PortalLeadService
                 ->first();
         }
 
-        $property = $this->matchProperty($integration, $data['reference'] ?? null);
+        $property = $this->matchProperty($integration, $reference)
+            ?? $this->matchPropertyById($tenant->id, $propertyId);
 
         if ($existing !== null) {
             $this->linkProperty($existing, $property);
@@ -52,6 +67,7 @@ class PortalLeadService
 
         $lead = Lead::withoutGlobalScopes()->create([
             'tenant_id'   => $tenant->id,
+            'agent_id'    => $routedAgent?->id,
             'first_name'  => $first,
             'last_name'   => $last,
             'phone'       => $phone,
@@ -71,10 +87,14 @@ class PortalLeadService
             ]),
         ]);
 
-        try {
-            app(LeadDistributionService::class)->distribute($lead, $tenant);
-        } catch (\Throwable $e) {
-            Log::warning('Portal lead distribution failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+        // A lead routed by its listing reference is already owned; only the
+        // leftover, unowned leads go through the tenant's distribution pool.
+        if ($lead->agent_id === null) {
+            try {
+                app(LeadDistributionService::class)->distribute($lead, $tenant);
+            } catch (\Throwable $e) {
+                Log::warning('Portal lead distribution failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            }
         }
 
         $this->linkProperty($lead, $property);
@@ -155,5 +175,33 @@ class PortalLeadService
         }
 
         return null;
+    }
+
+    /**
+     * Extract the agent code and property id embedded in a listing reference.
+     */
+    protected function parseListingReference(?string $reference): array
+    {
+        if (is_string($reference) && preg_match('/^([A-Z]{2}\d{2})-(\d+)$/', $reference, $m)) {
+            return [$m[1], (int) $m[2]];
+        }
+
+        return [null, null];
+    }
+
+    /**
+     * Resolution fallback that connects a lead to its inventory unit from the
+     * numeric property id carried inside a listing reference.
+     */
+    protected function matchPropertyById(?int $tenantId, ?int $propertyId): ?Property
+    {
+        if ($propertyId === null || $tenantId === null) {
+            return null;
+        }
+
+        return Property::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('id', $propertyId)
+            ->first();
     }
 }

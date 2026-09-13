@@ -53,6 +53,7 @@ class Lead extends Model
     protected $fillable = [
         'tenant_id',
         'agent_id',
+        'reference',
         'first_name',
         'last_name',
         'phone',
@@ -96,6 +97,10 @@ class Lead extends Model
 
             if ($lead->stage && ! $lead->stage_changed_at) {
                 $lead->stage_changed_at = now();
+            }
+
+            if (blank($lead->reference)) {
+                $lead->reference = app(\App\Services\LeadReferenceService::class)->generate($lead);
             }
         });
 

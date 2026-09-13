@@ -63,8 +63,8 @@
             <div class="card-body">
                 <div class="datagrid">
                     <div class="datagrid-item">
-                        <div class="datagrid-title">{{ __('Lead ID') }}</div>
-                        <div class="datagrid-content"><code>#{{ $lead->id }}</code></div>
+                        <div class="datagrid-title">{{ __('Reference') }}</div>
+                        <div class="datagrid-content"><code>{{ $lead->reference ?? ('#' . $lead->id) }}</code></div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Name') }}</div>
