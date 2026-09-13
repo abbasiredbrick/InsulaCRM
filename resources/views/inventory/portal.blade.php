@@ -8,7 +8,9 @@
     {{ __('Use the list/unlist toggle per unit to record portal status — including units that are already live on a portal after a manual upload.') }}
     {{ __('Pushing via the API requires portal-ready units (') }}<strong>{{ __('Ready to List') }}</strong>/<strong>{{ __('Listed') }}</strong>, {{ __('a RERA permit number and a category') }}<strong>.</strong>
     <span class="d-block mt-1">
+        <strong class="me-2">{{ __('Bayut credits:') }} {{ number_format($wallet) }}</strong>
         @if(auth()->user()->isAdmin())
+        <a href="{{ route('settings.index', ['tab' => 'portal-credits']) }}" class="btn btn-sm btn-outline-primary">{{ __('Manage Credits') }}</a>
         <a href="{{ route('portal-integrations.index') }}" class="btn btn-sm btn-outline-primary">{{ __('Portal Integrations') }}</a>
         @endif
     </span>
@@ -125,11 +127,25 @@
                     <td>
                         <a href="{{ route('inventory.show', $unit) }}" class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
                         @if($ready && in_array('bayut', $enabled_portals))
-                        <form method="POST" action="{{ route('inventory.push', [$unit, 'bayut']) }}" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-sm btn-outline-azure" {{ $unit->bayut_status === 'live' ? 'disabled' : '' }}>{{ __('Push Bayut') }}</button>
-                        </form>
-                        @endif
+                            @php
+                                $bayutCost = app(\App\Services\Portals\BayutCreditsService::class)->costFor(auth()->user()->tenant, $unit);
+                            @endphp
+                            <form method="POST" action="{{ route('inventory.push', [$unit, 'bayut']) }}" class="d-inline">
+                                @csrf
+                                @if($bayutCost > 0)
+                                <label class="form-check form-check-inline d-inline-flex align-items-center text-nowrap me-1">
+                                    <input type="checkbox" name="confirmed" value="1" class="form-check-input" required>
+                                    <span class="form-check-label small">{{ __('Confirm') }}</span>
+                                </label>
+                                @endif
+                                <button type="submit" class="btn btn-sm btn-outline-azure" {{ $unit->bayut_status === 'live' ? 'disabled' : '' }}>
+                                    {{ __('Push Bayut') }}
+                                    @if($bayutCost > 0)
+                                        <span class="badge bg-red ms-1" style="font-size:.65rem">{{ $bayutCost }} {{ __('cr') }}</span>
+                                    @endif
+                                </button>
+                            </form>
+                            @endif
                         @if($ready && in_array('propertyfinder', $enabled_portals))
                         <form method="POST" action="{{ route('inventory.push', [$unit, 'propertyfinder']) }}" class="d-inline">
                             @csrf

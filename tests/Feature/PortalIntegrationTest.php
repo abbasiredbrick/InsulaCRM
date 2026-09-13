@@ -176,6 +176,9 @@ class PortalIntegrationTest extends TestCase
     public function test_push_to_bayut_marks_unit_live(): void
     {
         $this->createIntegration('bayut', ['base_url' => 'https://push.bayut.example']);
+        $this->tenant->update(['custom_options' => array_merge($this->tenant->custom_options ?? [], [
+            'portal_wallet' => ['balance' => 100, 'auto_sync' => false, 'endpoint' => null],
+        ])]);
 
         Http::fake([
             'https://push.bayut.example/listings' => Http::response([
@@ -192,7 +195,7 @@ class PortalIntegrationTest extends TestCase
             'rent_price' => 95000,
         ]);
 
-        $this->post(route('inventory.push', [$property, 'bayut']))->assertRedirect();
+        $this->post(route('inventory.push', [$property, 'bayut']), ['confirmed' => '1'])->assertRedirect();
 
         $property->refresh();
 

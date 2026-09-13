@@ -661,6 +661,51 @@ class SettingsController extends Controller
         return redirect()->route('settings.index', ['tab' => 'distribution'])->with('success', 'Portal lead handling updated.');
     }
 
+    public function updatePortalCreditsSettings(Request $request)
+    {
+        $tenant = auth()->user()->tenant;
+        $action = $request->input('action');
+
+        if ($action === 'balance') {
+            $request->validate([
+                'balance' => 'required|integer|min:0',
+                'reason'  => 'nullable|string|max:255',
+            ]);
+
+            app(\App\Services\Portals\BayutCreditsService::class)->adjust(
+                $tenant,
+                (int) $request->balance,
+                $request->input('reason', 'Manual adjustment')
+            );
+
+            return redirect()->route('settings.index', ['tab' => 'portal-credits'])->with('success', 'Credit wallet updated.');
+        }
+
+        if ($action === 'cost_matrix') {
+            $data = $request->validate([
+                'default' => 'required|integer|min:0',
+            ]);
+
+            $matrix = ['default' => (int) $data['default']];
+            foreach (\App\Models\Property::CATEGORIES as $key => $label) {
+                $val = $request->input("category.{$key}");
+                if ($val !== null && $val !== '') {
+                    $matrix[$key] = max(0, (int) $val);
+                }
+            }
+
+            $options = $tenant->custom_options ?? [];
+            $options['portal_cost_matrix'] = $matrix;
+            $tenant->update(['custom_options' => $options]);
+
+            AuditLog::log('settings.portal_cost_matrix_updated', $tenant, ['matrix' => $matrix]);
+
+            return redirect()->route('settings.index', ['tab' => 'portal-credits'])->with('success', 'Cost matrix updated.');
+        }
+
+        return back()->with('error', 'Invalid action.');
+    }
+
     public function updateLeadSourceCosts(Request $request)
     {
         $request->validate([

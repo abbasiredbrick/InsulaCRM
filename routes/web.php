@@ -545,6 +545,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::put('/settings/distribution', [SettingsController::class, 'updateDistribution'])->name('settings.updateDistribution');
         Route::put('/settings/lead-references', [SettingsController::class, 'updateLeadReferenceSettings'])->name('settings.updateLeadReferenceSettings');
         Route::put('/settings/portal-leads', [SettingsController::class, 'updatePortalLeadSettings'])->name('settings.updatePortalLeadSettings');
+        Route::put('/settings/portal-credits', [SettingsController::class, 'updatePortalCreditsSettings'])->name('settings.updatePortalCreditsSettings');
 
         // DNC Management
         Route::get('/settings/dnc', [DncController::class, 'index'])->name('dnc.index');

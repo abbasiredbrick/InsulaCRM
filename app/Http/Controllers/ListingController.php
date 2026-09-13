@@ -401,6 +401,7 @@ class ListingController extends Controller
             'units' => $all,
             'ready' => $ready,
             'portals' => $portals,
+            'wallet' => app(\App\Services\Portals\BayutCreditsService::class)->balance(auth()->user()->tenant),
             'enabled_portals' => \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
                 ->where('is_active', true)
                 ->pluck('portal')
@@ -553,6 +554,22 @@ class ListingController extends Controller
             return back()->with('error', __('Add a RERA permit, category and intent before publishing to portals.'));
         }
 
+        if ($portal === 'bayut') {
+            $credits = app(\App\Services\Portals\BayutCreditsService::class);
+            $tenant = $integration->tenant;
+            $cost = $credits->costFor($tenant, $property);
+
+            if ($cost > 0) {
+                if (! $request->boolean('confirmed')) {
+                    return back()->with('error', __('Confirm that this listing may consume :cost Bayut credits before pushing.', ['cost' => $cost]));
+                }
+
+                if (! $credits->canAfford($tenant, $property)) {
+                    return back()->with('error', __('Not enough Bayut credits. This listing needs :cost credits; add more under Settings → Portal Credits.', ['cost' => $cost]));
+                }
+            }
+        }
+
         $service = $portal === 'bayut'
             ? new \App\Services\Portals\BayutPortalService($integration)
             : new \App\Services\Portals\PropertyFinderPortalService($integration);
@@ -583,6 +600,8 @@ class ListingController extends Controller
                 'dubizzle_listed_at' => now()->toDateString(),
                 'dubizzle_url'   => $result['url'] ?? null,
             ]));
+
+            app(\App\Services\Portals\BayutCreditsService::class)->consume($tenant, $property);
         } else {
             $property->update(array_filter([
                 'propertyfinder_status'   => 'live',

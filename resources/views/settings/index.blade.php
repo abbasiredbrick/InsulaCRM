@@ -29,6 +29,11 @@
                         <li class="nav-item">
                             <a href="#tab-distribution" class="nav-link" data-bs-toggle="tab">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Lead Routing') : __('Distribution') }}</a>
                         </li>
+                        @if(($businessMode ?? 'wholesale') === 'realestate')
+                        <li class="nav-item">
+                            <a href="#tab-portal-credits" class="nav-link" data-bs-toggle="tab">{{ __('Portal Credits') }}</a>
+                        </li>
+                        @endif
                         <li class="nav-item">
                             <a href="#tab-lead-references" class="nav-link" data-bs-toggle="tab">{{ __('Lead References') }}</a>
                         </li>
@@ -526,6 +531,73 @@
                     </div>
                     <button type="submit" class="btn btn-primary">{{ __('Save Portal Lead Handling') }}</button>
                 </form>
+            </div>
+
+            <!-- Portal Credits Tab -->
+            <div class="tab-pane" id="tab-portal-credits">
+                <p class="text-secondary mb-3">{{ __('Bayut charges a credit each time a listing goes live. Track your wallet balance and charge units by category. Pushing a unit requires enough credits and a confirmation on the Portals page.') }}</p>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header"><h3 class="card-title">{{ __('Credit Wallet') }}</h3></div>
+                            <div class="card-body">
+                                @php
+                                    $wallet = $tenant->portalWallet();
+                                @endphp
+                                <div class="h2 mb-2">{{ number_format($wallet['balance']) }} <span class="small text-muted">{{ __('credits available') }}</span></div>
+                                @if($wallet['auto_sync'])
+                                    <span class="badge bg-green-lt">{{ __('Auto-synced from portal') }}</span>
+                                @else
+                                    <span class="badge bg-secondary">{{ __('Manual wallet') }}</span>
+                                @endif
+                                <form action="{{ route('settings.updatePortalCreditsSettings') }}" method="POST" class="mt-3">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="action" value="balance">
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('New Balance') }}</label>
+                                        <input type="number" name="balance" min="0" class="form-control" value="{{ $wallet['balance'] }}" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('Reason (optional)') }}</label>
+                                        <input type="text" name="reason" maxlength="255" class="form-control" placeholder="{{ __('e.g. Renewed Bayut package') }}">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">{{ __('Save Balance') }}</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header"><h3 class="card-title">{{ __('Cost Matrix (credits per listing)') }}</h3></div>
+                            <div class="card-body">
+                                <form action="{{ route('settings.updatePortalCreditsSettings') }}" method="POST">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="action" value="cost_matrix">
+                                    @php
+                                    $matrix = $tenant->portalCostMatrix();
+                                @endphp
+                                    <div class="row mb-2">
+                                        <div class="col-6"><label class="form-label mb-0">{{ __('Default (all types)') }}</label></div>
+                                        <div class="col-6"><input type="number" name="default" min="0" class="form-control" value="{{ $matrix['default'] ?? 1 }}" required></div>
+                                    </div>
+                                    @foreach(\App\Models\Property::CATEGORIES as $key => $label)
+                                    <div class="row mb-2">
+                                        <div class="col-6"><label class="form-label mb-0">{{ __($label) }}</label></div>
+                                        <div class="col-6">
+                                            <input type="number" name="category[{{ $key }}]" min="0" class="form-control" value="{{ $matrix[$key] ?? '' }}" placeholder="{{ __('default') }}">
+                                        </div>
+                                    </div>
+                                    @endforeach
+                                    <button type="submit" class="btn btn-primary">{{ __('Save Cost Matrix') }}</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Lead References Tab -->

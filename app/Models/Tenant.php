@@ -122,6 +122,35 @@ class Tenant extends Model
         );
     }
 
+    /**
+     * Bayut listing credits wallet. Balance is the source of truth when
+     * auto-sync is off; otherwise the CRM mirrors the portal's balance via
+     * the configured endpoint on every read.
+     */
+    public function portalWallet(): array
+    {
+        return array_merge(
+            [
+                'balance'   => 0,
+                'auto_sync' => false,
+                'endpoint'  => null,
+            ],
+            $this->custom_options['portal_wallet'] ?? []
+        );
+    }
+
+    /**
+     * Credits consumed per Bayut listing publish, optionally weighted by
+     * property category (matrix[<category>] ?? matrix['default']).
+     */
+    public function portalCostMatrix(): array
+    {
+        return array_merge(
+            ['default' => 1],
+            $this->custom_options['portal_cost_matrix'] ?? []
+        );
+    }
+
     public function isWholesale(): bool
     {
         return ($this->business_mode ?? 'wholesale') === 'wholesale';
