@@ -1,5 +1,5 @@
 {{-- PWA Meta Tags & Service Worker Registration --}}
-<link rel="manifest" href="{{ asset('manifest.json') }}">
+<link rel="manifest" href="{{ asset('manifest.json') . '?v=keystone' }}">
 <meta name="theme-color" content="#0054a6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
