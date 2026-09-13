@@ -82,6 +82,9 @@
         <div class="card-actions">
             <a href="{{ route('listings.mandates') }}" class="btn btn-sm btn-outline-secondary">{{ __('Sales Mandates') }}</a>
             <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
+            @if(auth()->user()->isAdmin())
+                <a href="{{ route('listings.readiness') }}" class="btn btn-sm btn-outline-secondary">{{ __('Bayut Readiness') }}</a>
+            @endif
             <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
         </div>
     </div>

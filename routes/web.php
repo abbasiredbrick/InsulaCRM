@@ -40,6 +40,7 @@ use App\Http\Controllers\ListController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\ListingDashboardController;
 use App\Http\Controllers\ListingsController;
+use App\Http\Controllers\PortalReadinessController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OnboardingController;
@@ -211,6 +212,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
         Route::get('/listings', [ListingsController::class, 'index'])->name('listings.index');
         Route::get('/listings/mandates', [ListingDashboardController::class, 'index'])->name('listings.mandates');
+        Route::get('/listings/readiness', [PortalReadinessController::class, 'index'])->name('listings.readiness');
     });
 
     // ── Inventory / Units (real estate agent mode) ────────────────
