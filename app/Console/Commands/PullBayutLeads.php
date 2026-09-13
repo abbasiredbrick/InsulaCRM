@@ -37,8 +37,9 @@ class PullBayutLeads extends Command
                 $service = new BayutLeadsPullService($integration);
                 $result = $service->pull($integration->leads_last_synced_at);
 
+                $integration->refresh();
                 $integration->update([
-                    'leads_last_synced_at' => now(),
+                    'leads_last_synced_at' => $result['error'] === null ? now() : $integration->leads_last_synced_at,
                     'leads_last_error'     => $result['error'],
                 ]);
 

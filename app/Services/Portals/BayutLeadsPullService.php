@@ -57,6 +57,7 @@ class BayutLeadsPullService
         foreach (self::TARGETS as $target) {
             foreach (self::LEAD_TYPES as $type) {
                 $this->ingest($this->request($endpoint, $source, $type, $target, $timestamp), $source);
+                usleep(250000);
             }
         }
 
@@ -66,12 +67,33 @@ class BayutLeadsPullService
     protected function request(string $endpoint, string $source, string $type, string $target, string $timestamp): array
     {
         try {
-            $response = $this->client()->timeout(25)->get($endpoint, [
-                'type'       => $type,
-                'target'     => $target,
-                'is_trulead' => 1,
-                'timestamp'  => $timestamp,
-            ]);
+            $tries = 0;
+
+            do {
+                $response = $this->client()->timeout(25)->get($endpoint, [
+                    'type'       => $type,
+                    'target'     => $target,
+                    'is_trulead' => 1,
+                    'timestamp'  => $timestamp,
+                ]);
+
+                $tries++;
+
+                if ($response->status() === 429) {
+                    $retryAfter = min((int) ($response->json('retry_after') ?? 60), 120);
+
+                    if ($tries >= 2) {
+                        $this->errors[] = "{$source}/{$type}/{$target}: HTTP 429 still rate limited after retry";
+                        return [];
+                    }
+
+                    usleep($retryAfter * 1_000_000);
+
+                    continue;
+                }
+
+                break;
+            } while (true);
 
             if (! $response->successful()) {
                 $this->errors[] = "{$source}/{$type}/{$target}: HTTP {$response->status()} " . Str::limit((string) $response->body(), 200);
@@ -152,7 +174,9 @@ class BayutLeadsPullService
 
     protected function client()
     {
-        return Http::acceptJson()->withToken((string) $this->integration->leads_api_token);
+        return Http::acceptJson()
+            ->withToken((string) $this->integration->leads_api_token)
+            ->withHeaders(['x-api-key' => (string) $this->integration->leads_api_token]);
     }
 
     protected function result(?string $error = null): array
