@@ -1,0 +1,149 @@
+Marafid	308	1BRFLAT	126	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	87,000.00	
+Marafid	403	1BRFLAT	118	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	83,000.00	
+Marafid	604	1BRFLAT	112	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	90,000.00	
+Marafid	606	1BRFLAT	120	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	90,000.00	
+Marafid	709	1BRFLAT	119	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	83,000.00	
+P/2623	1803	2BRA/1BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	85,000.00	
+P/2623	1807	2BRA/1BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	145,000.00	
+126	1001	2BRA/2BA		Abu Dhabi	C36	E 6	Markaziyah East	24.490527 ; 54.360796	https://maps.app.goo.gl/muqX1jX5rfi1wSnT6	D	60,000.00	
+126	1601	2BRA/2BA		Abu Dhabi	C36	E 6	Markaziyah East	24.490527 ; 54.360796	https://maps.app.goo.gl/muqX1jX5rfi1wSnT6	D	60,000.00	
+126	301	2BRA/2BA		Abu Dhabi	C36	E 6	Markaziyah East	24.490527 ; 54.360796	https://maps.app.goo.gl/muqX1jX5rfi1wSnT6	D	60,000.00	
+126	801	2BRA/2BA		Abu Dhabi	C36	E 6	Markaziyah East	24.490527 ; 54.360796	https://maps.app.goo.gl/muqX1jX5rfi1wSnT6	D	60,000.00	
+126	802	2BRA/2BA		Abu Dhabi	C36	E 6	Markaziyah East	24.490527 ; 54.360796	https://maps.app.goo.gl/muqX1jX5rfi1wSnT6	D	60,000.00	
+130	1503	2BRA/2BA		Abu Dhabi	C47	E13	Al Zahiyah	24.499832 ; 54.376113	https://maps.app.goo.gl/kNQo6cX7vEGB7a9z8	D	65,000.00	
+2271	1308	2BRA/2BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	75,000.00	
+2271	602	2BRA/2BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	75,000.00	
+4142	1304	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+4142	1504	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+4142	401	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+4142	603	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+4142	604	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+4142	904	2BRA/2BA		Abu Dhabi	C6	E6	Al Danah	24.489238 ; 54.3595	https://maps.app.goo.gl/1wswBNBktmtqJrao7	D	70,000.00	
+5213	1102	2BRA/2BA		Abu Dhabi	C43	E3	Al Danah	24.487663 ; 54.364081	https://maps.app.goo.gl/e3ASrAppEpuYcPzy8	D	65,000.00	
+5213	1103	2BRA/2BA		Abu Dhabi	C43	E3	Al Danah	24.487663 ; 54.364081	https://maps.app.goo.gl/e3ASrAppEpuYcPzy8	D	65,000.00	
+5649	301	2BRA/2BA		Abu Dhabi	321	ME 10	Mohamed Bin Zayed City	24.336051 ; 54.535638	https://maps.app.goo.gl/fXsQTo98HAYA3Z3p7	D	40,000.00	
+5933	203	2BRA/2BA		Abu Dhabi	C54	ME12	Mohamed Bin Zayed City	24.3223 ; 54.534559	https://maps.app.goo.gl/CRpYaSJ2A7VechXh6	D	54,700.00	
+6014	201	2BRA/2BA		Abu Dhabi	61	ME12	Mohamed Bin Zayed City	24.323151 ; 54.533173	https://maps.app.goo.gl/5SBmzj3KvfEzKSAS8	D	60,000.00	
+6044	101	2BRA/2BA		Abu Dhabi	80	ME 12	Mohamed Bin Zayed City	24.323254 ; 54.532294	https://maps.app.goo.gl/JazmBGCdHPjBWhjQA	D	55,000.00	
+6044	104	2BRA/2BA		Abu Dhabi	80	ME 12	Mohamed Bin Zayed City	24.323254 ; 54.532294	https://maps.app.goo.gl/JazmBGCdHPjBWhjQA	D	55,000.00	
+6067	101	2BRA/2BA		Abu Dhabi	79	ME 12	Mohamed Bin Zayed City	24.323035 ; 54.532305	https://maps.app.goo.gl/ZWo8wZFEvBYrt1Qd7	D	53,000.00	
+6081	102	2BRA/2BA		Mohammed Bin Zayed City	57	ME 12	Mohamed Bin Zayed City	24.322263 ; 54.533217	https://maps.app.goo.gl/Ds3SMRB6m4f2ZGFf7	D	55,000.00	
+6084	103	2BRA/2BA		Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	50,000.00	
+6193	104	2BRA/2BA		Abu Dhabi	337	ME 10	Mohamed Bin Zayed City	24.334911 ; 54.538087	https://maps.app.goo.gl/FGXXkmJnSTFAA8e2A	D	37,350.00	
+6217	302	2BRA/2BA		Abu Dhabi	35	ME 12	Mohamed Bin Zayed City	24.321955 ; 54.534947	https://maps.app.goo.gl/Y8aNqjJu2UnGRnbv5	D	44,765.00	
+6318	203	2BRA/2BA		Abu Dhabi	C153	ME12	Mohamed Bin Zayed City	24.323759 ; 54.537298	https://maps.app.goo.gl/hihaqCBwbT7F8HL98	D	17,500.00	
+P/255	102	2BRA/2BA		Abu Dhabi	94	ME 10	Mohamed Bin Zayed City	24.33414 ; 54.53196	https://maps.app.goo.gl/mkQWGABm847ZGyLD8	D	65,000.00	
+P/273	404	2BRA/2BA	107.2	Abu Dhabi	C10	E29	Hadbat Al Zafaranah	24.4449167 ; 54.4037500	https://maps.app.goo.gl/PKczKy8NS1Tcr5Ya8	D	82,687.00	
+4091	6	2BRA/3BA		Abu Dhabi	197	ME 10	Mohamed Bin Zayed City	24.330912 ; 54.533932	https://maps.app.goo.gl/NZ4tGMo68bdagbyDA	D	40,000.00	
+P/2623	1101	2BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	85,000.00	
+P/2623	1102	2BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	80,000.00	
+P/2623	1203	2BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	90,000.00	
+P/2623	1301	2BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	85,000.00	
+P/2623	1402	2BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	63,000.00	
+P/567	403	2BRA/3BA	80	Abu Dhabi	C15	EB2_03	Bani Yas	24.317786 ; 54.631268	https://maps.app.goo.gl/kwfnCkpJ9A9LMMp76	D	80,000.00	
+P/1135	1104	2BRA/3BA	97	Abu Dhabi	C3	E16	Al Zahiyah	24.493440 ; 54.376686	https://maps.app.goo.gl/SpJFdjSKqW73bqwT8	D	80,000.00	
+P/1983	3VL	2BRA/4BA	308.2	Abu Dhabi	71	W24_02	Al Mushrif	24.4487956 ; 54.3880806	https://maps.app.goo.gl/qyKDnG3vw1KBwUX3A	D	147,000.00	
+P/1983	4VL	2BRA/4BA	308.2	Abu Dhabi	71	W24_02	Al Mushrif	24.4487956 ; 54.3880806	https://maps.app.goo.gl/qyKDnG3vw1KBwUX3A	D	150,000.00	
+1615	1	2BRFLAT		Abu Dhabi	29	E 43	Al Zahra	24.440527 ; 54.428305	https://maps.app.goo.gl/s1U5wVf9twW2TSiL6	D	100,000.00	
+2196	203	2BRFLAT		Abu Dhabi	4	E9_02	Al Danah	24.497274 ; 54.371114	https://maps.app.goo.gl/8Vn9q7AfwRj2jSbC8	D	65,000.00	
+363	406	2BRFLAT		Abu Dhabi	C79	E18_02	Al Danah	24.47498 ; 54.37167	https://maps.app.goo.gl/ZgbeQRZsQstbkyQKA	D	65,000.00	
+4298	105	2BRFLAT		Abu Dhabi	C1	ME12	Mohamed Bin Zayed City	24.319889 ; 54.530698	https://maps.app.goo.gl/wMHgHfxgSsxRDAEx6	D	35,000.00	
+4346	1302	2BRFLAT		Abu Dhabi	11	E4_01	Al Danah	24.48597 ; 54.364041	https://maps.app.goo.gl/95sbirWEXJMdYyib7	D	75,000.00	
+4346	1702	2BRFLAT		Abu Dhabi	11	E4_01	Al Danah	24.48597 ; 54.364041	https://maps.app.goo.gl/95sbirWEXJMdYyib7	D	75,000.00	
+6050	704	2BRFLAT		Abu Dhabi	C22	E9_02	Al Danah	24.498427 ; 54.368579	https://maps.app.goo.gl/yqbuHxURNSrdwuuq9	D	68,000.00	
+7274A	101	2BRFLAT		Abu Dhabi	C 34 to C	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/jKLAU5xVXSY1zoRK8	D	100,000.00	
+7274B	114	2BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	100,000.00	
+B/786	1304	2BRFLAT		Abu Dhabi	C 130	E11	Al Danah	24.489356 ; 54.371436	https://maps.app.goo.gl/Q6p9kJHKkL67RXS2A	D	85,000.00	
+P/1666	101	2BRFLAT	109	Abu Dhabi	C-14	E9_02	Al Danah	24.497839 ; 54.371445	https://maps.app.goo.gl/Txk4GbfHoCtGrvtL6	D	68,250.00	
+P/1666	1808	2BRFLAT	116	Abu Dhabi	C-14	E9_02	Al Danah	24.497839 ; 54.371445	https://maps.app.goo.gl/Txk4GbfHoCtGrvtL6	D	85,000.00	
+P/1666	607	2BRFLAT	109	Abu Dhabi	C-14	E9_02	Al Danah	24.497839 ; 54.371445	https://maps.app.goo.gl/Txk4GbfHoCtGrvtL6	D	85,000.00	
+P/328	501	2BRFLAT		Abu Dhabi	C 120	ME 9	Mohamed Bin Zayed City	24.340685 ; 54.531353	https://maps.app.goo.gl/FY8bJ4VaHwg1fdum8	D	75,000.00	
+P/359	703	2BRFLAT		Abu Dhabi	C 331	ME 10	Mohamed Bin Zayed City	24.3366 ; 54.53534	https://maps.app.goo.gl/a5fipB71ZpFigYbB8	D	58,000.00	
+P/614	203	2BRFLAT		Abu Dhabi	C11A	E9_02	Al Danah	24.496545 ; 54.37239	https://maps.app.goo.gl/eCXctdsQNHsQfh1R7	D	85,000.00	
+P/880	403	2BRFLAT	88.5	Abu Dhabi	C 149	ME 9	Mohamed Bin Zayed City	24.34372 ; 54.53273	https://maps.app.goo.gl/Amg7oy5yhdJRjVgp6	D	53,298.00	
+P/957	201	2BRFLAT	64.55	Abu Dhabi	C 91	ME 10	Mohamed Bin Zayed City	24.33373 ; 54.53184	https://maps.app.goo.gl/k5CLnQgJ9ieTyFGp8	D	68,000.00	
+P/998	201	2BRFLAT	71.37	Abu Dhabi	C264	ME12	Mohamed Bin Zayed City	24.31923 ; 54.53609	https://maps.app.goo.gl/fV5THs9e7rGno8jc9	D	42,000.00	
+P/592	501	2BRFLAT	68	Abu Dhabi	C5	E 9_2	Hamdan	24.496417 ; 54.370883	https://maps.app.goo.gl/S5c751U8MpK6Qh2V7	D	80,000.00	
+Compound A	A7-201	2BRFLAT	167	Abu Dhabi	92 to 99	E 19_2	Al Nahyan	24.47354562 ; 54.37991146	https://maps.app.goo.gl/X7xjQmR5PWBo7omY9	D	99,225.00	
+P/725	406	2BRFLAT	121.07	Abu Dhabi	C25	RBW7	Al Raha Beach	24.4441539 ; 54.5855828,	https://maps.app.goo.gl/qXJ5TW2D6955biUr7	D	99,225.00	
+P/725	709	2BRFLAT	121.07	Abu Dhabi	C25	RBW7	Al Raha Beach	24.4441539 ; 54.5855828,	https://maps.app.goo.gl/qXJ5TW2D6955biUr7	D	110,000.00	
+2151	401PH	2BRPENTH		Abu Dhabi	30	E9_02	Al Danah	24.497142 ; 54.369211	https://maps.app.goo.gl/n72QuJQAq5Qtw1eQ6	D	60,000.00	
+2271	1004	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1005	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1106	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1203	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1204	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1304	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1404	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1606	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1703	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	1704	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	703	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	704	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	706	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+2271	905	3BRA/3BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	90,000.00	
+5213	1101	3BRA/3BA		Abu Dhabi	C43	E3	Al Danah	24.487663 ; 54.364081	https://maps.app.goo.gl/e3ASrAppEpuYcPzy8	D	71,662.00	
+P/1058	504	3BRA/3BA		Abu Dhabi	C 55	E25	Al Nahyan	24.46711 ; 54.38506	https://maps.app.goo.gl/kHPm7ECa9ih9tdr68	D	100,000.00	
+P/2623	1701	3BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	78,750.00	
+P/2623	1703	3BRA/3BA		Abu Dhabi	C8E	E8	Al Danah	24.492989 ; 54.3665	https://maps.app.goo.gl/bE4eS3jgYWkzHAxU8	D	110,000.00	
+P/74	805	3BRA/3BA		Abu Dhabi	C-5	W4	Al Hisn	24.475857 ; 54.351489	https://maps.app.goo.gl/9Ucs8Mvz7hCkBALS6	D	90,000.00	
+2233	804	3BRA/4BA		Abu Dhabi	14	E13	Al Zahiyah	24.499202 ; 54.371981	https://maps.app.goo.gl/9VTCGjVPyJ8Qsc1x6	D	75,000.00	
+331	1301	3BRA/4BA		Abu Dhabi	C33	E16	Al Zahiyah	24.495424 ; 54.380412	https://maps.app.goo.gl/HfEnLv1djrGGHHzd7	D	80,000.00	
+331	301	3BRA/4BA		Abu Dhabi	C33	E16	Al Zahiyah	24.495424 ; 54.380412	https://maps.app.goo.gl/HfEnLv1djrGGHHzd7	D	85,000.00	
+331	701	3BRA/4BA		Abu Dhabi	C33	E16	Al Zahiyah	24.495424 ; 54.380412	https://maps.app.goo.gl/HfEnLv1djrGGHHzd7	D	85,000.00	
+P/3152A	1001	3BRA/4BA	1668.4045	Abu Dhabi	C59	E-48	Al Muntazah	24.419935 ; 54.461882	https://maps.app.goo.gl/4hVCUq44ERvepCMy5	D	130,000.00	
+157	1102	3BRFLAT		Abu Dhabi	C1	E10	Al Danah	24.4933 ; 54.36804	https://maps.app.goo.gl/KcRw29r86FuQwLkA9	D	69,458.00	
+157	1202	3BRFLAT		Abu Dhabi	C1	E10	Al Danah	24.4933 ; 54.36804	https://maps.app.goo.gl/KcRw29r86FuQwLkA9	D	69,458.00	
+4346	1201	3BRFLAT		Abu Dhabi	11	E4_01	Al Danah	24.48597 ; 54.364041	https://maps.app.goo.gl/95sbirWEXJMdYyib7	D	100,000.00	
+5451	202	3BRFLAT		Abu Dhabi	C79	W9	Al Khalidiyah	24.471909 ; 54.34848	https://maps.app.goo.gl/eLZnj1LEVLafMSD98	D	85,000.00	
+5451	403	3BRFLAT		Abu Dhabi	C79	W9	Al Khalidiyah	24.471909 ; 54.34848	https://maps.app.goo.gl/eLZnj1LEVLafMSD98	D	85,000.00	
+5833	202	3BRFLAT		Abu Dhabi	28	E9_02	Al Danah	24.496566 ; 54.369655	https://maps.app.goo.gl/KdLxKD4KNLCNrmh58	D	85,000.00	
+5833	402	3BRFLAT		Abu Dhabi	28	E9_02	Al Danah	24.496566 ; 54.369655	https://maps.app.goo.gl/KdLxKD4KNLCNrmh58	D	95,000.00	
+7274A	1005	3BRFLAT		Abu Dhabi	C 34 to C	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/jKLAU5xVXSY1zoRK8	D	125,000.00	
+7274A	2005	3BRFLAT		Abu Dhabi	C 34 to C	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/jKLAU5xVXSY1zoRK8	D	145,178.78	
+7274A	606	3BRFLAT		Abu Dhabi	C 34 to C	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/jKLAU5xVXSY1zoRK8	D	125,000.00	
+7274B	1211	3BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	130,000.00	
+7274B	1412	3BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	125,000.00	
+7274B	1611	3BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	125,000.00	
+7274B	211	3BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	125,000.00	
+P/1162	701	3BRFLAT		Abu Dhabi	C1	E9_02	Al Danah	24.493812 ; 54.368022	https://maps.app.goo.gl/i1F8Rk3WAVwmvCzP9	D	115,000.00	
+P/1695	1001	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	101	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	103	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	117,000.00	1 Month Rent Free
+P/1695	1302	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	1404	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	1604	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	1804	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	200,000.00	1 Month Rent Free
+P/1695	301	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	302	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	303	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	401	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	403	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	601	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	120,000.00	1 Month Rent Free
+P/1695	603	3BRFLAT	191	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/1695	604	3BRFLAT	187	Abu Dhabi	C17B	E10	Al Danah	24.4926 ; 54.37159	https://maps.app.goo.gl/dHpeXjebKFeysxFV7	D	130,000.00	1 Month Rent Free
+P/2263	102	3BRFLAT		Abu Dhabi	C7	E20_02	Al Nahyan	24.461389 ; 54.379463	https://maps.app.goo.gl/YXoc9VRgYjcP9oAEA	D	90,247.00	
+P/522	1701	3BRFLAT		Abu Dhabi	C 25	E6	Al Danah	24.4899 ; 54.359879	https://maps.app.goo.gl/i1F8Rk3WAVwmvCzP9	D	125,000.00	
+P/522	1702	3BRFLAT		Abu Dhabi	C 25	E6	Al Danah	24.4899 ; 54.359879	https://maps.app.goo.gl/i1F8Rk3WAVwmvCzP9	D	168,000.00	
+Al Reef Buildings 1	1301	3BRFLAT	143.53	Abu Dhabi	2404	AL REEF	Al Reef	24.456289 ; 54.673665	https://maps.app.goo.gl/ZBXaa7UW61Zoqxc79	D	115,000.00	
+Al Reef Buildings 4	4105	3BRFLAT	134.27	Abu Dhabi	2407	AL REEF	Al Reef	24.458851 ; 54.674007	https://maps.app.goo.gl/DXqG8xXRVpERSBjw7	D	110,000.00	
+Al Reef Buildings 28	28401	3BRFLAT	145.87	Abu Dhabi	2378	AL REEF	Al Reef	24.457349 ; 54.673411	https://maps.app.goo.gl/s9fKN9pFPrNuTpwS9	D	110,000.00	
+696	401PH	3BRPENTH		Abu Dhabi	22	E9_02	Al Danah	24.496813 ; 54.369998	https://maps.app.goo.gl/GsBQxoA96wQgb1pj8	D	75,000.00	
+4204	2VL	3BRVILL		Abu Dhabi	92	W15_02	Al Manhal	24.45886 ; 54.37269	https://maps.app.goo.gl/dsCgyHMNREFT8wwH8	D	115,000.00	
+5232	2VL	3BRVILL		Abu Dhabi	254	E 41	Al Zahra	24.43641 ; 54.43116	https://maps.app.goo.gl/f19jQo6d4Pxuwe3R8	D	70,000.00	
+2271	1802	4BRA/4BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	120,000.00	
+2271	1901	4BRA/4BA		Abu Dhabi	C3	E8	Al Danah	24.492147 ; 54.365858	https://maps.app.goo.gl/HSKsv3sS4DgZjD2M8	D	120,000.00	
+482	902	4BRA/4BA		Abu Dhabi	C39	E 6	Madinat Zayed	24.489903 ; 54.361323	https://maps.app.goo.gl/rF4CmSYF94ujhcv3A	D	100,000.00	
+7274B	2012	4BRFLAT		Abu Dhabi	C34_to_C37	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/yhUBYuGFAj12gvtn8	D	270,000.00	
+B/386	1001	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	140,000.00	
+B/386	102	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	130,000.00	
+B/386	1102	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	140,000.00	
+B/386	1701	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	140,000.00	
+B/386	202	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	130,000.00	
+B/386	801	4BRFLAT		Abu Dhabi	C43	E5	Al Danah	24.49324 ; 54.36015	https://maps.app.goo.gl/xWTjjSZSSrcWLMXC9	D	136,500.00	
+Lamar Residency Tower D	B02	4BRFLAT		Abu Dhabi	10	RBW-6	Al Raha	24.44546535 ; 54.58324348	https://maps.app.goo.gl/hqjnQCP4sELaUCuD6	D	255,000.00	
+AHS Villas - Al Raha Gardens	486VL	4BRVILL		Abu Dhabi	425	SW18	Al Raha Beach	24.4318453 ; 54.5671437	https://maps.app.goo.gl/jAW688v7nyAyzMKD7	D	200,000.00	
+AD1	2201PH	4PH/4BA	391	Abu Dhabi	C20	W59_01	Al Rawdah	24.42078 ; 54.44296	https://maps.app.goo.gl/NQYuQt435GzatF8D8	D	230,000.00	
+7289	18VL	5BRVILL		Abu Dhabi	197_201_205	E19_02	Al Nahyan	24.47772 ; 54.384035	https://maps.app.goo.gl/AQwMv6phuX67aYuXA	D	175,000.00	
+B/700	3VL	5BRVILL		Abu Dhabi	76	W 21	Shakhbout City	24.372326 ; 54.640628	https://maps.app.goo.gl/CxBabFZBTBFCSxNe6	D	162,750.00	
+P/1989	1VL	5BRVILL	449	Abu Dhabi	121	W 15_2	Al Manhal	24.456796 ; 54.380374	https://maps.app.goo.gl/6YbQ16dGCp38Ftcf9	D	350,000.00	

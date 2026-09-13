@@ -1,0 +1,19 @@
+1	United Square Desert Tower	USR-C88D-10-1002	155,000	C-3-Simplex	157	2	Pool, Gym & Sauna	Available
+2	United Square Desert Tower	USR-C88D-10-1006	157,500	B-3-Simplex	152	2	Pool, Gym & Sauna	Available
+3	United Square Oasis Tower	USR-C88O-17-1701	190,000	A-4-Simplex	221	2	Pool, Gym & Sauna	Available
+1	Khalidiya Village	KHV-P011-VL00-GF-0052	275000	6 BHK	536	2	Pool, Gym, Clubhouse, Tennis court, Squash court	Available
+2	Khalidiya Village	KHV-P011-VL00-GF-0118	181,912	5 BHK	325	2	Pool, Gym, Clubhouse, Tennis court, Squash court	Available
+3	Khalidiya Village	KHV-P011-VL00-GF-0133	180,000 4 BHk		276	2	Pool, Gym, Clubhouse, Tennis court, Squash court	Under Maintenance till 28/09/2026
+4	Khalidiya Village	KHV-P011-VL00-GF-0025	181,912	5 BHK	325	2	Pool, Gym, Clubhouse, Tennis court, Squash court	Available
+1	Marasy 6	MAR-MAR6-C099-01-6107	150,000	2 bedrooms	161	1	Gym &Pool & Sauna	Available
+2	Marasy 8	MAR-MAR8-C101-03-8303	136,500	2 bedrooms	146.5	1	Gym &Pool & Sauna	Available
+3	Marasy 7	MAR-MAR7-C099-01-7108	172,200	3 bedrooms	199	2	Gym &Pool & Sauna	Available
+4	Marasy 1	MAR-MAR1-C099-05-1502	150,000	2 bedrooms	137	1	Gym &Pool & Sauna	Available
+5	Marasy 7	MAR-MAR7-C099-GF-7004	126,000	2 bedrooms	130	1	Gym &Pool & Sauna	Available
+1	AL ARYAM Block C Reem View	ARY-5455-20-2010	133,126	3 bedrooms	184.3	0	Pool, Gym & Sauna	Available
+2	AL ARYAM Block B Corninch view	ARY-5455-20-2005	150,000	3 bedrooms	196.6	0	Pool, Gym & Sauna	Booked
+3	AL ARYAM Block C Reem View	ARY-5455-13-1306	135,000	3 bedrooms	196.6	0	Pool, Gym & Sauna	Available
+1	SWT	2703	136,000	3 Bedrooms	233	1	GYM, Pool & Sauna	Available
+1	Villa 27	LR-BD-00-VL00-GF-0027	375,000	5+M	472	3	Private Pool, Gym & Sauna	Available
+2	Villa 29	LR-BD-00-VL00-GF-0029	380,000	5+M	472	3	Private Pool, Gym & Sauna	Special Rate
+3	Villa 30	LR-BD-00-VL00-GF-0030	380,000	5+M	472	3	Private Pool, Gym & Sauna	Special Rate

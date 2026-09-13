@@ -1,0 +1,70 @@
+Bloom Living -Cordoba	Zayed city, shakhbout	Villa	Villa 047-Tag#059	3	375 Sqm	225,000	Booked	3 Bedrooms - Middle SIngle Row - 3 Master Bedrooms	Private owner
+Bloom Living -Cordoba	Zayed city, shakhbout	Townhouse	TH-81 - Tag#57	2	120.41 Sqm	150K (Negotiable)	Booked	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Cordoba	Zayed city, shakhbout	Townhouse	TH022-Tag#180	3	171.29 Sqm	160K	Booked	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living Cordoba	Zayed city, shakhbout	Townhouse	TH-099 - Tag#195	3	149.05 Sqm	175K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-162 -Tag#174	3	171.29 Sqm	220K (Negotiable)	Available	3 Master bedrooms - Corner double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-180 - Tag#181	3	171.29 Sqm	190K (Negotiable)	Under Offer	3 Master bedrooms - Corner double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-195 - Tag#195	3	151.31 Sqm	175K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-240 - Tag#240	3	171.29 Sqm	200K (Negotiable)	Available	3 Master bedrooms - Corner Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-167 - Tag#132	3	151.31 Sqm	190K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-109 - Tag#85	3	171.29 Sqm	190,000	Available	3 Master bedrooms - Corner Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-159 - Tag#171	3	151.31 Sqm	180K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-126 - Tag#138	3	151.31 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-201 - Tag#201	3	151.31 Sqm	165K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-200 - Tag#200	3	151.31 Sqm	165 K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-198 - Tag#198	3	151.31 Sqm	165 K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-211 - Tag#211	3	171.29 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-95 - Tag#71	2	123.12 Sqm	160K (Negotiable)	Available	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-215 - Tag#215	3	236.5 Sqm	210K (Negotiable)	Booked	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-188 - Tag#188	3	151.31 Sqm	190K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-47 - Tag#23	2	123.12 Sqm	145K (Negotiable)	Booked	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-57 - Tag#33	2	123.12 Sqm	160K (Negotiable)	Booked	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-65 - Tag#41	2	120.41 Sqm	170K (Negotiable)	Available	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-225 - Tag#225	3	151.31 Sqm	170K -One month free as per owner approval	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-118 - Tag#94	3	151.31 Sqm	175K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-191 - Tag#191	3	151.31 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-32 - Tag#8	2	120.41 Sqm	160K (Negotiable)	Available	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-184 -Tag#177	3	151.31 Sqm	175K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-96 - Tag#72	2	124.31 Sqm	170K (Negotiable)	Booked	2 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-178 - Tag#183	3	151.31 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-147 - Tag#159	3	171.29 Sqm	190K (Negotiable)	Available	3 Master bedrooms - Corner double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-152 - Tag#164	3	151.31 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-144 -Tag#156	3	151.31 Sqm	180K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-233 - Tag#233	3	171.29 Sqm	180K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-183 - Tag#178	3	151.31 Sqm	185K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-034 - Tag#10	2	123.12 Sqm	145K (Negotiable)	Booked	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-120 - Tag#96	3	171.29 Sqm	195K (Negotiable)	Available	3 Master bedrooms - Corner Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-219 - Tag#219	3	151.31 Sqm	170K (Negotiable)	Available	3 bedrooms - 1 Master Room - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-218 - Tag#218	3	172 Sqm	165K (Negotiable)	Available	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-182 - Tag#179	3	151.31 Sqm	170K (Negotiable)	Available	3 bedrooms - 1 Master Room - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-183 - Tag#178	3	188.5 Sqm	220k (furnished)	Available	3 Master bedrooms + Store Corner double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-136 - Tag#148	3	171.29 Sqm	180K (Negotiable)	Available	3 bedrooms - End double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Townhouse	TH-164 - Tag#135	3	171.29 Sqm	175K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Villa	V-88 - Tag#396	5	416.42	AED 285,000	Available	5 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Villa	V-87 - Tag#397	5	416.42	AED 285,000	Available	5 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Villa	V-148 - Tag#353	3	253.65 Sqm	215K (Negotiable)	Available	3 Master bedrooms - Mid double Row	Private owner
+Bloom Living -Toledo	Zayed city, shakhbout	Villa	V-65 - Tag#253	3	254 Sqm	220K	Booked	3 Master bedrooms - Mid Single Row	Private owner
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 215	3	176.69 Sqm	145,000	Under Offer	3 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 317	3	210.25	175000	Available	3 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 401	3	224.74	170000	Available	3 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 421	2	164.06	130000	Under Offer	2 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 101	3	223.02	155,000.00	Under Offer	3 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	East 224	1	88.91	80,062.50	Booked	1 BR	Bloom
+Bloom Marina	Al Bteen ,Abu Dhabi	Flat	West 113	3	217.55 Sqm	147,000	Booked	Maids Room/Terrace	Bloom
+Bloom Central Airport Road, Abu Dhabi		Flat	2207	2		115,500	Under Offer	2BR - Maids Room	Bloom
+Bloom Gardens A	l Muntazah, Abu Dhab	Villa	2G-24 - Villa 113	5	531 Sqm	300,000	Under Offer	5 BR	Bloom
+Aldhay	Al Muntazah, Abu Dhabi	Townhouse	A3C-095	3		179,610	Under Offer	3 BR	Private owner
+Al Mushref villas	Al Mushref ,Abu Dhabi	Villa	RUC-107	3	315.45 Sqm	172,165	Available	3 BR	Bloom
+WAHA	Al Hisn , Abu Dhabi	Flat	1,403	3		97,650	Under Offer	3 BR	Bloom
+WAHA	Al Hisn , Abu Dhabi	Flat	402	3		94,264	Booked	3 BR	Bloom
+SOHO	AL Saadiyat , ABu Dhabi	Flat	SS-A-820	Studio		88,200	Available	1 BR	Private owner
+SOHO	AL Saadiyat , ABu Dhabi	Flat	S_A_806	Studio		65,000	Available	1 BR	Private owner
+SOHO	AL Saadiyat , ABu Dhabi	Flat	1,005	Studio		65,000	Available	1 BR	Private owner
+Bloom Towers B	JVC Dubai	Flat	2,808	Studio		45,000	Available	Studio	Private owner
+Bloom Towers C	JVC Dubai	Flat	2,202	1		65,000	Available	1bhk+balcony+open kitchen+community	Bloom
+Bloom Towers C	JVC Dubai	Flat	1406	Studio		45,000	Available	Studio	Bloom
+Mankhool	Bur Dubai	Flat	710	2		80000	Available	2 BR+ balcony	Bloom
+Mankhool	Bur Dubai	Flat	803	1		66,000	Available	1bedroom	Bloom
+Mankhool	Bur Dubai	Flat	703	2		80,000	Available	2bhk + balcony	Bloom
+Mankhool	Bur Dubai	Flat	712	2		77,000	Available	2 BR	Bloom
+Mankhool	Bur Dubai	Flat	709	2		80,000	Available	2bhk + balcony	Bloom

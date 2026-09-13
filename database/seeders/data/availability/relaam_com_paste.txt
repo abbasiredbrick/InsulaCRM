@@ -1,0 +1,75 @@
+P/2767B	604OF	OFFICE	138.8	Abu Dhabi	C43	E16_01	Al Zahiyah	24.493849 ; 54.381478	https://maps.app.goo.gl/Lfwoxnv1B3Rpt6iCA	D	1,250	D
+P/2767B	704OF	OFFICE	138.8	Abu Dhabi	C43	E16_01	Al Zahiyah	24.493849 ; 54.381478	https://maps.app.goo.gl/Lfwoxnv1B3Rpt6iCA	D	1,250	D
+P/2767C	101OF	OFFICE	115	Abu Dhabi	C34	W8	Al Khalidiyah	24.474184 ; 54.348004	https://maps.app.goo.gl/pTuuSBZFFu8JSs5Z6	D	1,000	D
+P/2767C	102OF	OFFICE	115	Abu Dhabi	C34	W8	Al Khalidiyah	24.474184 ; 54.348004	https://maps.app.goo.gl/pTuuSBZFFu8JSs5Z6	D	900	D
+P/2767C	1OF	OFFICE	64	Abu Dhabi	C34	W8	Al Khalidiyah	24.474184 ; 54.348004	https://maps.app.goo.gl/pTuuSBZFFu8JSs5Z6	D	1,000	D
+P/528	1OF	OFFICE	79.73	Abu Dhabi	C 60	E25	Al Nahyan	24.4658 ; 54.38486	https://maps.app.goo.gl/sAw2uSTkcYhoasEY7	D	1,003	D
+P/631	2OF	OFFICE	66	Abu Dhabi	C 168	ME 10	Mohamed Bin Zayed City	24.33306 ; 54.53444	https://maps.app.goo.gl/niabN2ef9DqtWd4y5	D	700	D
+P/646	1OF	OFFICE	70.5	Abu Dhabi	C 148	ME 9	Mohamed Bin Zayed City	24.3414 ; 54.5353	https://maps.app.goo.gl/GbDaccHsL5KGP1FF8	D	882	D
+P/1035	1OF	OFFICE	47	Abu Dhabi	C61	E4_02	Al Danah	24.481474 ; 54.3727290	https://maps.app.goo.gl/kff3Qurr6yiLvox57	D	1,277	D
+P/1035	3OF	OFFICE	39	Abu Dhabi	C61	E4_02	Al Danah	24.481474 ; 54.3727290	https://maps.app.goo.gl/kff3Qurr6yiLvox57	D	1,282	D
+P/1745	102OF	OFFICE	128	Abu Dhabi	C27	E14	Al Zahiyah	24.501494 ; 54.376635	https://maps.app.goo.gl/jVNySSvHTDgR6jtk7	D	781	D
+B/845	1OF	OFFICE	110.5	Abu Dhabi	P216	AL SHAHAMAH	Al Shahamah	24.5407778 ; 54.6907778	https://maps.app.goo.gl/AqD78G7snS5B9wtQ7	D	800	D
+B/845	2OF	OFFICE	110.5	Abu Dhabi	P216	AL SHAHAMAH	Al Shahamah	24.5407778 ; 54.6907778	https://maps.app.goo.gl/AqD78G7snS5B9wtQ7	D	800	D
+B/845	3OF	OFFICE	110.5	Abu Dhabi	P216	AL SHAHAMAH	Al Shahamah	24.5407778 ; 54.6907778	https://maps.app.goo.gl/AqD78G7snS5B9wtQ7	D	800	D
+B/845	4OF	OFFICE	110.5	Abu Dhabi	P216	AL SHAHAMAH	Al Shahamah	24.5407778 ; 54.6907778	https://maps.app.goo.gl/AqD78G7snS5B9wtQ7	D	800	D
+P/3109	2OFM	OFFICE	330	Abu Dhabi	C 7	E 10	Al Danah	24.29423 ; 54.2216	https://maps.app.goo.gl/4LctREYv5NibitrJ8	D	772	D
+2196	2SH	SHOP	172.5	Abu Dhabi	4	E9_02	Al Danah	24.497274 ; 54.371114	https://maps.app.goo.gl/8Vn9q7AfwRj2jSbC8	D	730	D
+334	7SH	SHOP	43.42	Abu Dhabi	C 36	E 22_1	Al Ittihad	24.458016 ; 54.389626	https://maps.app.goo.gl/45h884T683mJ1AUv5	D	2,165	D
+5350	5SH	SHOP	12	Abu Dhabi	118	ME 10	Mohamed Bin Zayed City	24.334704 ; 54.533099	https://maps.app.goo.gl/DDqdC43ptQEHGXr56	D	1,500	D
+5350	6SH	SHOP	19.04	Abu Dhabi	118	ME 10	Mohamed Bin Zayed City	24.334704 ; 54.533099	https://maps.app.goo.gl/DDqdC43ptQEHGXr56	D	1,681	D
+5350	7SH	SHOP	13.33	Abu Dhabi	118	ME 10	Mohamed Bin Zayed City	24.334704 ; 54.533099	https://maps.app.goo.gl/DDqdC43ptQEHGXr56	D	1,500	D
+5481	9SH	SHOP	22.09	Abu Dhabi	C 36	W4	Al Hisn	24.473604 ; 54.352368	https://maps.app.goo.gl/s3huow2ZDVWZqowv6	D	1,811	D
+5934	2SH	SHOP	22.71	Abu Dhabi	356	ME 10	Mohamed Bin Zayed City	24.334563 ; 54.537729	https://maps.app.goo.gl/k2QBoqhgViqSVdG2A	D	2,202	D
+6050	6SH	SHOP	25.2	Abu Dhabi	C22	E9_02	Al Danah	24.498427 ; 54.368579	https://maps.app.goo.gl/yqbuHxURNSrdwuuq9	D	2,000	D
+6084	2SH	SHOP	26.47	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,511	D
+6084	4SH	SHOP	22.63	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,547	D
+6084	5SH	SHOP	21.9	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,507	D
+6084	6SH	SHOP	19.2	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,563	D
+6084	7SH	SHOP	17.6	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,420	D
+6084	8SH	SHOP	20	Abu Dhabi	C76	ME12	Mohamed Bin Zayed City	24.322371 ; 54.532338	https://maps.app.goo.gl/ZEc4K3zp6UyEcNo99	D	1,500	D
+6100	2SH	SHOP	98	Abu Dhabi	79	W 4	Al Manhal	24.476369 ; 54.356487	https://maps.app.goo.gl/afs65xGxbNJELZXT7	D	1,800	D
+6182	2SH	SHOP	42	Abu Dhabi	C107	ME12	Mohamed Bin Zayed City	24.323419 ; 54.530993	https://maps.app.goo.gl/nzd27EwSBZjtVT4k6	D	1,619	D
+6239	2SH	SHOP	22.66	Abu Dhabi	115	ME12	Mohamed Bin Zayed City	24.322009 ; 54.536056	https://maps.app.goo.gl/Hpk8CfAgRJwzFz9F8	D	1,545	D
+6352	1SH	SHOP	39.31	Abu Dhabi	C191	ME12	Mohamed Bin Zayed City	24.322779 ; 54.537719	https://maps.app.goo.gl/jTh7CaZUWTALdKxB8	D	1,018	D
+6506	112SH	SHOP	25	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,500	D
+6506	14SH	SHOP	42.46	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,355	D
+6506	17SH	SHOP	84	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	1,800	D
+6506	212SH	SHOP	21	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,000	D
+6506	4SH	SHOP	26.41	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,897	D
+6506	5SH	SHOP	21.14	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	8,728	D
+6506	6SH	SHOP	61.81	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,293	D
+6506	7SH	SHOP	173	Abu Dhabi	C23	E3	Al Danah	24.485922 ; 54.358626	https://maps.app.goo.gl/hNkJCzRCw5W98ojS9	D	2,341	D
+6537	4SH	SHOP	22.4	Abu Dhabi	C184	ME12	Mohamed Bin Zayed City	24.32347 ; 54.538227	https://maps.app.goo.gl/5AH81xoYRtpL5Bgk8	D	1,563	D
+6537	5SH	SHOP	31.72	Abu Dhabi	C184	ME12	Mohamed Bin Zayed City	24.32347 ; 54.538227	https://maps.app.goo.gl/5AH81xoYRtpL5Bgk8	D	1,400	D
+675	4SH	SHOP	78.8	Abu Dhabi	C21	E9_02	Al Danah	24.498264 ; 54.36836	https://maps.app.goo.gl/TSsRGSvrN9mqK3sB6	D	2,538	D
+P/1050	1SH	SHOP	94.19	Abu Dhabi	C183	E19_02	Al Nahyan	24.476892 ; 54.381767	https://maps.app.goo.gl/EuHFZPTLQao8wYhSA	D	1,911	D
+P/129	4SH	SHOP	82	Abu Dhabi	C37	E25	Al Nahyan	24.46318 ; 54.38549	https://maps.app.goo.gl/B4Jw42FL4Qh6tvYs9	D	1,882	D
+P/1928	2SH	SHOP	1539	Abu Dhabi	C4	W58	Al Rawdah	24.420601 ; 54.448242	https://maps.app.goo.gl/fEJvM8WmMZBSU9R2A	D	650	D
+P/210	4SH	SHOP	13	Abu Dhabi	C 236	ME12	Mohamed Bin Zayed City	24.31909 ; 54.53904	https://maps.app.goo.gl/xqTPQLMdTfNDxrue7	D	1,600	D
+P/2480	1SH	SHOP	202.6	Abu Dhabi	10	E9_02	Al Danah	24.4976 ; 54.37112	https://maps.app.goo.gl/UFZX7y4eonu54M9NA	D	1,727	D
+P/586	1SH	SHOP	36	Abu Dhabi	C103	ME12	Mohamed Bin Zayed City	24.323472 ; 54.531356	https://maps.app.goo.gl/FS6zEMLpfid8Rg686	D	1,611	D
+P/646	3SH	SHOP	42.51	Abu Dhabi	C 148	ME 9	Mohamed Bin Zayed City	24.3414 ; 54.5353	https://maps.app.goo.gl/GbDaccHsL5KGP1FF8	D	1,800	D
+P/700	1SH	SHOP	168	Abu Dhabi	C141	ME12	Mohamed Bin Zayed City	24.32332 ; 54.53581	https://maps.app.goo.gl/rcVjdAAXgsmaFvxJA	D	1,607	D
+P/947	3SH	SHOP	41	Abu Dhabi	C 38	ME 9	Mohamed Bin Zayed City	24.33373 ; 54.53184	https://maps.app.goo.gl/698Ljfzb2LKwADCJ9	D	1,195	D
+P/998	1SH	SHOP	96.95	Abu Dhabi	C264	ME12	Mohamed Bin Zayed City	24.31923 ; 54.53609	https://maps.app.goo.gl/fV5THs9e7rGno8jc9	D	1,506	D
+P/807	2SW	SHOP	108.2	Abu Dhabi	27	RBW2	Al Raha Beach	24.451345 ; 54.611911	https://maps.app.goo.gl/dyZ8KBGdxCiiDp5o8	D	1,063	D
+P/1380	1SH	SHOP	155	Abu Dhabi	C15	W7_01	Al Hisn	24.478167 ; 54.351860	https://maps.app.goo.gl/cLWR7QtGXW1Kr1De8	D	2,000	D
+P/2572	3SH	SHOP	57	Abu Dhabi	14	RBW5	Al Raha Beach	24.446136 ; 54.598382	https://maps.app.goo.gl/cQQCoCeREcK8nhMY8	D	1,404	D
+P/2572	4SH	SHOP	97.5	Abu Dhabi	14	RBW5	Al Raha Beach	24.446136 ; 54.598382	https://maps.app.goo.gl/cQQCoCeREcK8nhMY8	D	1,508	D
+P/2750	1SH	SHOP	265.5	Abu Dhabi	21	RBW-5	Al Raha Beach	24.447234 ; 54.593485	https://maps.app.goo.gl/Qd6Dz669GE6c7Gd48	D	1,205	D
+P/2587	1SH	SHOP	247.7	Abu Dhabi	C-18	SS-16	Al Riyadh City	24.3423745 ; 54.7591461	https://maps.app.goo.gl/MAEbT82H2eNUEaCWA	D	2,503	D
+B/845	1SH	SHOP	270	Abu Dhabi	P216	AL SHAHAMAH	Al Shahamah	24.5407778 ; 54.6907778	https://maps.app.goo.gl/AqD78G7snS5B9wtQ7	D	2,200	D
+P/2278	3SH	SHOP	152.5	Abu Dhabi	C7	SE 26	Khalifa City	24.403841 ; 54.593125	https://maps.app.goo.gl/PWvFoUX6K2gTcYae6	D	2,200	D
+Marafid	1SH	SHOP	187.4	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	2,152	D
+Marafid	2SH	SHOP	95.91	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	2,152	D
+Marafid	3SH	SHOP	184.9	Abu Dhabi	C18	Reem 2	Al Reem Island	24.483373 ; 54.406700	https://maps.app.goo.gl/msaTrnHFGC3vx9xd8	D	2,153	D
+7274A	3SW	SHOWROOM	221	Abu Dhabi	C 34 to C	W10	Al Bateen	24.470848 ; 54.342014	https://maps.app.goo.gl/jKLAU5xVXSY1zoRK8	D	1,900	D
+AD1	3SW	SHOWROOM	253.3	Abu Dhabi	C20	W59_01	Al Rawdah	24.42078 ; 54.44296	https://maps.app.goo.gl/NQYuQt435GzatF8D8	D	2,497	D
+AD1	4SW	SHOWROOM	2187	Abu Dhabi	C20	W59_01	Al Rawdah	24.42078 ; 54.44296	https://maps.app.goo.gl/NQYuQt435GzatF8D8	D	983	D
+P/1131	1SW	SHOWROOM	24.47	Abu Dhabi	17	ME 10	Mohamed Bin Zayed City	24.33757 ; 54.53302	https://maps.app.goo.gl/auK3GeJsLYh2CeeU7	D	1,500	D
+Q-Residence	1SW	SHOWROOM	101.5	Abu Dhabi	C26	RBW-7	Al Raha	24.44505575 ; 54.58762715	https://maps.app.goo.gl/e41sf9k2ak5eG8dq8	D	1,133	D
+1875	2SG	STORAGE	66.4	Abu Dhabi	34	E18_03	Al Danah	24.48283 ; 54.384063	https://maps.app.goo.gl/zpjQJf41sbfMyCPw7	D	602	D
+6100	3SG	STORAGE	90.41	Abu Dhabi	79	W 4	Al Manhal	24.476369 ; 54.356487	https://maps.app.goo.gl/afs65xGxbNJELZXT7	D	532	D
+P/322	1SG	STORAGE	46.3	Abu Dhabi	C 29	WB4_01	Bani Yas	24.278 ; 54.6443	https://maps.app.goo.gl/sebzTHzgMC6NdhtB7	D	324	D
+P/762	1SG	STORAGE	255.1	Abu Dhabi	C 11	E18_03	Al Danah	24.48559 ; 54.380173	https://maps.app.goo.gl/dXSmS72ESbSKFHTm8	D	453	D

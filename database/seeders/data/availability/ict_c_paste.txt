@@ -1,0 +1,3 @@
+Nation Towers Mall	NTM-C110-2F-016	Retail	2500/sqm	85
+Private Department Building	PDB-G-001	office	TBD	480
+Private Department Building	ADU-ALDF-Plot65	Full Building	TBD	7252

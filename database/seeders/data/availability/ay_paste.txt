@@ -1,0 +1,17 @@
+Property & Block	Floor	Unit no	View	Area Sqm	Parking	Unit type	Unit status	Annual Rent
+C15-RAHA	GF	Shop 02+03	Canal- View	180.7	2	Retail	Vacant	1,500 Per Sq.M
+C11-Al Raha	GF	Shop 03	Canal- View	101.38	1	Retail	Vacant	1,500 Per Sq.M
+C12- Al Raha	GF	Shop 01	Canal- View	110.81	1	Retail	Vacant	1,500 Per Sq.M
+C12- Al Raha	GF	Shop 02	Canal- View	113.4	1	Retail	Vacant	1,500 Per Sq.M
+C12- Al Raha	GF	Shop 03	Canal- View	129.85	1	Retail	Vacant	1,500 Per Sq.M
+Property & Block	Floor	Unit no	No of bed	Area Sqm	Balcony	Unit type	Unit status	Annual Rent
+C12- Al Raha	GF	TH01	4 BR	180.6	Yes	Resi - Flat	Vacant	198,450
+C12- Al Raha	9th F	904	1 BR	80.5	Yes	Residential	Under Offer	74,000
+Property & Block	Floor	Unit no	No of bed	Area Sqm	Balcony	Unit type	Unit status	Annual Rent
+C10-Najmat	18th	1810	1BR-B	64.77	NO	Resi - Flat	Vacant	80,000
+C10-Najmat	15th	1509	1BR-A	93.82	YES	Resi - Flat	Under Offer	82,000
+C10-Najmat	1st	102	DX-3BR-A1	225.63	Yes	Resi - Flat	Vacant	172,000
+Property & Block	Floor	Unit no	No of bed	Area Sqm	Balcony	Unit type	Unit status	Annual Rent
+Al Rabiah Compound	G.F	V44	3BR Vila	473.8	Yes	Resi-Villa	Under Offer	178,000
+Property & Block	Floor	Unit no	No of bed	Area Sqm	Balcony	Unit type	Unit status	Annual Rent
+Golden Tower A	10th	1004 A	Studio	42	Yes	Resi - Flat	Under Offer	50,000

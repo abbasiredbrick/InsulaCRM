@@ -1,0 +1,10 @@
+1	Tower 2	2405	1	1C	80	1	AED135,000	Full Sea View	Pool, Gym & BBQ Area	Under Maintenance (Viewing with Assistance)
+1	Tower 4	3805	1	1A	67	1	AED120,000	City View	Pool, Gym & BBQ Area	Available
+1	Tower 2	2307	2	2A	130	1	AED186,000	Cornich & Emirates Palace	Pool, Gym & BBQ Area	Under Maintenance (Viewing with Assistance)
+2	Tower 4	402	2	2A	110	1	AED152,000	Cornich & Emirates Palace	Pool, Gym & BBQ Area	Available
+3	Tower 4	1503	2	2A	126	1	AED165,000	Corniche & City	Pool, Gym & BBQ Area	Available
+1	Tower 2	1105	3+1	3A	158	1	AED222,000	Emirates Palace / Sea View	Pool, Gym & BBQ Area	Available
+2	Tower 2	3505	3+1	3B	181	1	AED225,000	Emirates Palace / Sea View	Pool, Gym & BBQ Area	Available
+1	Tower 2	2205	1	1C	76	1	AED155,000	Full Sea View		Pool, Gym & BBQ Area	Available	
+1	Tower 5	3005	2	2A	124	1	AED192,800	CommunityView		Pool, Gym & BBQ Area	Available	
+2	Tower 4	3303	2	2A	126	1	AED199,000	Corniche & City View		Pool, Gym & BBQ Area	Available	
