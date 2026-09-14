@@ -17,7 +17,7 @@ class OpenHouseController extends Controller
 
         $query = OpenHouse::with(['property', 'agent']);
 
-        if (!auth()->user()->isAdmin()) {
+        if (! auth()->user()->isAdmin()) {
             $query->where('agent_id', auth()->id());
         }
 
@@ -54,13 +54,16 @@ class OpenHouseController extends Controller
     {
         $this->authorize('create', OpenHouse::class);
 
-        $properties = Property::orderBy('address')->get(['id', 'address', 'city', 'state']);
+        $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
+            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
+            ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('open-houses.create', compact('properties', 'agents'));
+        return view('open-houses.create', compact('propertyOptions', 'agents'));
     }
 
     public function store(Request $request)
@@ -98,13 +101,16 @@ class OpenHouseController extends Controller
     {
         $this->authorize('update', $openHouse);
 
-        $properties = Property::orderBy('address')->get(['id', 'address', 'city', 'state']);
+        $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
+            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
+            ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('open-houses.edit', compact('openHouse', 'properties', 'agents'));
+        return view('open-houses.edit', compact('openHouse', 'propertyOptions', 'agents'));
     }
 
     public function update(Request $request, OpenHouse $openHouse)
@@ -156,15 +162,15 @@ class OpenHouseController extends Controller
 
         // Try to match existing lead by email or phone
         $lead = null;
-        if (!empty($data['email'])) {
+        if (! empty($data['email'])) {
             $lead = Lead::where('tenant_id', $tenantId)->where('email', $data['email'])->first();
         }
-        if (!$lead && !empty($data['phone'])) {
+        if (! $lead && ! empty($data['phone'])) {
             $lead = Lead::where('tenant_id', $tenantId)->where('phone', $data['phone'])->first();
         }
 
         // Auto-create lead if no match found
-        if (!$lead) {
+        if (! $lead) {
             $lead = Lead::create([
                 'tenant_id' => $tenantId,
                 'agent_id' => $openHouse->agent_id,
@@ -196,7 +202,7 @@ class OpenHouseController extends Controller
                 'phone' => $attendee->phone,
                 'interested' => $attendee->interested,
                 'lead_id' => $attendee->lead_id,
-                'lead_name' => $attendee->lead ? $attendee->lead->first_name . ' ' . $attendee->lead->last_name : null,
+                'lead_name' => $attendee->lead ? $attendee->lead->first_name.' '.$attendee->lead->last_name : null,
             ],
         ]);
     }

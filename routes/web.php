@@ -40,7 +40,6 @@ use App\Http\Controllers\ListController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\ListingDashboardController;
 use App\Http\Controllers\ListingsController;
-use App\Http\Controllers\PortalReadinessController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OnboardingController;
@@ -48,6 +47,7 @@ use App\Http\Controllers\OpenHouseController;
 use App\Http\Controllers\PdfExportController;
 use App\Http\Controllers\PluginController;
 use App\Http\Controllers\PortalIntegrationController;
+use App\Http\Controllers\PortalReadinessController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\ReportController;
@@ -181,19 +181,19 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     });
 
     // ── Showings (real estate agent mode) ────────────────────────
-    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::resource('showings', ShowingController::class);
     });
 
     // ── Open Houses (real estate agent mode) ──────────────────────
-    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::resource('open-houses', OpenHouseController::class);
         Route::post('/open-houses/{openHouse}/attendees', [OpenHouseController::class, 'addAttendee'])->name('open-houses.addAttendee');
         Route::delete('/open-house-attendees/{attendee}', [OpenHouseController::class, 'removeAttendee'])->name('open-houses.removeAttendee');
     });
 
     // ── Leases (real estate agent mode) ──────────────────────────
-    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::get('/leases', [LeaseController::class, 'index'])->name('leases.index');
         Route::get('/leases/create', [LeaseController::class, 'create'])->name('leases.create');
         Route::post('/leases', [LeaseController::class, 'store'])->name('leases.store');
@@ -223,7 +223,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     });
 
     // ── Inventory / Units (real estate agent mode) ────────────────
-    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::get('/inventory', [ListingController::class, 'index'])->name('inventory.index');
         Route::get('/inventory/create', [ListingController::class, 'create'])->name('inventory.create');
         Route::post('/inventory', [ListingController::class, 'store'])->name('inventory.store');
@@ -247,7 +247,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     });
 
     // ── Availability sheet imports (PM companies) ─────────────
-    Route::middleware(['role:admin,agent,listing_agent,buyers_agent', 'mode:realestate'])->group(function () {
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::get('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'index'])
             ->name('availability-sources.index');
         Route::get('/availability-sources/create', [\App\Http\Controllers\AvailabilitySourceController::class, 'create'])

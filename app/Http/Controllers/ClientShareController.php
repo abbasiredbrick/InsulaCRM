@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Services\LeadDistributionService;
+use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Crypt;
@@ -32,7 +33,7 @@ class ClientShareController extends Controller
 
     protected function cookieName(Tenant $tenant): string
     {
-        return 'insulacrm_share_' . $tenant->id;
+        return 'insulacrm_share_'.$tenant->id;
     }
 
     /**
@@ -97,6 +98,7 @@ class ClientShareController extends Controller
         }
 
         $payload = json_decode($value, true);
+
         return is_array($payload) ? $payload : null;
     }
 
@@ -112,14 +114,7 @@ class ClientShareController extends Controller
             ->with('media');
 
         if ($request->filled('search')) {
-            $search = trim($request->search);
-            $query->where(function ($q) use ($search) {
-                $q->where('marketing_title', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%")
-                  ->orWhere('community', 'like', "%{$search}%")
-                  ->orWhere('sub_community', 'like', "%{$search}%")
-                  ->orWhere('unit_no', 'like', "%{$search}%");
-            });
+            InventorySearchParser::apply($query, $request->search);
         }
 
         if ($request->filled('bedrooms') && is_numeric($request->bedrooms)) {
@@ -196,9 +191,9 @@ class ClientShareController extends Controller
 
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'phone'      => 'required_without:email|nullable|string|max:20',
-            'email'      => 'required_without:phone|nullable|email|max:255',
+            'last_name' => 'required|string|max:255',
+            'phone' => 'required_without:email|nullable|string|max:20',
+            'email' => 'required_without:phone|nullable|email|max:255',
         ]);
 
         $filters = $request->query();
@@ -220,26 +215,26 @@ class ClientShareController extends Controller
         if ($lead) {
             AuditLog::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
-                'user_id'   => null,
-                'action'    => 'lead.verified_share_link',
+                'user_id' => null,
+                'action' => 'lead.verified_share_link',
                 'model_type' => Lead::class,
-                'model_id'  => $lead->id,
+                'model_id' => $lead->id,
                 'new_values' => ['filters' => $filters],
             ]);
         } else {
             $lead = Lead::withoutGlobalScopes()->create([
-                'tenant_id'   => $tenant->id,
-                'first_name'  => $validated['first_name'],
-                'last_name'   => $validated['last_name'],
-                'phone'       => $validated['phone'] ?? null,
-                'email'       => $validated['email'] ?? null,
+                'tenant_id' => $tenant->id,
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'phone' => $validated['phone'] ?? null,
+                'email' => $validated['email'] ?? null,
                 'lead_source' => 'Share Link',
-                'status'      => 'new',
+                'status' => 'new',
                 'temperature' => 'warm',
-                'deal_type'   => 'rent',
-                'stage'       => 'new_lead',
-                'notes'       => $this->filterNote($filters)
-                    ? 'Came in from the shared availability link. Looking for: ' . $this->filterNote($filters) . '.'
+                'deal_type' => 'rent',
+                'stage' => 'new_lead',
+                'notes' => $this->filterNote($filters)
+                    ? 'Came in from the shared availability link. Looking for: '.$this->filterNote($filters).'.'
                     : 'Came in from the shared availability link.',
                 'custom_fields' => [
                     'share_link_filters' => $this->cleanFilters($filters),
@@ -248,10 +243,10 @@ class ClientShareController extends Controller
 
             AuditLog::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
-                'user_id'   => null,
-                'action'    => 'lead.created_via_share_link',
+                'user_id' => null,
+                'action' => 'lead.created_via_share_link',
                 'model_type' => Lead::class,
-                'model_id'  => $lead->id,
+                'model_id' => $lead->id,
                 'new_values' => ['filters' => $this->cleanFilters($filters)],
             ]);
 
@@ -290,10 +285,10 @@ class ClientShareController extends Controller
 
         AuditLog::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,
-            'user_id'   => null,
-            'action'    => 'lead.interested_in_unit',
+            'user_id' => null,
+            'action' => 'lead.interested_in_unit',
             'model_type' => Lead::class,
-            'model_id'  => $lead->id,
+            'model_id' => $lead->id,
             'new_values' => ['property_id' => $property->id],
         ]);
 
@@ -319,7 +314,7 @@ class ClientShareController extends Controller
     {
         $bits = [];
         if (isset($filters['bedrooms']) && $filters['bedrooms'] !== '') {
-            $bits[] = ((int) $filters['bedrooms'] === 0 ? 'Studio' : ((int) $filters['bedrooms'] . 'BR'));
+            $bits[] = ((int) $filters['bedrooms'] === 0 ? 'Studio' : ((int) $filters['bedrooms'].'BR'));
         }
         if (isset($filters['community']) && $filters['community'] !== '') {
             $bits[] = (string) $filters['community'];
@@ -328,7 +323,7 @@ class ClientShareController extends Controller
             $bits[] = (string) $filters['building'];
         }
         if (isset($filters['max_rent']) && $filters['max_rent'] !== '') {
-            $bits[] = 'max AED ' . number_format((float) $filters['max_rent']);
+            $bits[] = 'max AED '.number_format((float) $filters['max_rent']);
         }
         if (isset($filters['furnishing']) && $filters['furnishing'] !== '') {
             $bits[] = ucfirst(str_replace('_', ' ', (string) $filters['furnishing']));

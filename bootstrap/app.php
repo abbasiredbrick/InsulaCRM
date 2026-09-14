@@ -52,6 +52,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant' => \App\Http\Middleware\TenantMiddleware::class,
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'role_or_permission' => \App\Http\Middleware\RoleOrPermissionMiddleware::class,
             'mode' => \App\Http\Middleware\RequireBusinessMode::class,
             'api.key' => \App\Http\Middleware\ApiKeyMiddleware::class,
             'require2fa' => \App\Http\Middleware\Require2faSetup::class,

@@ -172,7 +172,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        @if(auth()->user()->isAdmin() && $agents->isNotEmpty())
+                        @if($canFilterByAgent && $agents->isNotEmpty())
                         <div class="col-md-2">
                             <label class="form-label">{{ __('Agent') }}</label>
                             <select name="agent" class="form-select form-select-sm">

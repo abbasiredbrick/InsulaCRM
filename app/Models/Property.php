@@ -20,28 +20,28 @@ class Property extends Model
     ];
 
     public const MARKET_CLASSES = [
-        'ready'   => 'Ready / Secondary',
+        'ready' => 'Ready / Secondary',
         'off_plan' => 'Off-Plan / Primary',
     ];
 
     public const AVAILABILITIES = [
-        'draft'       => 'Draft',
+        'draft' => 'Draft',
         'ready_to_list' => 'Ready to List',
-        'listed'      => 'Listed',
-        'reserved'    => 'Reserved',
-        'leased'      => 'Leased',
-        'sold'        => 'Sold',
-        'unlisted'    => 'Unlisted',
+        'listed' => 'Listed',
+        'reserved' => 'Reserved',
+        'leased' => 'Leased',
+        'sold' => 'Sold',
+        'unlisted' => 'Unlisted',
     ];
 
     public const FURNISHING = [
-        'unfurnished'   => 'Unfurnished',
+        'unfurnished' => 'Unfurnished',
         'semi_furnished' => 'Semi-Furnished',
-        'furnished'     => 'Furnished',
+        'furnished' => 'Furnished',
     ];
 
     public const RENT_PERIODS = [
-        'yearly'  => 'Yearly',
+        'yearly' => 'Yearly',
         'monthly' => 'Monthly',
     ];
 
@@ -49,27 +49,27 @@ class Property extends Model
      * Bayut-standard categories used by the UAE portals.
      */
     public const CATEGORIES = [
-        'apartment'           => 'Apartment',
-        'penthouse'           => 'Penthouse',
-        'villa'               => 'Villa',
-        'villa_compound'      => 'Villa Compound',
-        'townhouse'           => 'Townhouse',
+        'apartment' => 'Apartment',
+        'penthouse' => 'Penthouse',
+        'villa' => 'Villa',
+        'villa_compound' => 'Villa Compound',
+        'townhouse' => 'Townhouse',
         'residential_building' => 'Residential Building',
-        'hotel_apartment'     => 'Hotel Apartment',
-        'office'              => 'Office',
-        'shop'                => 'Shop',
-        'showroom'            => 'Showroom',
-        'warehouse'           => 'Warehouse',
-        'factory'             => 'Factory',
+        'hotel_apartment' => 'Hotel Apartment',
+        'office' => 'Office',
+        'shop' => 'Shop',
+        'showroom' => 'Showroom',
+        'warehouse' => 'Warehouse',
+        'factory' => 'Factory',
         'commercial_building' => 'Commercial Building',
-        'land'                => 'Land / Plot',
-        'other'               => 'Other',
+        'land' => 'Land / Plot',
+        'other' => 'Other',
     ];
 
     public const PORTAL_STATUSES = [
         'not_listed' => 'Not Listed',
-        'live'       => 'Live',
-        'removed'    => 'Removed',
+        'live' => 'Live',
+        'removed' => 'Removed',
     ];
 
     protected $fillable = [
@@ -249,6 +249,7 @@ class Property extends Model
         if ($this->our_offer && $this->after_repair_value && $this->repair_estimate) {
             return $this->our_offer - ($this->after_repair_value * 0.70) - $this->repair_estimate;
         }
+
         return null;
     }
 
@@ -257,10 +258,32 @@ class Property extends Model
         if ($this->after_repair_value && $this->repair_estimate) {
             return ($this->after_repair_value * 0.70) - $this->repair_estimate;
         }
+
         return null;
     }
 
     // ── Brokerage helpers ──────────────────────────────────────
+
+    /**
+     * Concise picker label used by searchable property dropdowns.
+     */
+    public function optionLabel(): string
+    {
+        $bits = [
+            $this->display_name,
+            $this->community ?: null,
+        ];
+
+        if ($this->bedrooms || $this->bathrooms) {
+            $bed = $this->bedrooms ? $this->bedrooms.' '.__('BR') : null;
+            $bath = $this->bathrooms ? $this->bathrooms.' '.__('BA') : null;
+            $bits[] = trim(implode(' / ', array_filter([$bed, $bath])));
+        }
+
+        $bits[] = $this->price_line;
+
+        return trim(implode(' — ', array_filter($bits)));
+    }
 
     public function getDisplayNameAttribute(): string
     {
@@ -270,7 +293,7 @@ class Property extends Model
 
         $parts = [];
         if ($this->bedrooms) {
-            $parts[] = $this->bedrooms . ' ' . __('BR');
+            $parts[] = $this->bedrooms.' '.__('BR');
         }
         if ($this->property_category) {
             $parts[] = __(self::CATEGORIES[$this->property_category] ?? ucwords(str_replace('_', ' ', $this->property_category)));
@@ -285,7 +308,7 @@ class Property extends Model
             return implode(' ', $parts);
         }
 
-        return $this->address ?: '#' . $this->id;
+        return $this->address ?: '#'.$this->id;
     }
 
     /**
@@ -296,6 +319,7 @@ class Property extends Model
         if (in_array($this->intent, ['sale', 'both'], true)) {
             return $this->list_price ? $this->list_price : $this->asking_price;
         }
+
         return null;
     }
 
@@ -307,6 +331,7 @@ class Property extends Model
         if (in_array($this->intent, ['rent', 'both'], true)) {
             return $this->rent_price;
         }
+
         return null;
     }
 
@@ -319,7 +344,7 @@ class Property extends Model
 
         if ($this->rent_advertised_price) {
             $bits[] = \App\Helpers\TenantFormatHelper::currency($this->rent_advertised_price)
-                . ' / ' . __(self::RENT_PERIODS[$this->rent_period] ?? ucfirst($this->rent_period));
+                .' / '.__(self::RENT_PERIODS[$this->rent_period] ?? ucfirst($this->rent_period));
         }
 
         if ($this->sale_price) {

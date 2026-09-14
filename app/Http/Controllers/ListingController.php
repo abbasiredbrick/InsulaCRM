@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Property;
 use App\Models\PropertyMedia;
+use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -12,36 +13,39 @@ use Illuminate\Support\Str;
 class ListingController extends Controller
 {
     /**
-     * Units the current user may see in the inventory.
+     * Units the current user may see in the inventory. Regular agents only see
+     * their own (or unassigned) units; admins and management roles (e.g. a
+     * property manager) can browse the whole portfolio.
      */
     protected function baseQuery(Request $request)
     {
         $query = Property::with(['assignedAgent', 'media', 'leads']);
 
-        if (! auth()->user()->isAdmin()) {
+        if (! auth()->user()->isAdmin() && auth()->user()->isAgent()) {
             $query->where(fn ($q) => $q->where('assigned_agent_id', auth()->id())->orWhereNull('assigned_agent_id'));
         }
 
         return $query;
     }
 
+    /**
+     * Whether the current user may filter results by assigned agent.
+     */
+    protected function canFilterByAgent(): bool
+    {
+        return auth()->user()->isAdmin() || ! auth()->user()->isAgent();
+    }
+
     public function index(Request $request)
     {
         $query = $this->baseQuery($request);
 
-        // ── Basic search (matched on any text field) ──
+        // ── Basic search (free text: "2br", "2 br", "2bhk", "2 bed", "marina tower 901"...)
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('marketing_title', 'like', "%{$search}%")
-                    ->orWhere('address', 'like', "%{$search}%")
-                    ->orWhere('community', 'like', "%{$search}%")
-                    ->orWhere('sub_community', 'like', "%{$search}%")
-                    ->orWhere('unit_no', 'like', "%{$search}%");
-            });
+            InventorySearchParser::apply($query, $request->search);
         }
 
-        if (auth()->user()->isAdmin() && $request->filled('agent')) {
+        if ($this->canFilterByAgent() && $request->filled('agent')) {
             $query->where('assigned_agent_id', $request->agent);
         }
 
@@ -159,7 +163,7 @@ class ListingController extends Controller
                 })->count(),
         ];
 
-        $agents = auth()->user()->isAdmin()
+        $agents = $this->canFilterByAgent()
             ? \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
                 ->whereHas('role', fn ($q) => $q->whereIn('name', \App\Services\BusinessModeService::getRoles()))
                 ->orderBy('name')->get(['id', 'name'])
@@ -182,6 +186,7 @@ class ListingController extends Controller
             'sources' => $sources,
             'communities' => $communities,
             'subCommunities' => $subCommunities,
+            'canFilterByAgent' => $this->canFilterByAgent(),
         ]);
     }
 
@@ -331,15 +336,7 @@ class ListingController extends Controller
             ->whereIn('availability', ['draft', 'ready_to_list', 'listed', 'reserved']);
 
         if ($request->filled('q')) {
-            $q = $request->q;
-            $query->where(function ($builder) use ($q) {
-                $builder->where('marketing_title', 'like', "%{$q}%")
-                    ->orWhere('address', 'like', "%{$q}%")
-                    ->orWhere('community', 'like', "%{$q}%")
-                    ->orWhere('sub_community', 'like', "%{$q}%")
-                    ->orWhere('developer_name', 'like', "%{$q}%")
-                    ->orWhere('unit_no', 'like', "%{$q}%");
-            });
+            InventorySearchParser::apply($query, $request->q);
         }
 
         if ($request->filled('intent')) {
@@ -383,7 +380,7 @@ class ListingController extends Controller
     {
         $query = $this->baseQuery($request);
 
-        if (auth()->user()->isAdmin() && $request->filled('agent')) {
+        if ($this->canFilterByAgent() && $request->filled('agent')) {
             $query->where('assigned_agent_id', $request->agent);
         }
 
@@ -415,7 +412,7 @@ class ListingController extends Controller
                 ->where('is_active', true)
                 ->pluck('portal')
                 ->all(),
-            'agents' => auth()->user()->isAdmin()
+            'agents' => $this->canFilterByAgent()
                 ? \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
                     ->whereHas('role', fn ($q) => $q->whereIn('name', \App\Services\BusinessModeService::getRoles()))
                     ->orderBy('name')->get(['id', 'name'])

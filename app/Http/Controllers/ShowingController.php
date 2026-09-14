@@ -63,8 +63,13 @@ class ShowingController extends Controller
     {
         $this->authorize('create', Showing::class);
 
-        $properties = Property::orderBy('address')->get(['id', 'address', 'city', 'state']);
-        $leads = Lead::orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
+            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
+            ->values();
+        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => trim($l->first_name.' '.$l->last_name)])
+            ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
@@ -72,7 +77,7 @@ class ShowingController extends Controller
 
         $preselectedLeadId = request()->input('lead_id');
 
-        return view('showings.create', compact('properties', 'leads', 'agents', 'preselectedLeadId'));
+        return view('showings.create', compact('propertyOptions', 'leadOptions', 'agents', 'preselectedLeadId'));
     }
 
     public function store(ShowingRequest $request, \App\Services\Cloud\CloudCalendarService $calendar)
@@ -131,14 +136,19 @@ class ShowingController extends Controller
     {
         $this->authorize('update', $showing);
 
-        $properties = Property::orderBy('address')->get(['id', 'address', 'city', 'state']);
-        $leads = Lead::orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
+            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
+            ->values();
+        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => trim($l->first_name.' '.$l->last_name)])
+            ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('showings.edit', compact('showing', 'properties', 'leads', 'agents'));
+        return view('showings.edit', compact('showing', 'propertyOptions', 'leadOptions', 'agents'));
     }
 
     public function update(ShowingRequest $request, Showing $showing, \App\Services\Cloud\CloudCalendarService $calendar)

@@ -14,27 +14,28 @@
 
 <div class="row mb-3">
                 <div class="col-md-6">
-                    <label class="form-label required">{{ __('Client') }}</label>
-                    <select name="lead_id" class="form-select @error('lead_id') is-invalid @enderror">
-                        <option value="">{{ __('Select client (optional)...') }}</option>
-                        @foreach($leads as $lead)
-                            <option value="{{ $lead->id }}" {{ (old('lead_id') ?? $preselectedLeadId ?? '') == $lead->id ? 'selected' : '' }}>
-                                {{ $lead->first_name }} {{ $lead->last_name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label class="form-label">{{ __('Client') }}</label>
+                    <x-searchable-select
+                        name="lead_id"
+                        :options="$leadOptions"
+                        :selected="old('lead_id', $preselectedLeadId ?? '')"
+                        :invalid="$errors->has('lead_id')"
+                        :placeholder="__('Select client (optional)...')"
+                        :search-placeholder="__('Type name to search...')"
+                    />
                     @error('lead_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">{{ __('Property') }}</label>
-                    <select name="property_id" class="form-select @error('property_id') is-invalid @enderror">
-                        <option value="">{{ __('Select property (optional)...') }}</option>
-                        @foreach($properties as $property)
-                            <option value="{{ $property->id }}" {{ old('property_id') == $property->id ? 'selected' : '' }}>
-                                {{ $property->address }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label class="form-label required">{{ __('Property') }}</label>
+                    <x-searchable-select
+                        name="property_id"
+                        :options="$propertyOptions"
+                        :selected="old('property_id', '')"
+                        :invalid="$errors->has('property_id')"
+                        required
+                        :placeholder="__('Select property...')"
+                        :search-placeholder="__('Type title, community, unit...')"
+                    />
                     @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
             </div>

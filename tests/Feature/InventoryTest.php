@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Property;
+use App\Models\Role;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class InventoryTest extends TestCase
@@ -177,7 +179,7 @@ class InventoryTest extends TestCase
             'rent_period' => 'yearly',
         ]);
 
-        $this->get(route('inventory.index') . '?rent_min=100000&rent_max=200000')
+        $this->get(route('inventory.index').'?rent_min=100000&rent_max=200000')
             ->assertOk()
             ->assertDontSee('Cheap Studio')
             ->assertSee('Premium 3BR');
@@ -201,10 +203,99 @@ class InventoryTest extends TestCase
             'furnishing' => 'unfurnished',
         ]);
 
-        $this->get(route('inventory.index') . '?community=Dubai+Marina&furnishing=furnished')
+        $this->get(route('inventory.index').'?community=Dubai+Marina&furnishing=furnished')
             ->assertOk()
             ->assertSee('Furnished Marina Unit')
             ->assertDontSee('Unfurnished Reef');
+    }
+
+    public function test_search_matches_bedroom_shorthand(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Luxury 2BR Apartment in Marina',
+            'bedrooms' => 2,
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Dubai Marina',
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Premium 3BR Villa in Hills',
+            'bedrooms' => 3,
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'sub_community' => 'Emirates Hills',
+        ]);
+
+        foreach (['2BR', '2 BR', '2bhk', '2 BHK', '2 bed', '2 bedroom', '2bd'] as $term) {
+            $response = $this->get(route('inventory.index').'?search='.urlencode($term));
+            $response->assertOk()
+                ->assertSee('Luxury 2BR Apartment in Marina')
+                ->assertDontSee('Premium 3BR Villa in Hills');
+        }
+    }
+
+    public function test_search_combines_bedroom_and_text_words(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Sunset 2BR Apartment in Marina',
+            'bedrooms' => 2,
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Dubai Marina',
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Sunset 3BR Apartment in Marina',
+            'bedrooms' => 3,
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Dubai Marina',
+        ]);
+
+        $this->get(route('inventory.index').'?search='.urlencode('2 marina'))
+            ->assertOk()
+            ->assertSee('Sunset 2BR Apartment in Marina')
+            ->assertDontSee('Sunset 3BR Apartment in Marina');
+    }
+
+    public function test_property_manager_can_browse_and_filter_all_inventory(): void
+    {
+        $role = Role::create([
+            'name' => 'pm',
+            'display_name' => 'Property Manager',
+            'is_system' => false,
+            'tenant_id' => $this->tenant->id,
+        ]);
+        $viewPermissionId = DB::table('permissions')->where('key', 'properties.view')->value('id');
+        $role->permissions()->sync([$viewPermissionId]);
+
+        $agent = $this->createUserWithRole('agent');
+        $pm = $this->createUserWithRole('pm');
+
+        $agentUnit = $this->createProperty([
+            'assigned_agent_id' => $agent->id,
+            'marketing_title' => 'Agent Assigned Unit',
+            'intent' => 'both',
+            'availability' => 'listed',
+        ]);
+        $this->createProperty([
+            'assigned_agent_id' => null,
+            'marketing_title' => 'Unassigned Unit',
+            'intent' => 'both',
+            'availability' => 'listed',
+        ]);
+
+        $this->actingAs($pm)->get(route('inventory.index'))
+            ->assertOk()
+            ->assertSee('Agent Assigned Unit')
+            ->assertSee('Unassigned Unit')
+            ->assertSee('name="agent"', false);
+
+        $this->actingAs($pm)->get(route('inventory.index').'?agent='.$agent->id)
+            ->assertOk()
+            ->assertSee('Agent Assigned Unit')
+            ->assertDontSee('Unassigned Unit');
+
+        $this->assertNotNull($agentUnit->fresh());
     }
 
     public function test_destroy_removes_unit(): void
