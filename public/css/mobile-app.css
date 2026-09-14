@@ -4,7 +4,7 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. Global Mobile Reset & Touch Optimizations
+   1. CSS Custom Properties
    -------------------------------------------------------------------------- */
 :root {
     --mobile-header-height: 56px;
@@ -13,47 +13,116 @@
     --mobile-accent-gradient: linear-gradient(135deg, #0066cc 0%, #004499 100%);
 }
 
+/* ==========================================================================
+   MOBILE LAYOUT (< 768px)  — full native app experience
+   ========================================================================== */
 @media (max-width: 767.98px) {
+
+    /* ── Touch optimizations ── */
     html, body {
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior-y: contain;
     }
 
+    /* ── Body: push content between the two fixed bars ── */
     body {
         padding-top: calc(var(--mobile-header-height) + env(safe-area-inset-top, 0px)) !important;
         padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+        overflow-x: hidden;
     }
 
-    /* Hide desktop vertical navigation sidebar */
+    /* ─────────────────────────────────────────────────────────────────
+       HIDE ALL DESKTOP CHROME — sidebar, page-header toolbar, top bar
+       ───────────────────────────────────────────────────────────────── */
+
+    /* Tabler vertical sidebar */
+    aside.navbar-vertical,
     .navbar-vertical.navbar-expand-lg {
         display: none !important;
     }
 
-    /* Hide redundant desktop top header on mobile */
-    .page-header .col-auto.ms-auto,
-    .page-header .breadcrumb-item {
+    /* Desktop page-header (contains page title, search, user dropdown, breadcrumbs) */
+    .page-header.d-print-none {
         display: none !important;
     }
 
-    .page-header {
-        margin-bottom: 0.75rem !important;
-        padding-top: 0.5rem !important;
-    }
-
+    /* Reset page-wrapper left offset injected by Tabler for sidebar width */
     .page-wrapper {
         margin-left: 0 !important;
+        padding-left: 0 !important;
     }
 
-    /* Clean container padding for native edge-to-edge feel */
+    /* The outer .page flex container — stop Tabler from applying sidebar spacing */
+    .page {
+        flex-direction: column !important;
+    }
+
+    /* ── Container padding for native edge-to-edge feel ── */
     .container-xl {
         padding-left: 1rem !important;
         padding-right: 1rem !important;
+        max-width: 100% !important;
+    }
+
+    /* ── Page body — fill the available space ── */
+    .page-body {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0 !important;
+        min-height: 0 !important;
+    }
+
+    /* ── Modals — full-width on mobile ── */
+    .modal-dialog {
+        margin: 0.5rem !important;
+    }
+
+    /* ── Notification dropdown full-width ── */
+    #notification-bell .dropdown-menu {
+        width: 100vw !important;
+        max-width: 360px;
+    }
+
+    /* ── Tables scroll horizontally ── */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Card header wrapping ── */
+    .card-header {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .card-header .card-actions {
+        width: 100%;
+    }
+
+    /* ── Kanban horizontal scroll ── */
+    .kanban-board {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 1rem;
+    }
+    .kanban-board .col {
+        min-width: 280px;
+    }
+
+    /* ── Compact KPI ── */
+    .card .display-6 {
+        font-size: 1.5rem;
+    }
+
+    /* ── Steps ── */
+    .steps {
+        flex-wrap: wrap;
     }
 }
 
+/* ==========================================================================
+   DESKTOP / TABLET (>= 768px) — hide all mobile-only shell elements
+   ========================================================================== */
 @media (min-width: 768px) {
-    /* Hide all mobile app shell elements on desktop/tablet */
     .mobile-only-header,
     .mobile-only-bottom-nav,
     .mobile-bottom-sheet,
@@ -63,6 +132,11 @@
         display: none !important;
     }
 }
+
+/* ==========================================================================
+   MOBILE SHELL COMPONENTS
+   These are always in the DOM but hidden on desktop via the rule above.
+   ========================================================================== */
 
 /* --------------------------------------------------------------------------
    2. Native Mobile Top Bar
