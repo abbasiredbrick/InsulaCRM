@@ -209,6 +209,37 @@ class InventoryTest extends TestCase
             ->assertDontSee('Unfurnished Reef');
     }
 
+    public function test_bedroom_filters_default_to_any_not_zero(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Two Bed Marina Unit',
+            'bedrooms' => 2,
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'community' => 'Dubai Marina',
+        ]);
+
+        $response = $this->get(route('inventory.index'));
+        $response->assertOk();
+
+        $html = $response->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/name="bedrooms_min"(.*?)<option value="" selected>/s',
+            $html,
+            'Beds-from must default to "Any", otherwise every search is silently restricted to bedrooms 0.'
+        );
+        $this->assertMatchesRegularExpression(
+            '/name="bedrooms_max"(.*?)<option value="" selected>/s',
+            $html,
+            'Beds-to must default to "Any", otherwise every search is silently restricted to bedrooms 0.'
+        );
+
+        $this->get(route('inventory.index').'?search='.urlencode('marina'))
+            ->assertOk()
+            ->assertSee('Two Bed Marina Unit');
+    }
+
     public function test_search_matches_bedroom_shorthand(): void
     {
         $this->createProperty([

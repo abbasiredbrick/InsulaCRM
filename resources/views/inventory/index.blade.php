@@ -212,18 +212,18 @@
                         <div class="col-md-2">
                             <label class="form-label">{{ __('Beds from') }}</label>
                             <select name="bedrooms_min" class="form-select form-select-sm">
-                                <option value="">{{ __('Any') }}</option>
+                                <option value="" @selected(! request()->has('bedrooms_min'))>{{ __('Any') }}</option>
                                 @for($i = 0; $i <= 6; $i++)
-                                    <option value="{{ $i }}" {{ request('bedrooms_min') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                    <option value="{{ $i }}" {{ (string) request('bedrooms_min') === (string) $i ? 'selected' : '' }}>{{ $i }}</option>
                                 @endfor
                             </select>
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">{{ __('Beds to') }}</label>
                             <select name="bedrooms_max" class="form-select form-select-sm">
-                                <option value="">{{ __('Any') }}</option>
+                                <option value="" @selected(! request()->has('bedrooms_max'))>{{ __('Any') }}</option>
                                 @for($i = 0; $i <= 6; $i++)
-                                    <option value="{{ $i }}" {{ request('bedrooms_max') == $i ? 'selected' : '' }}>{{ $i }}</option>
+                                    <option value="{{ $i }}" {{ (string) request('bedrooms_max') === (string) $i ? 'selected' : '' }}>{{ $i }}</option>
                                 @endfor
                             </select>
                         </div>
