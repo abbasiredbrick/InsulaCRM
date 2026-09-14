@@ -64,7 +64,7 @@ class ShowingController extends Controller
         $this->authorize('create', Showing::class);
 
         $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
-            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
@@ -137,7 +137,7 @@ class ShowingController extends Controller
         $this->authorize('update', $showing);
 
         $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
-            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])

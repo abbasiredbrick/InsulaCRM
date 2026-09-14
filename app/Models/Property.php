@@ -265,6 +265,30 @@ class Property extends Model
     // ── Brokerage helpers ──────────────────────────────────────
 
     /**
+     * The DB columns the picker label accessors need. `sale_price` is a
+     * computed accessor (from list_price / asking_price), so it must NOT be
+     * listed here — selecting it directly breaks on MySQL.
+     */
+    public static function optionLabelColumns(): array
+    {
+        return [
+            'id',
+            'marketing_title',
+            'property_category',
+            'community',
+            'sub_community',
+            'bedrooms',
+            'bathrooms',
+            'unit_no',
+            'intent',
+            'rent_price',
+            'rent_period',
+            'list_price',
+            'asking_price',
+        ];
+    }
+
+    /**
      * Concise picker label used by searchable property dropdowns.
      */
     public function optionLabel(): string

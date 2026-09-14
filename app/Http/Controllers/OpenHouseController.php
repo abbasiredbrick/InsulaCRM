@@ -55,7 +55,7 @@ class OpenHouseController extends Controller
         $this->authorize('create', OpenHouse::class);
 
         $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
-            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
@@ -102,7 +102,7 @@ class OpenHouseController extends Controller
         $this->authorize('update', $openHouse);
 
         $propertyOptions = Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
-            ->get(['id', 'address', 'city', 'state', 'community', 'sub_community', 'bedrooms', 'bathrooms', 'unit_no', 'marketing_title', 'rent_price', 'sale_price', 'intent', 'rent_period'])
+            ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
