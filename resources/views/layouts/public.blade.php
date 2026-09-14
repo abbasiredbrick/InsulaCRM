@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+    @include('layouts._pwa')
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <title>@yield('title', config('app.name'))</title>
     <meta name="description" content="{{ config('app.name') }} — the CRM built for property brokers.">
