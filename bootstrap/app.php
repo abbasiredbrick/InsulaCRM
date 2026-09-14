@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('digest:morning-summary')->dailyAt('07:30');
         $schedule->command('digest:expiring-contingencies')->dailyAt('08:00');
         $schedule->command('leases:remind-expiring')->dailyAt('08:30');
+        $schedule->command('leads:create-move-in-reminders')->dailyAt('08:15');
         $schedule->command('digest:inactive-clients')->weeklyOn(1, '09:00');
     })
     ->withMiddleware(function (Middleware $middleware): void {

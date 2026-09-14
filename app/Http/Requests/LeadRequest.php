@@ -31,8 +31,9 @@ class LeadRequest extends FormRequest
             'timezone' => 'nullable|string|max:50',
             'do_not_contact' => 'nullable|boolean',
             'contact_type' => 'nullable|string|in:seller_lead,buyer_lead,active_client,past_client',
+            'expected_move_in_date' => 'nullable|date|after_or_equal:today',
             'deal_type' => 'nullable|string|in:rent,sale',
-            'stage' => 'nullable|in:' . implode(',', \App\Models\Lead::allStageKeys()),
+            'stage' => 'nullable|in:'.implode(',', \App\Models\Lead::allStageKeys()),
             'notes' => 'nullable|string',
             'custom_fields' => 'nullable|array',
             'custom_fields.*' => 'nullable',
@@ -47,10 +48,10 @@ class LeadRequest extends FormRequest
                 $rules["custom_fields.{$field->slug}"] = 'required';
             }
             if ($field->field_type === 'number') {
-                $rules["custom_fields.{$field->slug}"] = ($field->required ? 'required' : 'nullable') . '|numeric';
+                $rules["custom_fields.{$field->slug}"] = ($field->required ? 'required' : 'nullable').'|numeric';
             }
             if ($field->field_type === 'date') {
-                $rules["custom_fields.{$field->slug}"] = ($field->required ? 'required' : 'nullable') . '|date';
+                $rules["custom_fields.{$field->slug}"] = ($field->required ? 'required' : 'nullable').'|date';
             }
         }
 

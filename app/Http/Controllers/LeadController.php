@@ -10,14 +10,13 @@ use App\Models\Lead;
 use App\Models\LeadClaim;
 use App\Models\LeadPhoto;
 use App\Models\Property;
-use App\Models\Role;
 use App\Models\User;
-use Illuminate\Http\Request;
-use App\Services\CustomFieldService;
-use App\Services\AssignmentHistoryService;
-use App\Services\MotivationScoreService;
-use Illuminate\Support\Facades\DB;
 use App\Notifications\LeadAssigned;
+use App\Services\AssignmentHistoryService;
+use App\Services\CustomFieldService;
+use App\Services\MotivationScoreService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class LeadController extends Controller
@@ -36,9 +35,9 @@ class LeadController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -84,7 +83,7 @@ class LeadController extends Controller
 
         $leads = $query->latest()->paginate(25);
 
-        $agents = !auth()->user()->isAgent() ? $this->getAgents() : collect();
+        $agents = ! auth()->user()->isAgent() ? $this->getAgents() : collect();
 
         return view('leads.index', compact('leads', 'agents'));
     }
@@ -125,7 +124,7 @@ class LeadController extends Controller
 
             case 'status':
                 $validStatuses = CustomFieldService::getValidSlugs('lead_status');
-                if (!in_array($request->status, $validStatuses)) {
+                if (! in_array($request->status, $validStatuses)) {
                     return redirect()->back()->with('error', 'Invalid status.');
                 }
                 foreach ($leads as $lead) {
@@ -158,6 +157,7 @@ class LeadController extends Controller
         $agents = $this->getAgents();
         $inventoryUnits = $this->visibleInventory();
         $selectedUnitIds = [];
+
         return view('leads.create', compact('agents', 'inventoryUnits', 'selectedUnitIds'));
     }
 
@@ -170,7 +170,7 @@ class LeadController extends Controller
 
         // Handle custom fields — store as JSON, remove empty values
         if (isset($data['custom_fields'])) {
-            $data['custom_fields'] = array_filter($data['custom_fields'], fn($v) => $v !== null && $v !== '');
+            $data['custom_fields'] = array_filter($data['custom_fields'], fn ($v) => $v !== null && $v !== '');
         }
 
         if (auth()->user()->isAgent()) {
@@ -214,12 +214,52 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
-        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps', 'showings.property']);
+        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps', 'showings.property', 'meetings']);
         $sequences = \App\Models\Sequence::where('is_active', true)->get();
         $assignmentHistory = app(AssignmentHistoryService::class)->getHistory($lead);
         $reassignAgents = $this->getAgents($lead);
         $canReassign = auth()->user()->can('reassign', $lead);
-        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory', 'reassignAgents', 'canReassign'));
+
+        // Upcoming follow-ups: pending tasks, scheduled viewings and meetings.
+        $upcoming = collect();
+
+        $lead->tasks()->where('is_completed', false)->get()->each(function ($task) use ($upcoming) {
+            $upcoming->push([
+                'type' => 'task',
+                'at' => $task->due_date ? \Illuminate\Support\Carbon::parse($task->due_date) : null,
+                'title' => $task->title,
+                'url' => null,
+                'model' => $task,
+            ]);
+        });
+
+        $lead->showings()->with('property')->get()->each(function ($showing) use ($upcoming) {
+            $upcoming->push([
+                'type' => 'showing',
+                'at' => $showing->showing_date ? \Illuminate\Support\Carbon::parse($showing->showing_date->format('Y-m-d').' '.$showing->showing_time) : null,
+                'title' => __('Showing').($showing->property?->address ? ': '.$showing->property->address : ''),
+                'url' => route('showings.show', $showing),
+                'model' => $showing,
+            ]);
+        });
+
+        $lead->meetings()->where('status', 'scheduled')->get()->each(function ($meeting) use ($upcoming) {
+            $upcoming->push([
+                'type' => 'meeting',
+                'at' => $meeting->scheduled_at,
+                'title' => $meeting->title,
+                'url' => null,
+                'model' => $meeting,
+            ]);
+        });
+
+        $upcoming = $upcoming
+            ->filter(fn ($item) => $item['at'] && $item['at']->isFuture() || ($item['at'] && $item['at']->isToday()))
+            ->sortBy('at')
+            ->take(10)
+            ->values();
+
+        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory', 'reassignAgents', 'canReassign', 'upcoming'));
     }
 
     /**
@@ -273,6 +313,7 @@ class LeadController extends Controller
         $agents = $this->getAgents($lead);
         $inventoryUnits = $this->visibleInventory();
         $selectedUnitIds = $lead->properties->pluck('id')->all();
+
         return view('leads.edit', compact('lead', 'agents', 'inventoryUnits', 'selectedUnitIds'));
     }
 
@@ -283,7 +324,7 @@ class LeadController extends Controller
 
         $data = $request->validated();
         if (isset($data['custom_fields'])) {
-            $data['custom_fields'] = array_filter($data['custom_fields'], fn($v) => $v !== null && $v !== '');
+            $data['custom_fields'] = array_filter($data['custom_fields'], fn ($v) => $v !== null && $v !== '');
         }
 
         $lead->update($data);
@@ -442,7 +483,7 @@ class LeadController extends Controller
 
         // Only works for shark_tank or hybrid distribution
         $tenant = auth()->user()->tenant;
-        if (!in_array($tenant->distribution_method, ['shark_tank', 'hybrid'])) {
+        if (! in_array($tenant->distribution_method, ['shark_tank', 'hybrid'])) {
             return response()->json(['error' => __('Claiming not enabled')], 422);
         }
 
@@ -453,7 +494,7 @@ class LeadController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if (!$locked) {
+            if (! $locked) {
                 return false;
             }
 
@@ -489,7 +530,7 @@ class LeadController extends Controller
 
         $uploaded = 0;
         foreach ($request->file('photos') as $i => $file) {
-            $filename = uniqid('photo_') . '.' . $file->getClientOriginalExtension();
+            $filename = uniqid('photo_').'.'.$file->getClientOriginalExtension();
             $path = $file->storeAs("lead-photos/{$lead->id}", $filename, 'public');
 
             LeadPhoto::create([
@@ -542,9 +583,9 @@ class LeadController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -594,7 +635,7 @@ class LeadController extends Controller
                 ]);
             }
             fclose($handle);
-        }, 'leads-export-' . now()->format('Y-m-d') . '.csv', [
+        }, 'leads-export-'.now()->format('Y-m-d').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }

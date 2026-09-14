@@ -36,6 +36,8 @@ class Showing extends Model
         'listing_agent_name',
         'listing_agent_phone',
         'notes',
+        'calendar_provider',
+        'calendar_event_id',
     ];
 
     protected $casts = [

@@ -3,11 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Activity;
-use App\Models\Lead;
-use App\Models\Property;
 use App\Models\Showing;
 use App\Notifications\LeadLostForReview;
-use App\Services\BusinessModeService;
 use Tests\TestCase;
 
 class LeadLifecycleTest extends TestCase
@@ -22,6 +19,7 @@ class LeadLifecycleTest extends TestCase
     public function test_scheduled_showing_advances_rental_lead_to_viewing_scheduled(): void
     {
         $this->realEstateTenant();
+        $this->withCalendar();
         $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_requested']);
         $property = $this->createProperty(['tenant_id' => $this->tenant->id, 'rent_price' => 120000]);
 
@@ -91,6 +89,7 @@ class LeadLifecycleTest extends TestCase
     public function test_sales_lead_showing_does_not_change_stage(): void
     {
         $this->realEstateTenant();
+        $this->withCalendar();
         $lead = $this->createLead(['deal_type' => 'sale', 'stage' => 'offer_sent']);
         $property = $this->createProperty(['tenant_id' => $this->tenant->id]);
 

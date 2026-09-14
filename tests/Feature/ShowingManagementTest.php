@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\Activity;
 use App\Models\Showing;
 use Tests\TestCase;
 
@@ -31,7 +30,7 @@ class ShowingManagementTest extends TestCase
 
     public function test_admin_can_create_showing(): void
     {
-        $this->reAdmin();
+        $this->reAdmin()->withCalendar();
         $property = $this->createProperty();
         $lead = $this->createLead();
 
@@ -54,7 +53,7 @@ class ShowingManagementTest extends TestCase
 
     public function test_showing_creates_activity_on_lead(): void
     {
-        $this->reAdmin();
+        $this->reAdmin()->withCalendar();
         $property = $this->createProperty();
         $lead = $this->createLead();
 

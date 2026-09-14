@@ -17,6 +17,8 @@ class Task extends Model
         'title',
         'due_date',
         'is_completed',
+        'calendar_provider',
+        'calendar_event_id',
     ];
 
     protected $casts = [

@@ -429,6 +429,7 @@
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end">
                                     <a class="dropdown-item" href="{{ route('profile.edit') }}">{{ __('My Profile') }}</a>
+                                    <a class="dropdown-item" href="{{ route('my-cloud.show') }}">{{ __('My Cloud') }}</a>
                                     @if(auth()->user()->isAdmin())
                                     <a class="dropdown-item" href="{{ route('settings.index') }}">{{ __('Settings') }}</a>
                                     @endif

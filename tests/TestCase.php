@@ -106,6 +106,18 @@ abstract class TestCase extends BaseTestCase
         return $user;
     }
 
+    /**
+     * Grant the acting admin an iCal calendar (the "other" calendar). Required
+     * before scheduling viewings, tasks or meetings because of the hard-block.
+     */
+    protected function withCalendar(): self
+    {
+        $this->adminUser->calendar_feed_token = 'test-ical-'.\Illuminate\Support\Str::random(8);
+        $this->adminUser->save();
+
+        return $this;
+    }
+
     protected function createLead(array $overrides = []): \App\Models\Lead
     {
         return \App\Models\Lead::factory()->create(array_merge([

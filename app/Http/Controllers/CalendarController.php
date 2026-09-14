@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Activity;
+use App\Models\Meeting;
 use App\Models\OpenHouse;
 use App\Models\Showing;
 use App\Models\Task;
@@ -31,12 +31,12 @@ class CalendarController extends Controller
         $tasksQuery = Task::with('lead')
             ->whereBetween('due_date', [$start, $end]);
 
-        if (!$user->isAdmin()) {
+        if (! $user->isAdmin()) {
             $tasksQuery->where('agent_id', $user->id);
         }
 
         $tasks = $tasksQuery->get()->map(fn ($task) => [
-            'id' => 'task-' . $task->id,
+            'id' => 'task-'.$task->id,
             'title' => $task->title,
             'date' => $task->due_date->format('Y-m-d'),
             'type' => 'task',
@@ -47,26 +47,26 @@ class CalendarController extends Controller
 
         $events = $events->merge($tasks);
 
-        // Activities (meetings and calls only for calendar)
-        $activitiesQuery = Activity::with('agent')
-            ->whereIn('type', ['meeting', 'call'])
-            ->whereNotNull('logged_at')
-            ->whereBetween('logged_at', [$start, $end]);
+        // Meetings (scheduled client meetings/appointments)
+        $meetingsQuery = Meeting::with('lead')
+            ->where('status', 'scheduled')
+            ->whereDate('scheduled_at', '>=', $start)
+            ->whereDate('scheduled_at', '<=', $end);
 
-        if (!$user->isAdmin()) {
-            $activitiesQuery->where('agent_id', $user->id);
+        if (! $user->isAdmin()) {
+            $meetingsQuery->where('agent_id', $user->id);
         }
 
-        $activities = $activitiesQuery->get()->map(fn ($activity) => [
-            'id' => 'activity-' . $activity->id,
-            'title' => ucfirst($activity->type) . ($activity->subject ? ': ' . $activity->subject : ''),
-            'date' => $activity->logged_at->format('Y-m-d'),
-            'type' => $activity->type,
-            'color' => $activity->type === 'meeting' ? 'purple' : 'cyan',
-            'url' => $activity->lead_id ? url("/leads/{$activity->lead_id}") : ($activity->deal_id ? url("/pipeline/{$activity->deal_id}") : null),
+        $meetingEvents = $meetingsQuery->get()->map(fn ($m) => [
+            'id' => 'meeting-'.$m->id,
+            'title' => __('Meeting').': '.$m->title,
+            'date' => $m->scheduled_at->format('Y-m-d'),
+            'type' => 'meeting',
+            'color' => 'purple',
+            'url' => $m->lead_id ? url("/leads/{$m->lead_id}") : null,
         ]);
 
-        $events = $events->merge($activities);
+        $events = $events->merge($meetingEvents);
 
         // Showings (real estate mode only)
         if (BusinessModeService::isRealEstate()) {
@@ -74,13 +74,13 @@ class CalendarController extends Controller
                 ->where('status', 'scheduled')
                 ->whereBetween('showing_date', [$start, $end]);
 
-            if (!$user->isAdmin()) {
+            if (! $user->isAdmin()) {
                 $showingsQuery->where('agent_id', $user->id);
             }
 
             $showingEvents = $showingsQuery->get()->map(fn ($s) => [
-                'id' => 'showing-' . $s->id,
-                'title' => __('Showing') . ': ' . ($s->property->address ?? ''),
+                'id' => 'showing-'.$s->id,
+                'title' => __('Showing').': '.($s->property->address ?? ''),
                 'date' => $s->showing_date->format('Y-m-d'),
                 'type' => 'showing',
                 'color' => 'orange',
@@ -94,13 +94,13 @@ class CalendarController extends Controller
                 ->whereIn('status', ['scheduled', 'active'])
                 ->whereBetween('event_date', [$start, $end]);
 
-            if (!$user->isAdmin()) {
+            if (! $user->isAdmin()) {
                 $openHouseQuery->where('agent_id', $user->id);
             }
 
             $openHouseEvents = $openHouseQuery->get()->map(fn ($oh) => [
-                'id' => 'openhouse-' . $oh->id,
-                'title' => __('Open House') . ': ' . ($oh->property->address ?? ''),
+                'id' => 'openhouse-'.$oh->id,
+                'title' => __('Open House').': '.($oh->property->address ?? ''),
                 'date' => $oh->event_date->format('Y-m-d'),
                 'type' => 'open_house',
                 'color' => 'teal',

@@ -18,7 +18,7 @@ class ListingController extends Controller
     {
         $query = Property::with(['assignedAgent', 'media', 'leads']);
 
-        if (!auth()->user()->isAdmin()) {
+        if (! auth()->user()->isAdmin()) {
             $query->where(fn ($q) => $q->where('assigned_agent_id', auth()->id())->orWhereNull('assigned_agent_id'));
         }
 
@@ -34,10 +34,10 @@ class ListingController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('marketing_title', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%")
-                  ->orWhere('community', 'like', "%{$search}%")
-                  ->orWhere('sub_community', 'like', "%{$search}%")
-                  ->orWhere('unit_no', 'like', "%{$search}%");
+                    ->orWhere('address', 'like', "%{$search}%")
+                    ->orWhere('community', 'like', "%{$search}%")
+                    ->orWhere('sub_community', 'like', "%{$search}%")
+                    ->orWhere('unit_no', 'like', "%{$search}%");
             });
         }
 
@@ -131,8 +131,8 @@ class ListingController extends Controller
         if ($request->filled('has_portal_live')) {
             $query->where(function ($q) {
                 $q->where('bayut_status', 'live')
-                  ->orWhere('dubizzle_status', 'live')
-                  ->orWhere('propertyfinder_status', 'live');
+                    ->orWhere('dubizzle_status', 'live')
+                    ->orWhere('propertyfinder_status', 'live');
             });
         }
 
@@ -147,16 +147,16 @@ class ListingController extends Controller
         $units = (clone $query)->latest('updated_at')->paginate(20);
 
         $kpis = [
-            'total'       => (clone $query)->count(),
-            'active'      => (clone $query)->whereIn('availability', ['ready_to_list', 'listed'])->count(),
-            'for_rent'    => (clone $query)->whereIn('intent', ['rent', 'both'])->whereIn('availability', ['ready_to_list', 'listed'])->count(),
-            'for_sale'    => (clone $query)->whereIn('intent', ['sale', 'both'])->whereIn('availability', ['ready_to_list', 'listed'])->count(),
-            'live_portals'=> (clone $query)->where('availability', 'listed')
-                                ->where(function ($q) {
-                                    $q->where('bayut_status', 'live')
-                                      ->orWhere('dubizzle_status', 'live')
-                                      ->orWhere('propertyfinder_status', 'live');
-                                })->count(),
+            'total' => (clone $query)->count(),
+            'active' => (clone $query)->whereIn('availability', ['ready_to_list', 'listed'])->count(),
+            'for_rent' => (clone $query)->whereIn('intent', ['rent', 'both'])->whereIn('availability', ['ready_to_list', 'listed'])->count(),
+            'for_sale' => (clone $query)->whereIn('intent', ['sale', 'both'])->whereIn('availability', ['ready_to_list', 'listed'])->count(),
+            'live_portals' => (clone $query)->where('availability', 'listed')
+                ->where(function ($q) {
+                    $q->where('bayut_status', 'live')
+                        ->orWhere('dubizzle_status', 'live')
+                        ->orWhere('propertyfinder_status', 'live');
+                })->count(),
         ];
 
         $agents = auth()->user()->isAdmin()
@@ -177,7 +177,7 @@ class ListingController extends Controller
 
         return view('inventory.index', [
             'units' => $units,
-            'kpis'  => $kpis,
+            'kpis' => $kpis,
             'agents' => $agents,
             'sources' => $sources,
             'communities' => $communities,
@@ -215,7 +215,7 @@ class ListingController extends Controller
     {
         return view('inventory.create', [
             'property' => new Property(['availability' => 'draft']),
-            'agents'   => $this->agents(),
+            'agents' => $this->agents(),
         ]);
     }
 
@@ -260,7 +260,7 @@ class ListingController extends Controller
 
         return view('inventory.show', [
             'property' => $property,
-            'agents'   => $this->agents(),
+            'agents' => $this->agents(),
         ]);
     }
 
@@ -270,7 +270,7 @@ class ListingController extends Controller
 
         return view('inventory.edit', [
             'property' => $property,
-            'agents'   => $this->agents(),
+            'agents' => $this->agents(),
         ]);
     }
 
@@ -358,15 +358,15 @@ class ListingController extends Controller
 
         $units = $units->map(function (Property $unit) {
             return [
-                'id'           => $unit->id,
-                'label'        => $unit->display_name,
-                'meta'         => $unit->price_line,
-                'detail'       => trim(
+                'id' => $unit->id,
+                'label' => $unit->display_name,
+                'meta' => $unit->price_line,
+                'detail' => trim(
                     implode(' • ', array_filter([
                         $unit->sub_community ?: $unit->community,
-                        $unit->bedrooms ? $unit->bedrooms . ' ' . __('BR') : null,
+                        $unit->bedrooms ? $unit->bedrooms.' '.__('BR') : null,
                         $unit->square_footage ? \App\Helpers\TenantFormatHelper::area($unit->square_footage) : null,
-                        $unit->unit_no ? __('Unit') . ' ' . $unit->unit_no : null,
+                        $unit->unit_no ? __('Unit').' '.$unit->unit_no : null,
                     ]))
                 ),
                 'availability' => __(\App\Models\Property::AVAILABILITIES[$unit->availability] ?? $unit->availability),
@@ -397,8 +397,8 @@ class ListingController extends Controller
 
         // Per-portal counters for the current view
         $portals = [
-            'bayut'          => ['units' => $ready->filter(fn ($p) => $p->bayut_status !== 'live')->count(), 'live' => $all->where('bayut_status', 'live')->count()],
-            'dubizzle'       => ['units' => $ready->filter(fn ($p) => $p->dubizzle_status !== 'live')->count(), 'live' => $all->where('dubizzle_status', 'live')->count()],
+            'bayut' => ['units' => $ready->filter(fn ($p) => $p->bayut_status !== 'live')->count(), 'live' => $all->where('bayut_status', 'live')->count()],
+            'dubizzle' => ['units' => $ready->filter(fn ($p) => $p->dubizzle_status !== 'live')->count(), 'live' => $all->where('dubizzle_status', 'live')->count()],
             'propertyfinder' => ['units' => $ready->filter(fn ($p) => $p->propertyfinder_status !== 'live')->count(), 'live' => $all->where('propertyfinder_status', 'live')->count()],
         ];
 
@@ -409,7 +409,7 @@ class ListingController extends Controller
             'wallet' => app(\App\Services\Portals\BayutCreditsService::class)->balance(auth()->user()->tenant),
             'bayut_sync' => $bayutIntegration !== null ? [
                 'last_synced_at' => $bayutIntegration->last_synced_at,
-                'last_error'     => $bayutIntegration->last_error,
+                'last_error' => $bayutIntegration->last_error,
             ] : null,
             'enabled_portals' => \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
                 ->where('is_active', true)
@@ -500,19 +500,19 @@ class ListingController extends Controller
         $data = $request->validate($rules);
 
         $map = [
-            'bayut'          => ['status' => 'bayut_status', 'reference' => 'bayut_listing_id', 'url' => 'bayut_url', 'listed_at' => 'bayut_listed_at'],
-            'dubizzle'       => ['status' => 'dubizzle_status', 'reference' => 'dubizzle_listing_reference', 'url' => 'dubizzle_url', 'listed_at' => 'dubizzle_listed_at'],
+            'bayut' => ['status' => 'bayut_status', 'reference' => 'bayut_listing_id', 'url' => 'bayut_url', 'listed_at' => 'bayut_listed_at'],
+            'dubizzle' => ['status' => 'dubizzle_status', 'reference' => 'dubizzle_listing_reference', 'url' => 'dubizzle_url', 'listed_at' => 'dubizzle_listed_at'],
             'propertyfinder' => ['status' => 'propertyfinder_status', 'reference' => 'propertyfinder_listing_reference', 'url' => 'propertyfinder_url', 'listed_at' => 'propertyfinder_listed_at'],
         ][$portal];
 
         $property->update([
-            $map['status']    => $data['status'],
+            $map['status'] => $data['status'],
             $map['reference'] => $data['listing_reference'] ?? null,
-            $map['url']       => $data['url'] ?? null,
+            $map['url'] => $data['url'] ?? null,
             $map['listed_at'] => $data['status'] === 'live' && empty($data['listed_at']) ? now()->toDateString() : ($data['listed_at'] ?? null),
         ]);
 
-        AuditLog::log('inventory.portal_status_' . $portal, $property, ['portal' => $portal, 'status' => $data['status']]);
+        AuditLog::log('inventory.portal_status_'.$portal, $property, ['portal' => $portal, 'status' => $data['status']]);
 
         return redirect()->route('inventory.portal')->with('success', __('Portal status recorded.'));
     }
@@ -535,7 +535,7 @@ class ListingController extends Controller
             $listedAtField => $wasLive ? null : now()->toDateString(),
         ]);
 
-        AuditLog::log($wasLive ? 'inventory.portal_unlisted_' . $portal : 'inventory.portal_listed_' . $portal, $property, ['portal' => $portal]);
+        AuditLog::log($wasLive ? 'inventory.portal_unlisted_'.$portal : 'inventory.portal_listed_'.$portal, $property, ['portal' => $portal]);
 
         return back()->with('success', __(':portal marked as :status.', [
             'portal' => ucfirst($portal),
@@ -587,11 +587,11 @@ class ListingController extends Controller
 
         $integration->update([
             'last_synced_at' => now(),
-            'last_error'     => $result['ok'] ? null : ($result['message'] ?? null),
+            'last_error' => $result['ok'] ? null : ($result['message'] ?? null),
         ]);
 
         if (! $result['ok']) {
-            AuditLog::log('inventory.portal_push_failed_' . $portal, $property, ['error' => $result['message'] ?? null]);
+            AuditLog::log('inventory.portal_push_failed_'.$portal, $property, ['error' => $result['message'] ?? null]);
 
             return back()->with('error', $result['message'] ?? __('The portal rejected the push.'));
         }
@@ -600,27 +600,27 @@ class ListingController extends Controller
             // Bayut owns Dubizzle: it auto-duplicates each listing, so a
             // successful Bayut push also publishes the unit on Dubizzle.
             $property->update(array_filter([
-                'bayut_status'   => 'live',
+                'bayut_status' => 'live',
                 'bayut_listed_at' => now()->toDateString(),
                 'bayut_listing_id' => $result['reference'] ?? null,
-                'bayut_url'      => $result['url'] ?? null,
+                'bayut_url' => $result['url'] ?? null,
                 'dubizzle_status' => 'live',
                 'dubizzle_listing_reference' => $result['reference'] ?? null,
                 'dubizzle_listed_at' => now()->toDateString(),
-                'dubizzle_url'   => $result['url'] ?? null,
+                'dubizzle_url' => $result['url'] ?? null,
             ]));
 
             app(\App\Services\Portals\BayutCreditsService::class)->consume($tenant, $property);
         } else {
             $property->update(array_filter([
-                'propertyfinder_status'   => 'live',
+                'propertyfinder_status' => 'live',
                 'propertyfinder_listed_at' => now()->toDateString(),
                 'propertyfinder_listing_reference' => $result['reference'] ?? null,
-                'propertyfinder_url'      => $result['url'] ?? null,
+                'propertyfinder_url' => $result['url'] ?? null,
             ]));
         }
 
-        AuditLog::log('inventory.portal_pushed_' . $portal, $property, ['reference' => $result['reference'] ?? null]);
+        AuditLog::log('inventory.portal_pushed_'.$portal, $property, ['reference' => $result['reference'] ?? null]);
 
         return back()->with('success', __('Submitted to :portal.', ['portal' => $integration->portal_label]));
     }
@@ -645,7 +645,7 @@ class ListingController extends Controller
 
         $integration->update([
             'last_synced_at' => now(),
-            'last_error'     => $result['error'],
+            'last_error' => $result['error'],
         ]);
 
         AuditLog::log('inventory.portal_status_sync', null, $result);
@@ -656,7 +656,7 @@ class ListingController extends Controller
 
         return back()->with('success', __('Bayut status refresh complete: :checked checked, :live live, :updated status changes, :removed removed.', [
             'checked' => $result['checked'],
-            'live'    => $result['live'],
+            'live' => $result['live'],
             'updated' => $result['updated'],
             'removed' => $result['removed'],
         ]));
@@ -667,47 +667,47 @@ class ListingController extends Controller
     protected function rules(): array
     {
         return [
-            'address'     => 'nullable|string|max:255',
-            'city'        => 'nullable|string|max:100',
-            'state'       => 'nullable|string|max:60',
-            'zip_code'    => 'nullable|string|max:20',
-            'intent'      => 'required|in:rent,sale,both',
+            'address' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:100',
+            'state' => 'nullable|string|max:60',
+            'zip_code' => 'nullable|string|max:20',
+            'intent' => 'required|in:rent,sale,both',
             'market_class' => 'required|in:ready,off_plan',
             'property_category' => 'required|string|max:40',
-            'community'   => 'nullable|string|max:120',
+            'community' => 'nullable|string|max:120',
             'sub_community' => 'nullable|string|max:120',
             'developer_name' => 'nullable|string|max:150',
             'handover_date' => 'nullable|date',
             'title_deed_no' => 'nullable|string|max:60',
             'rera_permit_no' => 'nullable|string|max:60',
-            'plot_no'     => 'nullable|string|max:60',
+            'plot_no' => 'nullable|string|max:60',
             'building_no' => 'nullable|string|max:60',
-            'unit_no'     => 'nullable|string|max:60',
-            'floor_no'    => 'nullable|string|max:60',
-            'bedrooms'    => 'nullable|integer|min:0',
-            'bathrooms'   => 'nullable|integer|min:0',
+            'unit_no' => 'nullable|string|max:60',
+            'floor_no' => 'nullable|string|max:60',
+            'bedrooms' => 'nullable|integer|min:0',
+            'bathrooms' => 'nullable|integer|min:0',
             'square_footage' => 'nullable|numeric|min:0',
-            'parking'     => 'nullable|integer|min:0',
+            'parking' => 'nullable|integer|min:0',
             'property_type' => 'nullable|string|max:40',
-            'furnishing'  => 'nullable|in:unfurnished,semi_furnished,furnished',
+            'furnishing' => 'nullable|in:unfurnished,semi_furnished,furnished',
             'service_charge' => 'nullable|numeric|min:0',
-            'rent_price'  => 'nullable|numeric|min:0',
+            'rent_price' => 'nullable|numeric|min:0',
             'deposit_amount' => 'nullable|numeric|min:0',
-            'admin_fee'   => 'nullable|numeric|min:0',
+            'admin_fee' => 'nullable|numeric|min:0',
             'tawtheeq_fee' => 'nullable|numeric|min:0',
             'rent_period' => 'nullable|in:yearly,monthly',
-            'list_price'  => 'nullable|numeric|min:0',
+            'list_price' => 'nullable|numeric|min:0',
             'availability' => 'required|in:draft,ready_to_list,listed,reserved,leased,sold,unlisted',
             'assigned_agent_id' => 'nullable|exists:users,id',
-            'owner_name'  => 'nullable|string|max:150',
+            'owner_name' => 'nullable|string|max:150',
             'owner_phone' => 'nullable|string|max:30',
             'owner_email' => 'nullable|email|max:190',
             'marketing_title' => 'nullable|string|max:200',
             'marketing_description' => 'nullable|string',
             'virtual_tour_url' => 'nullable|url|max:500',
-            'notes'       => 'nullable|string|max:2000',
-            'photos.*'    => 'nullable|image|max:10240',
-            'floor_plan'  => 'nullable|image|max:10240',
+            'notes' => 'nullable|string|max:2000',
+            'photos.*' => 'nullable|image|max:10240',
+            'floor_plan' => 'nullable|image|max:10240',
             'external_photo_urls' => 'nullable|string',
         ];
     }
@@ -715,22 +715,27 @@ class ListingController extends Controller
     protected function syncMedia(Request $request, Property $property): void
     {
         $uploads = [];
+        $cloud = app(\App\Services\Cloud\CloudPhotoService::class);
 
         if ($request->hasFile('photos')) {
             foreach ($request->file('photos') as $file) {
                 if ($file->isValid()) {
+                    $stored = $cloud->store($file, 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
                     $uploads[] = [
                         'type' => 'photo',
-                        'path' => $file->store('properties/' . $property->id . '/' . Str::random(6), 'public'),
+                        'path' => $stored['path'],
+                        'external_url' => $stored['external_url'],
                     ];
                 }
             }
         }
 
         if ($request->hasFile('floor_plan') && $request->file('floor_plan')->isValid()) {
+            $stored = $cloud->store($request->file('floor_plan'), 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
             $uploads[] = [
                 'type' => 'floor_plan',
-                'path' => $request->file('floor_plan')->store('properties/' . $property->id . '/' . Str::random(6), 'public'),
+                'path' => $stored['path'],
+                'external_url' => $stored['external_url'],
             ];
         }
 
@@ -762,29 +767,31 @@ class ListingController extends Controller
     public function uploadPhotos(Request $request, Property $property)
     {
         $request->validate([
-            'photos'   => 'required|array|max:10',
+            'photos' => 'required|array|max:10',
             'photos.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:10240',
             'captions' => 'nullable|array',
             'captions.*' => 'nullable|string|max:255',
         ]);
 
         $uploaded = 0;
+        $cloud = app(\App\Services\Cloud\CloudPhotoService::class);
         foreach ($request->file('photos') as $i => $file) {
             if (! $file->isValid()) {
                 continue;
             }
 
-            $path = $file->store('properties/' . $property->id . '/' . Str::random(6), 'public');
+            $stored = $cloud->store($file, 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
 
             $property->media()->create([
-                'type'          => 'photo',
-                'path'          => $path,
-                'caption'       => $request->input("captions.{$i}"),
+                'type' => 'photo',
+                'path' => $stored['path'],
+                'external_url' => $stored['external_url'],
+                'caption' => $request->input("captions.{$i}"),
                 'original_name' => $file->getClientOriginalName(),
-                'uploaded_by'   => auth()->id(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'sort_order'    => $property->media()->max('sort_order') + 1,
+                'uploaded_by' => auth()->id(),
+                'mime_type' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'sort_order' => $property->media()->max('sort_order') + 1,
             ]);
             $uploaded++;
         }
@@ -924,6 +931,7 @@ class ListingController extends Controller
         if ($unit->virtual_tour_url) {
             $items[] = 'Virtual Tour';
         }
+
         return $items;
     }
 

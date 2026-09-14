@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Activity;
+use App\Models\Meeting;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -50,7 +50,7 @@ class CalendarSyncController extends Controller
     {
         $user = User::where('calendar_feed_token', $token)->first();
 
-        if (!$user) {
+        if (! $user) {
             abort(404);
         }
 
@@ -66,17 +66,17 @@ class CalendarSyncController extends Controller
             ->whereBetween('due_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->get();
 
-        // Fetch activities (meetings & calls) for the user within the date range
-        $activities = Activity::withoutGlobalScopes()
+        // Fetch meetings assigned to the user within the date range
+        $meetings = Meeting::withoutGlobalScopes()
             ->with('lead')
             ->where('tenant_id', $user->tenant_id)
             ->where('agent_id', $user->id)
-            ->whereIn('type', ['meeting', 'call'])
-            ->whereNotNull('logged_at')
-            ->whereBetween('logged_at', [$startDate, $endDate])
+            ->where('status', 'scheduled')
+            ->whereDate('scheduled_at', '>=', $startDate->toDateString())
+            ->whereDate('scheduled_at', '<=', $endDate->toDateString())
             ->get();
 
-        $ical = $this->buildIcal($user, $tasks, $activities);
+        $ical = $this->buildIcal($user, $tasks, $meetings);
 
         return response($ical, 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
@@ -96,7 +96,7 @@ class CalendarSyncController extends Controller
         $user = auth()->user();
         $url = $request->input('ical_url');
 
-        if (!$this->isUrlSafe($url)) {
+        if (! $this->isUrlSafe($url)) {
             return redirect()->route('calendar.sync')
                 ->with('error', __('The provided URL is not allowed. Only public HTTP/HTTPS URLs are accepted.'));
         }
@@ -122,7 +122,7 @@ class CalendarSyncController extends Controller
         $imported = 0;
 
         foreach ($events as $event) {
-            if (!$event['summary'] || !$event['dtstart']) {
+            if (! $event['summary'] || ! $event['dtstart']) {
                 continue;
             }
 
@@ -161,12 +161,12 @@ class CalendarSyncController extends Controller
     {
         $parsed = parse_url($url);
 
-        if (!$parsed || empty($parsed['scheme']) || empty($parsed['host'])) {
+        if (! $parsed || empty($parsed['scheme']) || empty($parsed['host'])) {
             return false;
         }
 
         // Only allow http and https schemes
-        if (!in_array(strtolower($parsed['scheme']), ['http', 'https'], true)) {
+        if (! in_array(strtolower($parsed['scheme']), ['http', 'https'], true)) {
             return false;
         }
 
@@ -186,7 +186,7 @@ class CalendarSyncController extends Controller
         $ip = gethostbyname($host);
 
         // gethostbyname returns the hostname unchanged on failure; also reject that
-        if ($ip === $host && !filter_var($host, FILTER_VALIDATE_IP)) {
+        if ($ip === $host && ! filter_var($host, FILTER_VALIDATE_IP)) {
             return false;
         }
 
@@ -201,56 +201,59 @@ class CalendarSyncController extends Controller
     }
 
     /**
-     * Build iCal content string from tasks and activities.
+     * Build iCal content string from tasks and meetings.
      */
-    protected function buildIcal(User $user, $tasks, $activities): string
+    protected function buildIcal(User $user, $tasks, $meetings): string
     {
         $lines = [];
         $lines[] = 'BEGIN:VCALENDAR';
         $lines[] = 'VERSION:2.0';
-        $lines[] = 'PRODID:-//' . $this->escapeIcalText(config('app.name')) . '//Calendar//EN';
+        $lines[] = 'PRODID:-//'.$this->escapeIcalText(config('app.name')).'//Calendar//EN';
         $lines[] = 'CALSCALE:GREGORIAN';
         $lines[] = 'METHOD:PUBLISH';
-        $lines[] = 'X-WR-CALNAME:' . $this->escapeIcalText(config('app.name')) . ' - ' . $this->escapeIcalText($user->name);
+        $lines[] = 'X-WR-CALNAME:'.$this->escapeIcalText(config('app.name')).' - '.$this->escapeIcalText($user->name);
 
         foreach ($tasks as $task) {
             $lines[] = 'BEGIN:VEVENT';
-            $lines[] = 'UID:task-' . $task->id . '@insulacrm';
-            $lines[] = 'DTSTART;VALUE=DATE:' . $task->due_date->format('Ymd');
-            $lines[] = 'SUMMARY:' . $this->escapeIcalText('Task: ' . $task->title);
+            $lines[] = 'UID:task-'.$task->id.'@insulacrm';
+            $lines[] = 'DTSTART;VALUE=DATE:'.$task->due_date->format('Ymd');
+            $lines[] = 'SUMMARY:'.$this->escapeIcalText('Task: '.$task->title);
 
             $description = '';
             if ($task->lead) {
-                $description = $task->lead->first_name . ' ' . $task->lead->last_name;
+                $description = $task->lead->first_name.' '.$task->lead->last_name;
             }
-            $lines[] = 'DESCRIPTION:' . $this->escapeIcalText($description);
+            $lines[] = 'DESCRIPTION:'.$this->escapeIcalText($description);
 
-            $lines[] = 'STATUS:' . ($task->is_completed ? 'COMPLETED' : 'CONFIRMED');
-            $lines[] = 'DTSTAMP:' . now()->utc()->format('Ymd\THis\Z');
+            $lines[] = 'STATUS:'.($task->is_completed ? 'COMPLETED' : 'CONFIRMED');
+            $lines[] = 'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z');
             $lines[] = 'END:VEVENT';
         }
 
-        foreach ($activities as $activity) {
+        foreach ($meetings as $meeting) {
             $lines[] = 'BEGIN:VEVENT';
-            $lines[] = 'UID:activity-' . $activity->id . '@insulacrm';
-            $lines[] = 'DTSTART;VALUE=DATE:' . $activity->logged_at->format('Ymd');
-            $summary = ucfirst($activity->type) . ($activity->subject ? ': ' . $activity->subject : '');
-            $lines[] = 'SUMMARY:' . $this->escapeIcalText($summary);
+            $lines[] = 'UID:meeting-'.$meeting->id.'@insulacrm';
+            $lines[] = 'DTSTART:'.$meeting->scheduled_at->format('Ymd\THis');
+            $lines[] = 'DTEND:'.$meeting->scheduled_at->copy()->addMinutes($meeting->duration_minutes ?: 60)->format('Ymd\THis');
+            $lines[] = 'SUMMARY:'.$this->escapeIcalText('Meeting: '.$meeting->title);
 
             $description = '';
-            if ($activity->lead) {
-                $description = $activity->lead->first_name . ' ' . $activity->lead->last_name;
+            if ($meeting->lead) {
+                $description = $meeting->lead->first_name.' '.$meeting->lead->last_name;
             }
-            $lines[] = 'DESCRIPTION:' . $this->escapeIcalText($description);
+            if ($meeting->notes) {
+                $description .= ($description ? ' — ' : '').$meeting->notes;
+            }
+            $lines[] = 'DESCRIPTION:'.$this->escapeIcalText($description);
 
             $lines[] = 'STATUS:CONFIRMED';
-            $lines[] = 'DTSTAMP:' . now()->utc()->format('Ymd\THis\Z');
+            $lines[] = 'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z');
             $lines[] = 'END:VEVENT';
         }
 
         $lines[] = 'END:VCALENDAR';
 
-        return implode("\r\n", $lines) . "\r\n";
+        return implode("\r\n", $lines)."\r\n";
     }
 
     /**
@@ -276,6 +279,7 @@ class CalendarSyncController extends Controller
             if ($line === 'BEGIN:VEVENT') {
                 $inEvent = true;
                 $currentEvent = ['summary' => null, 'dtstart' => null];
+
                 continue;
             }
 
@@ -284,10 +288,11 @@ class CalendarSyncController extends Controller
                     $events[] = $currentEvent;
                 }
                 $inEvent = false;
+
                 continue;
             }
 
-            if (!$inEvent) {
+            if (! $inEvent) {
                 continue;
             }
 

@@ -66,6 +66,7 @@ class Lead extends Model
         'deal_type',
         'stage',
         'stage_changed_at',
+        'expected_move_in_date',
         'motivation_score',
         'ai_motivation_score',
         'do_not_contact',
@@ -82,6 +83,7 @@ class Lead extends Model
             'ai_motivation_score' => 'integer',
             'custom_fields' => 'array',
             'stage_changed_at' => 'datetime',
+            'expected_move_in_date' => 'date',
         ];
     }
 
@@ -252,6 +254,11 @@ class Lead extends Model
     public function showings()
     {
         return $this->hasMany(Showing::class);
+    }
+
+    public function meetings()
+    {
+        return $this->hasMany(Meeting::class);
     }
 
     public function tasks()

@@ -18,7 +18,7 @@ class ShowingController extends Controller
 
         $query = Showing::with(['property', 'lead', 'agent']);
 
-        if (!auth()->user()->isAdmin()) {
+        if (! auth()->user()->isAdmin()) {
             $query->where('agent_id', auth()->id());
         }
 
@@ -42,7 +42,7 @@ class ShowingController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->whereHas('property', fn ($pq) => $pq->where('address', 'like', "%{$search}%"))
-                  ->orWhereHas('lead', fn ($lq) => $lq->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
+                    ->orWhereHas('lead', fn ($lq) => $lq->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
             });
         }
 
@@ -75,9 +75,14 @@ class ShowingController extends Controller
         return view('showings.create', compact('properties', 'leads', 'agents', 'preselectedLeadId'));
     }
 
-    public function store(ShowingRequest $request)
+    public function store(ShowingRequest $request, \App\Services\Cloud\CloudCalendarService $calendar)
     {
         $this->authorize('create', Showing::class);
+
+        if (! $calendar->schedulerAllowed(auth()->user())) {
+            return redirect()->route('showings.create', ['lead_id' => $request->input('lead_id')])
+                ->with('error', __('Connect a calendar (Google, Microsoft or iCal feed) in My Cloud before scheduling viewings.'));
+        }
 
         $data = $request->validated();
         $data['tenant_id'] = auth()->user()->tenant_id;
@@ -109,6 +114,8 @@ class ShowingController extends Controller
             ]);
         }
 
+        $calendar->sync($showing, auth()->user());
+
         return redirect()->route('showings.show', $showing)->with('success', __('Showing scheduled successfully.'));
     }
 
@@ -134,7 +141,7 @@ class ShowingController extends Controller
         return view('showings.edit', compact('showing', 'properties', 'leads', 'agents'));
     }
 
-    public function update(ShowingRequest $request, Showing $showing)
+    public function update(ShowingRequest $request, Showing $showing, \App\Services\Cloud\CloudCalendarService $calendar)
     {
         $this->authorize('update', $showing);
 
@@ -171,6 +178,8 @@ class ShowingController extends Controller
             ]);
         }
 
+        $calendar->sync($showing, auth()->user());
+
         if ($request->ajax()) {
             return response()->json(['success' => true, 'showing' => $showing->fresh()]);
         }
@@ -178,10 +187,11 @@ class ShowingController extends Controller
         return redirect()->route('showings.show', $showing)->with('success', __('Showing updated successfully.'));
     }
 
-    public function destroy(Showing $showing)
+    public function destroy(Showing $showing, \App\Services\Cloud\CloudCalendarService $calendar)
     {
         $this->authorize('delete', $showing);
 
+        $calendar->removeEvent($showing);
         $showing->delete();
 
         return redirect()->route('showings.index')->with('success', __('Showing deleted successfully.'));

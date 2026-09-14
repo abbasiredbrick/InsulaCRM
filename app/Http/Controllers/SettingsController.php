@@ -129,6 +129,39 @@ class SettingsController extends Controller
     }
 
     /**
+     * Save the tenant-level OAuth app credentials used for Google/Microsoft
+     * calendar + drive connections.
+     */
+    public function updateCloud(Request $request)
+    {
+        $request->validate([
+            'google_client_id' => 'nullable|string|max:255',
+            'google_client_secret' => 'nullable|string|max:255',
+            'microsoft_client_id' => 'nullable|string|max:255',
+            'microsoft_client_secret' => 'nullable|string|max:255',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $data = [];
+
+        $data['google_client_id'] = $request->google_client_id;
+        if ($request->filled('google_client_secret')) {
+            $data['google_client_secret'] = $request->google_client_secret;
+        }
+
+        $data['microsoft_client_id'] = $request->microsoft_client_id;
+        if ($request->filled('microsoft_client_secret')) {
+            $data['microsoft_client_secret'] = $request->microsoft_client_secret;
+        }
+
+        $tenant->update($data);
+
+        AuditLog::log('settings.cloud_updated', $tenant);
+
+        return redirect()->route('settings.index', ['tab' => 'integrations'])->with('success', __('Cloud connection settings updated.'));
+    }
+
+    /**
      * Test S3 connection with the provided or saved credentials.
      */
     public function testS3Connection(Request $request)
@@ -650,7 +683,7 @@ class SettingsController extends Controller
         $tenant = auth()->user()->tenant;
         $options = $tenant->custom_options ?? [];
         $options['portal_leads'] = [
-            'unmatched'     => $request->unmatched,
+            'unmatched' => $request->unmatched,
             'notify_admins' => $request->boolean('notify_admins'),
         ];
 
@@ -669,7 +702,7 @@ class SettingsController extends Controller
         if ($action === 'balance') {
             $request->validate([
                 'balance' => 'required|integer|min:0',
-                'reason'  => 'nullable|string|max:255',
+                'reason' => 'nullable|string|max:255',
             ]);
 
             app(\App\Services\Portals\BayutCreditsService::class)->adjust(

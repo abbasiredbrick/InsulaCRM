@@ -53,6 +53,10 @@ class Tenant extends Model
         'require_2fa',
         'sso_default_driver',
         'storage_disk',
+        'google_client_id',
+        'google_client_secret',
+        'microsoft_client_id',
+        'microsoft_client_secret',
     ];
 
     protected function casts(): array
@@ -71,7 +75,37 @@ class Tenant extends Model
             'default_dashboard_widgets' => 'array',
             'mail_settings' => 'array',
             'require_2fa' => 'boolean',
+            'google_client_secret' => 'encrypted',
+            'microsoft_client_secret' => 'encrypted',
         ];
+    }
+
+    /**
+     * Whether the tenant has configured OAuth credentials for a provider.
+     */
+    public function cloudProviderConfigured(string $provider): bool
+    {
+        return match ($provider) {
+            'google' => $this->google_client_id && $this->google_client_secret,
+            'microsoft' => $this->microsoft_client_id && $this->microsoft_client_secret,
+            default => false,
+        };
+    }
+
+    /**
+     * OAuth application settings for the given provider, null when unset.
+     */
+    public function cloudClient(string $provider): ?array
+    {
+        return match ($provider) {
+            'google' => $this->google_client_id && $this->google_client_secret
+                ? ['client_id' => $this->google_client_id, 'client_secret' => $this->google_client_secret]
+                : null,
+            'microsoft' => $this->microsoft_client_id && $this->microsoft_client_secret
+                ? ['client_id' => $this->microsoft_client_id, 'client_secret' => $this->microsoft_client_secret]
+                : null,
+            default => null,
+        };
     }
 
     /**

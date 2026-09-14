@@ -192,6 +192,12 @@
                         <div class="datagrid-title">{{ __('Created') }}</div>
                         <div class="datagrid-content">{{ $lead->created_at->format('M d, Y') }}</div>
                     </div>
+                    @if(($businessMode ?? 'wholesale') === 'realestate')
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Expected Move-in') }}</div>
+                        <div class="datagrid-content">{{ $lead->expected_move_in_date ? $lead->expected_move_in_date->format('M d, Y') : '-' }}</div>
+                    </div>
+                    @endif
                 </div>
                 @if($lead->notes)
                 <div class="mt-3">
@@ -617,6 +623,32 @@
             </div>
         </div>
 
+        <!-- Upcoming follow-ups, viewings & meetings -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Upcoming') }}</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                @forelse($upcoming as $item)
+                <div class="list-group-item d-flex align-items-center">
+                    <span class="badge me-2
+                        {{ $item['type'] === 'showing' ? 'bg-blue-lt' : ($item['type'] === 'meeting' ? 'bg-purple-lt' : 'bg-warning-lt') }}">
+                        {{ $item['type'] === 'showing' ? __('Viewing') : ($item['type'] === 'meeting' ? __('Meeting') : __('Follow-up')) }}
+                    </span>
+                    <div class="flex-fill">
+                        <div class="text-truncate" style="max-width:260px;">{{ $item['title'] }}</div>
+                        <small class="text-secondary">{{ $item['at']->format('M d, Y') }}{{ $item['type'] === 'showing' ? ' ' . $item['at']->format('g:i A') : '' }}</small>
+                    </div>
+                    @if($item['url'])
+                    <a href="{{ $item['url'] }}" class="btn btn-sm btn-outline-secondary ms-1">{{ __('View') }}</a>
+                    @endif
+                </div>
+                @empty
+                <div class="list-group-item text-secondary">{{ __('Nothing scheduled yet.') }}</div>
+                @endforelse
+            </div>
+        </div>
+
         <!-- Add Task Form -->
         <div class="card mb-3">
             <div class="card-header">
@@ -684,6 +716,79 @@
                 @endforelse
             </div>
         </div>
+        @if(($businessMode ?? 'wholesale') === 'realestate')
+        <!-- Schedule Meeting -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Schedule Meeting') }}</h3>
+            </div>
+            <div class="card-body">
+                <form action="{{ route('leads.meetings.store', $lead) }}" method="POST">
+                    @csrf
+                    <div class="mb-2">
+                        <input type="text" name="title" class="form-control form-control-sm" placeholder="{{ __('Meeting title') }}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">{{ __('Date & time') }}</label>
+                        <input type="datetime-local" name="scheduled_at" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">{{ __('Duration (minutes)') }}</label>
+                        <input type="number" name="duration_minutes" class="form-control form-control-sm" value="60" min="5" max="480">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">{{ __('Notes') }}</label>
+                        <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">{{ __('Schedule Meeting') }}</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Meetings List -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Meetings') }}</h3>
+            </div>
+            <div class="list-group list-group-flush">
+                @forelse($lead->meetings->sortBy('scheduled_at') as $meeting)
+                <div class="list-group-item">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-fill">
+                            <div class="{{ $meeting->status === 'completed' ? 'text-decoration-line-through text-secondary' : '' }}">
+                                {{ $meeting->title }}
+                            </div>
+                            <small class="{{ $meeting->is_overdue ? 'text-danger' : 'text-secondary' }}">
+                                {{ $meeting->scheduled_at->format('M d, Y g:i A') }}
+                                @if($meeting->status !== 'scheduled')
+                                    • <span class="badge bg-secondary-lt">{{ __(ucfirst($meeting->status)) }}</span>
+                                @endif
+                            </small>
+                            @if($meeting->notes)
+                            <div class="small text-secondary mt-1">{{ $meeting->notes }}</div>
+                            @endif
+                        </div>
+                        @if($meeting->status === 'scheduled')
+                        <form method="POST" action="{{ route('meetings.update', $meeting) }}" class="ms-1 d-inline">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="status" value="completed">
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="{{ __('Mark complete') }}">{{ __('Done') }}</button>
+                        </form>
+                        @endif
+                        <form method="POST" action="{{ route('meetings.destroy', $meeting) }}" class="ms-1 d-inline" onsubmit="return confirm('{{ __('Delete this meeting?') }}')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-ghost-danger" title="{{ __('Delete meeting') }}">×</button>
+                        </form>
+                    </div>
+                </div>
+                @empty
+                <div class="list-group-item text-secondary">{{ __('No meetings scheduled.') }}</div>
+                @endforelse
+            </div>
+        </div>
+        @endif
         <!-- Sequence Enrollments -->
         @if($lead->sequenceEnrollments->count())
         <div class="card mb-3">

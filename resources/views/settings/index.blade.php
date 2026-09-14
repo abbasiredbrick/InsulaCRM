@@ -1839,6 +1839,52 @@ Content-Type: application/json</code></pre>
 
             <!-- Integrations Tab -->
             <div class="tab-pane" id="tab-integrations">
+                <!-- Cloud / Google & Microsoft OAuth credentials -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ __('Cloud Connections (Google & Microsoft)') }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-secondary mb-3">{{ __('Create an OAuth app in the Google Cloud Console and/or Microsoft Azure portal, then paste the credentials below. Agents use them to connect their own Google/Microsoft accounts for calendar sync and Drive/OneDrive inventory photo storage.') }}</p>
+                        <form action="{{ route('settings.updateCloud') }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-google"></i> Google</h6>
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('Client ID') }}</label>
+                                        <input type="text" class="form-control" name="google_client_id" value="{{ old('google_client_id', $tenant->google_client_id) }}" placeholder="xxxxxxxx.apps.googleusercontent.com">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('Client Secret') }}</label>
+                                        <input type="password" class="form-control" name="google_client_secret" placeholder="••••••••••••••••" autocomplete="new-password">
+                                        <small class="form-hint">{{ __('Leave blank to keep the current secret.') }}</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-windows"></i> Microsoft</h6>
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('Client ID') }}</label>
+                                        <input type="text" class="form-control" name="microsoft_client_id" value="{{ old('microsoft_client_id', $tenant->microsoft_client_id) }}" placeholder="Application (client) ID">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">{{ __('Client Secret') }}</label>
+                                        <input type="password" class="form-control" name="microsoft_client_secret" placeholder="••••••••••••••••" autocomplete="new-password">
+                                        <small class="form-hint">{{ __('Leave blank to keep the current secret.') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            @if(! $tenant->cloudProviderConfigured('google') && ! $tenant->cloudProviderConfigured('microsoft'))
+                            <div class="alert alert-warning mt-3 py-2">
+                                <i class="bi bi-info-circle"></i> {{ __('Until at least one provider is configured here, agents cannot connect their calendar and scheduling will remain blocked.') }}
+                            </div>
+                            @endif
+                            <button type="submit" class="btn btn-primary mt-2">{{ __('Save Cloud Credentials') }}</button>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- Security Settings -->
                 <div class="card mb-4">
                     <div class="card-header">

@@ -31,6 +31,7 @@ class User extends Authenticatable
         'dashboard_widgets',
         'notification_delivery',
         'agent_code',
+        'photo_storage',
     ];
 
     protected $hidden = [
@@ -69,6 +70,34 @@ class User extends Authenticatable
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function cloudConnections()
+    {
+        return $this->hasMany(UserCloudConnection::class, 'user_id');
+    }
+
+    public function calendarConnections()
+    {
+        return $this->cloudConnections()->where('scope', 'calendar');
+    }
+
+    public function driveConnections()
+    {
+        return $this->cloudConnections()->where('scope', 'drive');
+    }
+
+    /**
+     * Whether the user has a working calendar connection (Google, Microsoft,
+     * or an active iCal feed subscription as the "other" option).
+     */
+    public function hasCalendarConnection(): bool
+    {
+        if ($this->calendarConnections()->exists()) {
+            return true;
+        }
+
+        return ! blank($this->calendar_feed_token);
     }
 
     public function role()

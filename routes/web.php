@@ -153,6 +153,13 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Theme Toggle (all roles) ────────────────────────
     Route::post('/theme/toggle', [ThemeController::class, 'toggle'])->name('theme.toggle');
 
+    // ── Cloud connections (Google/Microsoft calendar + drive, all roles) ────
+    Route::get('/my-cloud', [\App\Http\Controllers\Cloud\MyCloudController::class, 'index'])->name('my-cloud.show');
+    Route::put('/my-cloud/photos', [\App\Http\Controllers\Cloud\MyCloudController::class, 'updatePhotos'])->name('my-cloud.updatePhotos');
+    Route::get('/connect/{provider}/start', [\App\Http\Controllers\Cloud\CloudConnectionController::class, 'start'])->name('cloud.start');
+    Route::get('/connect/{provider}/callback', [\App\Http\Controllers\Cloud\CloudConnectionController::class, 'callback'])->name('cloud.callback');
+    Route::delete('/connect/{provider}', [\App\Http\Controllers\Cloud\CloudConnectionController::class, 'disconnect'])->name('cloud.disconnect');
+
     // ── Onboarding Wizard (all roles) ────────────────────────
     Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding.index');
     Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
@@ -371,6 +378,11 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/leads/{lead}/tasks', [TaskController::class, 'store'])->name('leads.tasks.store');
         Route::patch('/tasks/{task}/toggle', [TaskController::class, 'toggleComplete'])->name('tasks.toggle');
         Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+
+        // Meetings on leads (scheduled client meetings/appointments)
+        Route::post('/leads/{lead}/meetings', [\App\Http\Controllers\MeetingController::class, 'store'])->name('leads.meetings.store');
+        Route::patch('/meetings/{meeting}', [\App\Http\Controllers\MeetingController::class, 'update'])->name('meetings.update');
+        Route::delete('/meetings/{meeting}', [\App\Http\Controllers\MeetingController::class, 'destroy'])->name('meetings.destroy');
 
         // Property for a lead (create/update from lead detail)
         Route::post('/leads/{lead}/property', [PropertyController::class, 'store'])->name('leads.property.store');
@@ -659,6 +671,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         // Storage Settings
         Route::put('/settings/storage', [SettingsController::class, 'updateStorage'])->name('settings.updateStorage');
         Route::post('/settings/storage/test', [SettingsController::class, 'testS3Connection'])->name('settings.testS3');
+        Route::put('/settings/cloud', [SettingsController::class, 'updateCloud'])->name('settings.updateCloud');
 
         // SMS Test
         Route::post('/settings/sms/test', [SettingsController::class, 'testSms'])->name('settings.testSms');

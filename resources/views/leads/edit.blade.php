@@ -127,6 +127,10 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label">{{ __('Expected Move-in Date') }}</label>
+                    <input type="date" name="expected_move_in_date" class="form-control" value="{{ old('expected_move_in_date', optional($lead->expected_move_in_date)->format('Y-m-d')) }}">
+                </div>
                 @endif
             </div>
             <div class="row mb-3">
