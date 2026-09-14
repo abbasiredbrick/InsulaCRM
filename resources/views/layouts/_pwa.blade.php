@@ -1,10 +1,13 @@
 {{-- PWA Meta Tags & Service Worker Registration --}}
-<link rel="manifest" href="{{ asset('manifest.json') . '?v=keystone' }}">
+<link rel="manifest" href="{{ asset('manifest.json') . '?v=2' }}">
 <meta name="theme-color" content="#0054a6">
+<meta name="application-name" content="{{ config('app.name') }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="{{ config('app.name') }}">
 <link rel="apple-touch-icon" href="{{ asset('img/icon-192.png') }}">
+<link rel="apple-touch-icon" sizes="192x192" href="{{ asset('img/icon-192.png') }}">
+<link rel="apple-touch-icon" sizes="512x512" href="{{ asset('img/icon-512.png') }}">
 <meta name="mobile-web-app-capable" content="yes">
 
 <script>

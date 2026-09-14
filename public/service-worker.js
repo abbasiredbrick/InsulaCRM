@@ -11,7 +11,7 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var CACHE_VERSION = 'v1.3.0';
+var CACHE_VERSION = 'v1.4.0';
 var STATIC_CACHE = 'insulacrm-static-' + CACHE_VERSION;
 var DYNAMIC_CACHE = 'insulacrm-dynamic-' + CACHE_VERSION;
 var APP_SHELL_CACHE = 'insulacrm-app-shell-' + CACHE_VERSION;
@@ -22,6 +22,9 @@ var BASE_PATH = self.location.pathname.replace(/\/service-worker\.js$/, '') + '/
 // App shell resources to cache on install (HTML, CSS, JS)
 var APP_SHELL = [
     BASE_PATH + 'offline',
+    BASE_PATH + 'css/mobile.css',
+    BASE_PATH + 'css/mobile-app.css',
+    BASE_PATH + 'js/mobile-app.js',
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css',
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler-vendors.min.css',
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js',

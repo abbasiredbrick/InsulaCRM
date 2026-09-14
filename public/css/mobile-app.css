@@ -1,0 +1,735 @@
+/* ==========================================================================
+   InsulaCRM Native Mobile App & PWA Shell Styles
+   Provides an iOS/Android native app experience on mobile devices & PWAs.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Global Mobile Reset & Touch Optimizations
+   -------------------------------------------------------------------------- */
+:root {
+    --mobile-header-height: 56px;
+    --mobile-nav-height: 62px;
+    --mobile-accent: #0054a6;
+    --mobile-accent-gradient: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+}
+
+@media (max-width: 767.98px) {
+    html, body {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: contain;
+    }
+
+    body {
+        padding-top: calc(var(--mobile-header-height) + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+    }
+
+    /* Hide desktop vertical navigation sidebar */
+    .navbar-vertical.navbar-expand-lg {
+        display: none !important;
+    }
+
+    /* Hide redundant desktop top header on mobile */
+    .page-header .col-auto.ms-auto,
+    .page-header .breadcrumb-item {
+        display: none !important;
+    }
+
+    .page-header {
+        margin-bottom: 0.75rem !important;
+        padding-top: 0.5rem !important;
+    }
+
+    .page-wrapper {
+        margin-left: 0 !important;
+    }
+
+    /* Clean container padding for native edge-to-edge feel */
+    .container-xl {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
+@media (min-width: 768px) {
+    /* Hide all mobile app shell elements on desktop/tablet */
+    .mobile-only-header,
+    .mobile-only-bottom-nav,
+    .mobile-bottom-sheet,
+    .mobile-drawer,
+    .mobile-backdrop,
+    .mobile-search-sheet {
+        display: none !important;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   2. Native Mobile Top Bar
+   -------------------------------------------------------------------------- */
+.mobile-only-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1040;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: env(safe-area-inset-top, 0px);
+    height: calc(var(--mobile-header-height) + env(safe-area-inset-top, 0px));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+[data-bs-theme="dark"] .mobile-only-header {
+    background: rgba(27, 36, 48, 0.94);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-header-inner {
+    height: var(--mobile-header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.85rem;
+    gap: 0.5rem;
+}
+
+.mobile-header-left,
+.mobile-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 68px;
+}
+
+.mobile-header-right {
+    justify-content: flex-end;
+}
+
+.mobile-header-center {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+}
+
+.mobile-page-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: inherit;
+}
+
+.mobile-tenant-badge {
+    display: block;
+    font-size: 0.68rem;
+    color: #64748b;
+    font-weight: 500;
+    line-height: 1;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-bs-theme="dark"] .mobile-tenant-badge {
+    color: #94a3b8;
+}
+
+.mobile-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: #334155;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+    text-decoration: none;
+}
+
+[data-bs-theme="dark"] .mobile-btn-icon {
+    color: #cbd5e1;
+}
+
+.mobile-btn-icon:active {
+    background: rgba(0, 0, 0, 0.06);
+    transform: scale(0.92);
+}
+
+[data-bs-theme="dark"] .mobile-btn-icon:active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.mobile-avatar-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--mobile-accent-gradient);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 5px rgba(0, 84, 166, 0.25);
+}
+
+.mobile-avatar-circle.large {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+}
+
+.mobile-notif-dot {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+}
+
+[data-bs-theme="dark"] .mobile-notif-dot {
+    border-color: #1e293b;
+}
+
+/* --------------------------------------------------------------------------
+   3. Native Mobile Bottom Tab Navigation
+   -------------------------------------------------------------------------- */
+.mobile-only-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1040;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+[data-bs-theme="dark"] .mobile-only-bottom-nav {
+    background: rgba(27, 36, 48, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-nav-items {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    height: var(--mobile-nav-height);
+    position: relative;
+    padding: 0 0.5rem;
+}
+
+.mobile-nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    transition: color 0.15s ease, transform 0.1s ease;
+    cursor: pointer;
+}
+
+[data-bs-theme="dark"] .mobile-nav-tab {
+    color: #94a3b8;
+}
+
+.mobile-nav-tab .mobile-tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 26px;
+    margin-bottom: 2px;
+}
+
+.mobile-nav-tab .mobile-tab-label {
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.mobile-nav-tab.active {
+    color: var(--mobile-accent);
+}
+
+[data-bs-theme="dark"] .mobile-nav-tab.active {
+    color: #38bdf8;
+}
+
+.mobile-nav-tab.active .mobile-tab-label {
+    font-weight: 700;
+}
+
+.mobile-nav-tab:active {
+    transform: scale(0.92);
+}
+
+/* Center Floating Action Button (FAB) */
+.mobile-fab-container {
+    flex: 0 0 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    height: 100%;
+}
+
+.mobile-fab-btn {
+    position: absolute;
+    top: -18px;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--mobile-accent-gradient);
+    color: #ffffff;
+    border: 3px solid #ffffff;
+    box-shadow: 0 8px 20px rgba(0, 84, 166, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+    padding: 0;
+}
+
+[data-bs-theme="dark"] .mobile-fab-btn {
+    border-color: #1b2430;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-fab-btn:active {
+    transform: scale(0.9) rotate(45deg);
+}
+
+/* --------------------------------------------------------------------------
+   4. Native Backdrop Overlay
+   -------------------------------------------------------------------------- */
+.mobile-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1048;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.mobile-backdrop.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* --------------------------------------------------------------------------
+   5. Native Bottom Sheet (Quick Actions)
+   -------------------------------------------------------------------------- */
+.mobile-bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #ffffff;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.15);
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: 85vh;
+    overflow-y: auto;
+    user-select: none;
+}
+
+[data-bs-theme="dark"] .mobile-bottom-sheet {
+    background: #1e293b;
+    box-shadow: 0 -8px 35px rgba(0, 0, 0, 0.5);
+}
+
+.mobile-bottom-sheet.show {
+    transform: translateY(0);
+}
+
+.sheet-handle-bar {
+    width: 38px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+    margin: 10px auto 4px auto;
+    cursor: grab;
+}
+
+[data-bs-theme="dark"] .sheet-handle-bar {
+    background: #475569;
+}
+
+.sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem 0.5rem 1.25rem;
+}
+
+.sheet-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    margin: 0;
+    color: inherit;
+}
+
+.sheet-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.sheet-body {
+    padding: 0.75rem 1.25rem;
+}
+
+.quick-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+}
+
+.quick-action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+[data-bs-theme="dark"] .quick-action-card {
+    background: #0f172a;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.quick-action-card:active {
+    background: #e2e8f0;
+    transform: scale(0.96);
+}
+
+[data-bs-theme="dark"] .quick-action-card:active {
+    background: #1e293b;
+}
+
+.quick-action-card .action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    margin-bottom: 0.65rem;
+}
+
+.quick-action-card .action-label {
+    font-weight: 700;
+    font-size: 0.92rem;
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.quick-action-card .action-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.2;
+}
+
+/* --------------------------------------------------------------------------
+   6. Native "More" App Drawer (Slide-Over Panel)
+   -------------------------------------------------------------------------- */
+.mobile-drawer {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 88vw;
+    max-width: 360px;
+    z-index: 1050;
+    background: #ffffff;
+    box-shadow: 8px 0 35px rgba(0, 0, 0, 0.2);
+    transform: translateX(-100%);
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+[data-bs-theme="dark"] .mobile-drawer {
+    background: #1e293b;
+    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.6);
+}
+
+.mobile-drawer.show {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-bs-theme="dark"] .drawer-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.drawer-user-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.drawer-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.7rem;
+    line-height: 1;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.drawer-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.drawer-group-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 0.35rem;
+    padding-left: 0.5rem;
+}
+
+.drawer-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #334155;
+    font-weight: 500;
+    font-size: 0.92rem;
+    transition: background 0.15s ease;
+}
+
+[data-bs-theme="dark"] .drawer-nav-item {
+    color: #cbd5e1;
+}
+
+.drawer-nav-item:active {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+[data-bs-theme="dark"] .drawer-nav-item:active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.drawer-nav-item.active {
+    background: rgba(0, 84, 166, 0.08);
+    color: var(--mobile-accent);
+    font-weight: 700;
+}
+
+[data-bs-theme="dark"] .drawer-nav-item.active {
+    background: rgba(56, 189, 248, 0.12);
+    color: #38bdf8;
+}
+
+.drawer-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+}
+
+.drawer-actions {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-bs-theme="dark"] .drawer-actions {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --------------------------------------------------------------------------
+   7. Native Full-Screen Search Sheet
+   -------------------------------------------------------------------------- */
+.mobile-search-sheet {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1060;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+}
+
+[data-bs-theme="dark"] .mobile-search-sheet {
+    background: #0f172a;
+}
+
+.mobile-search-sheet.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.mobile-search-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-bs-theme="dark"] .mobile-search-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-search-form {
+    flex: 1;
+    margin: 0;
+}
+
+.mobile-search-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.mobile-search-input-wrap .search-input-icon {
+    position: absolute;
+    left: 12px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.mobile-search-input {
+    width: 100%;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #f1f5f9;
+    padding: 0 36px 0 38px;
+    font-size: 0.95rem;
+    color: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .mobile-search-input {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.mobile-search-input:focus {
+    border-color: var(--mobile-accent);
+    background: #ffffff;
+}
+
+[data-bs-theme="dark"] .mobile-search-input:focus {
+    background: #0f172a;
+}
+
+.mobile-search-clear {
+    position: absolute;
+    right: 10px;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.mobile-search-cancel {
+    background: transparent;
+    border: none;
+    color: var(--mobile-accent);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    white-space: nowrap;
+}
+
+.mobile-search-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem 1rem;
+}
+
+.mobile-search-list .dropdown-item {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}

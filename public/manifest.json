@@ -1,14 +1,14 @@
 {
-    "name": "Keystone",
-    "short_name": "Keystone",
-    "description": "Keystone CRM",
+    "name": "InsulaCRM",
+    "short_name": "InsulaCRM",
+    "description": "Real Estate Wholesaler & Agency CRM",
     "start_url": "./dashboard",
     "scope": "./",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#0054a6",
     "orientation": "any",
-    "categories": ["business", "productivity"],
+    "categories": ["business", "productivity", "utilities"],
     "icons": [
         {
             "src": "./img/icon-192.png",
@@ -21,6 +21,36 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Add Lead",
+            "short_name": "New Lead",
+            "description": "Create a new lead quickly",
+            "url": "./leads/create",
+            "icons": [{ "src": "./img/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Pipeline",
+            "short_name": "Pipeline",
+            "description": "View deal pipeline",
+            "url": "./pipeline",
+            "icons": [{ "src": "./img/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Calendar",
+            "short_name": "Calendar",
+            "description": "View schedule and appointments",
+            "url": "./calendar",
+            "icons": [{ "src": "./img/icon-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Global Search",
+            "short_name": "Search",
+            "description": "Search leads, deals, properties",
+            "url": "./search",
+            "icons": [{ "src": "./img/icon-192.png", "sizes": "192x192" }]
         }
     ]
 }
