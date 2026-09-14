@@ -246,7 +246,7 @@
         @if(($businessMode ?? 'wholesale') === 'realestate')
         <div class="card mb-3" id="viewings-panel">
             <div class="card-header">
-                <h3 class="card-title">{{ __('Viewings / Showings') }}</h3>
+                <h3 class="card-title">{{ __('Viewings') }}</h3>
                 <div class="card-actions">
                     <a href="{{ route('showings.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-orange btn-sm">{{ __('+ Schedule Viewing') }}</a>
                 </div>

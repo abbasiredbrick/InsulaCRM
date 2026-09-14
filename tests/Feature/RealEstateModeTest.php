@@ -33,7 +33,7 @@ class RealEstateModeTest extends TestCase
 
         $response = $this->get('/dashboard');
         $response->assertStatus(200);
-        $response->assertSee('Showings');
+        $response->assertSee('Viewings');
         $response->assertSee('Open Houses');
         $response->assertSee('Listings');
     }

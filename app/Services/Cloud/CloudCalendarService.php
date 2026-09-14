@@ -156,7 +156,7 @@ class CloudCalendarService
             $address = $record->property?->address ?? __('Viewing unit #:id', ['id' => $record->property_id]);
 
             return [
-                'summary' => __('Showing').': '.$address,
+                'summary' => __('Viewing').': '.$address,
                 'description' => implode("\n", $lines),
                 'start' => $start,
                 'all_day' => $allDay,

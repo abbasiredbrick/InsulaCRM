@@ -67,7 +67,7 @@
                         </span>
                     </div>
                     <div class="col">
-                        <div class="font-weight-medium">{{ $showingsThisWeek }} {{ __('showings') }} / {{ $pendingOffers }} {{ __('offers') }}</div>
+                        <div class="font-weight-medium">{{ $showingsThisWeek }} {{ __('viewings') }} / {{ $pendingOffers }} {{ __('offers') }}</div>
                         <div class="text-muted">{{ __('This Week') }}</div>
                     </div>
                 </div>

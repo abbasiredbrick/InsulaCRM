@@ -237,7 +237,7 @@ class LeadController extends Controller
             $upcoming->push([
                 'type' => 'showing',
                 'at' => $showing->showing_date ? \Illuminate\Support\Carbon::parse($showing->showing_date->format('Y-m-d').' '.$showing->showing_time) : null,
-                'title' => __('Showing').($showing->property?->address ? ': '.$showing->property->address : ''),
+                'title' => __('Viewing').($showing->property?->address ? ': '.$showing->property->address : ''),
                 'url' => route('showings.show', $showing),
                 'model' => $showing,
             ]);

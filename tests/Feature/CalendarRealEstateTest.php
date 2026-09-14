@@ -30,7 +30,7 @@ class CalendarRealEstateTest extends TestCase
         $response->assertStatus(200);
         $events = $response->json();
 
-        $showingEvents = array_filter($events, fn ($e) => str_contains($e['title'] ?? '', 'Showing') || ($e['color'] ?? '') === '#f97316');
+        $showingEvents = array_filter($events, fn ($e) => str_contains($e['title'] ?? '', 'Viewing') || ($e['color'] ?? '') === '#f97316');
         $this->assertNotEmpty($showingEvents);
     }
 

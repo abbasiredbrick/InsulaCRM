@@ -28,7 +28,7 @@ class ShowingModelTest extends TestCase
     public function test_outcome_label_returns_translated_string(): void
     {
         $this->assertEquals('Interested', Showing::outcomeLabel('interested'));
-        $this->assertEquals('Needs Second Showing', Showing::outcomeLabel('needs_second_showing'));
+        $this->assertEquals('Needs Second Viewing', Showing::outcomeLabel('needs_second_showing'));
     }
 
     public function test_status_label_handles_unknown_value(): void

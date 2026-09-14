@@ -217,7 +217,7 @@
                                 </div>
                                 <div>
                                     <strong>{{ __('Real Estate Agent / Broker') }}</strong><br>
-                                    <span class="text-secondary">{{ __('Listings, showings, open houses, offer tracking and commissions.') }}</span>
+                                    <span class="text-secondary">{{ __('Listings, viewings, open houses, offer tracking and commissions.') }}</span>
                                 </div>
                             </div>
                         </div>

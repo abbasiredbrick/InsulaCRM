@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', __('Edit Showing'))
-@section('page-title', __('Edit Showing'))
+@section('title', __('Edit Viewing'))
+@section('page-title', __('Edit Viewing'))
 
 @section('content')
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">{{ __('Edit Showing') }}</h3>
+        <h3 class="card-title">{{ __('Edit Viewing') }}</h3>
     </div>
     <div class="card-body">
         <form method="POST" action="{{ route('showings.update', $showing) }}">
@@ -83,7 +83,7 @@
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">{{ __('Update Showing') }}</button>
+                <button type="submit" class="btn btn-primary">{{ __('Update Viewing') }}</button>
                 <a href="{{ route('showings.show', $showing) }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
             </div>
         </form>

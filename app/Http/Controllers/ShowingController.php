@@ -104,7 +104,7 @@ class ShowingController extends Controller
                 'deal_id' => $showing->deal_id,
                 'agent_id' => auth()->id(),
                 'type' => 'meeting',
-                'subject' => __('Showing scheduled'),
+                'subject' => __('Viewing scheduled'),
                 'body' => __('Showing at :address on :date at :time', [
                     'address' => $showing->property->address ?? '',
                     'date' => $showing->showing_date->format('M j, Y'),
@@ -116,7 +116,7 @@ class ShowingController extends Controller
 
         $calendar->sync($showing, auth()->user());
 
-        return redirect()->route('showings.show', $showing)->with('success', __('Showing scheduled successfully.'));
+        return redirect()->route('showings.show', $showing)->with('success', __('Viewing scheduled successfully.'));
     }
 
     public function show(Showing $showing)
@@ -169,7 +169,7 @@ class ShowingController extends Controller
                 'deal_id' => $showing->deal_id,
                 'agent_id' => auth()->id(),
                 'type' => 'note',
-                'subject' => __('Showing :status', ['status' => \App\Models\Showing::statusLabel($showing->status)]),
+                'subject' => __('Viewing :status', ['status' => \App\Models\Showing::statusLabel($showing->status)]),
                 'body' => __('Showing status changed from :from to :to', [
                     'from' => \App\Models\Showing::statusLabel($oldStatus),
                     'to' => \App\Models\Showing::statusLabel($showing->status),
@@ -184,7 +184,7 @@ class ShowingController extends Controller
             return response()->json(['success' => true, 'showing' => $showing->fresh()]);
         }
 
-        return redirect()->route('showings.show', $showing)->with('success', __('Showing updated successfully.'));
+        return redirect()->route('showings.show', $showing)->with('success', __('Viewing updated successfully.'));
     }
 
     public function destroy(Showing $showing, \App\Services\Cloud\CloudCalendarService $calendar)
@@ -194,6 +194,6 @@ class ShowingController extends Controller
         $calendar->removeEvent($showing);
         $showing->delete();
 
-        return redirect()->route('showings.index')->with('success', __('Showing deleted successfully.'));
+        return redirect()->route('showings.index')->with('success', __('Viewing deleted successfully.'));
     }
 }

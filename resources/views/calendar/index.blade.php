@@ -34,7 +34,7 @@
             <span class="d-flex align-items-center gap-1"><span class="cal-dot" style="background:#d63939;"></span> <small class="text-muted">{{ __('Overdue') }}</small></span>
             <span class="d-flex align-items-center gap-1"><span class="cal-dot" style="background:#ae3ec9;"></span> <small class="text-muted">{{ __('Meeting') }}</small></span>
             @if(($businessMode ?? 'wholesale') === 'realestate')
-            <span class="d-flex align-items-center gap-1"><span class="cal-dot" style="background:#f76707;"></span> <small class="text-muted">{{ __('Showing') }}</small></span>
+            <span class="d-flex align-items-center gap-1"><span class="cal-dot" style="background:#f76707;"></span> <small class="text-muted">{{ __('Viewing') }}</small></span>
             <span class="d-flex align-items-center gap-1"><span class="cal-dot" style="background:#0ca678;"></span> <small class="text-muted">{{ __('Open House') }}</small></span>
             @endif
         </div>

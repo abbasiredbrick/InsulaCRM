@@ -1,14 +1,23 @@
 {
-    "name": "Keystone",
-    "short_name": "Keystone",
-    "description": "Keystone CRM",
-    "start_url": "./dashboard",
-    "scope": "./",
+    "name": "InsulaCRM",
+    "short_name": "InsulaCRM",
+    "description": "InsulaCRM - Property CRM",
+    "start_url": "/dashboard",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#0054a6",
     "orientation": "any",
+    "display_override": ["standalone", "window-controls-overlay"],
     "categories": ["business", "productivity"],
+    "screenshots": [
+        {
+            "src": "/img/screenshot-1.jpg",
+            "sizes": "1080x1920",
+            "type": "image/jpg",
+            "form_factor": "narrow"
+        }
+    ],
     "icons": [
         {
             "src": "./img/icon-192.png",

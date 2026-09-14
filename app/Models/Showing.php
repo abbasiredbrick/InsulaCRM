@@ -11,14 +11,14 @@ class Showing extends Model
         'scheduled' => 'Scheduled',
         'completed' => 'Completed',
         'cancelled' => 'Cancelled',
-        'no_show'   => 'No Show',
+        'no_show' => 'No Show',
     ];
 
     public const OUTCOMES = [
-        'interested'            => 'Interested',
-        'not_interested'        => 'Not Interested',
-        'made_offer'            => 'Made Offer',
-        'needs_second_showing'  => 'Needs Second Showing',
+        'interested' => 'Interested',
+        'not_interested' => 'Not Interested',
+        'made_offer' => 'Made Offer',
+        'needs_second_showing' => 'Needs Second Viewing',
     ];
 
     protected $fillable = [

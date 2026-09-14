@@ -26,7 +26,7 @@ class CalendarGateTest extends TestCase
         ]);
 
         $this->assertDatabaseMissing('showings', ['lead_id' => $lead->id]);
-        $this->assertDatabaseMissing('activities', ['lead_id' => $lead->id, 'subject' => 'Showing scheduled']);
+        $this->assertDatabaseMissing('activities', ['lead_id' => $lead->id, 'subject' => 'Viewing scheduled']);
     }
 
     public function test_meeting_scheduling_is_blocked_without_a_calendar(): void

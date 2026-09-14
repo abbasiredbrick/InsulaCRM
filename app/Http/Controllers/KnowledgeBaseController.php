@@ -751,7 +751,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <tr><td><strong>Lead</strong></td><td>New inquiry or prospect</td></tr>
 <tr><td><strong>Listing Agreement</strong></td><td>Listing agreement signed with client</td></tr>
 <tr><td><strong>Active Listing</strong></td><td>Property listed on MLS and marketed</td></tr>
-<tr><td><strong>Showing</strong></td><td>Property being shown to prospective buyers</td></tr>
+<tr><td><strong>Viewing</strong></td><td>Property being shown to prospective buyers</td></tr>
 <tr><td><strong>Offer Received</strong></td><td>One or more offers received on the listing</td></tr>
 <tr><td><strong>Under Contract</strong></td><td>Offer accepted, contract signed</td></tr>
 <tr><td><strong>Inspection</strong></td><td>Inspection period and contingencies</td></tr>

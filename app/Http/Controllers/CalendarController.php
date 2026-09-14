@@ -80,7 +80,7 @@ class CalendarController extends Controller
 
             $showingEvents = $showingsQuery->get()->map(fn ($s) => [
                 'id' => 'showing-'.$s->id,
-                'title' => __('Showing').': '.($s->property->address ?? ''),
+                'title' => __('Viewing').': '.($s->property->address ?? ''),
                 'date' => $s->showing_date->format('Y-m-d'),
                 'type' => 'showing',
                 'color' => 'orange',

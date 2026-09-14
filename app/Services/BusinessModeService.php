@@ -36,7 +36,7 @@ class BusinessModeService
         'lead' => 'Lead',
         'listing_agreement' => 'Listing Agreement',
         'active_listing' => 'Active Listing',
-        'showing' => 'Showing',
+        'showing' => 'Viewing',
         'offer_received' => 'Offer Received',
         'under_contract' => 'Under Contract',
         'inspection' => 'Inspection',
@@ -512,7 +512,7 @@ class BusinessModeService
             'interested' => __('Interested'),
             'not_interested' => __('Not Interested'),
             'made_offer' => __('Made Offer'),
-            'needs_second_showing' => __('Needs Second Showing'),
+            'needs_second_showing' => __('Needs Second Viewing'),
         ];
     }
 

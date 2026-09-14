@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', __('Showing Details'))
-@section('page-title', __('Showing Details'))
+@section('title', __('Viewing Details'))
+@section('page-title', __('Viewing Details'))
 
 @section('content')
 <div class="row">
@@ -9,10 +9,10 @@
         {{-- Showing Details --}}
         <div class="card mb-3">
             <div class="card-header">
-                <h3 class="card-title">{{ __('Showing Information') }}</h3>
+                <h3 class="card-title">{{ __('Viewing Information') }}</h3>
                 <div class="card-actions">
                     <a href="{{ route('showings.edit', $showing) }}" class="btn btn-sm btn-outline-primary">{{ __('Edit') }}</a>
-                    <form method="POST" action="{{ route('showings.destroy', $showing) }}" class="d-inline" onsubmit="return confirm('{{ __('Delete this showing?') }}')">
+                    <form method="POST" action="{{ route('showings.destroy', $showing) }}" class="d-inline" onsubmit="return confirm('{{ __('Delete this viewing?') }}')">
                         @csrf @method('DELETE')
                         <button type="submit" class="btn btn-sm btn-outline-danger">{{ __('Delete') }}</button>
                     </form>

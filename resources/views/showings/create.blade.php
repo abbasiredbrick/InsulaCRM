@@ -1,12 +1,12 @@
 @extends('layouts.app')
 
-@section('title', __('Schedule Showing'))
-@section('page-title', __('Schedule Showing'))
+@section('title', __('Schedule Viewing'))
+@section('page-title', __('Schedule Viewing'))
 
 @section('content')
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">{{ __('Schedule a Property Showing') }}</h3>
+        <h3 class="card-title">{{ __('Schedule a Property Viewing') }}</h3>
     </div>
     <div class="card-body">
         <form method="POST" action="{{ route('showings.store') }}">
@@ -26,16 +26,16 @@
                     @error('lead_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">{{ __('Client') }}</label>
-                    <select name="lead_id" class="form-select @error('lead_id') is-invalid @enderror">
-                        <option value="">{{ __('Select client (optional)...') }}</option>
-                        @foreach($leads as $lead)
-                            <option value="{{ $lead->id }}" {{ old('lead_id') == $lead->id ? 'selected' : '' }}>
-                                {{ $lead->first_name }} {{ $lead->last_name }}
+                    <label class="form-label">{{ __('Property') }}</label>
+                    <select name="property_id" class="form-select @error('property_id') is-invalid @enderror">
+                        <option value="">{{ __('Select property (optional)...') }}</option>
+                        @foreach($properties as $property)
+                            <option value="{{ $property->id }}" {{ old('property_id') == $property->id ? 'selected' : '' }}>
+                                {{ $property->address }}
                             </option>
                         @endforeach
                     </select>
-                    @error('lead_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
             </div>
 
@@ -83,7 +83,7 @@
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">{{ __('Schedule Showing') }}</button>
+                <button type="submit" class="btn btn-primary">{{ __('Schedule Viewing') }}</button>
                 <a href="{{ route('showings.index') }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
             </div>
         </form>

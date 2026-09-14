@@ -34,7 +34,7 @@ class LeadLifecycleTest extends TestCase
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
             'type' => 'meeting',
-            'subject' => 'Showing scheduled',
+            'subject' => 'Viewing scheduled',
         ]);
     }
 
@@ -104,7 +104,7 @@ class LeadLifecycleTest extends TestCase
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
             'type' => 'meeting',
-            'subject' => 'Showing scheduled',
+            'subject' => 'Viewing scheduled',
         ]);
     }
 
