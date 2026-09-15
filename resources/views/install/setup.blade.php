@@ -46,7 +46,7 @@
             @csrf
             <div class="mb-3">
                 <label class="form-label">{{ __('Application Name') }}</label>
-                <input type="text" name="app_name" class="form-control" value="{{ config('app.name', 'InsulaCRM') }}" required>
+                <input type="text" name="app_name" class="form-control" value="{{ config('app.name', 'Keystone') }}" required>
             </div>
 
             <hr class="my-3">

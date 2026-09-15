@@ -1,5 +1,5 @@
 /**
- * InsulaCRM Native Mobile App & PWA Controller
+ * Keystone Native Mobile App & PWA Controller
  * Handles native bottom sheets, drawers, tactile interactions, live search, and iOS install guidance.
  */
 

@@ -82,8 +82,8 @@ class KnowledgeBaseController extends Controller
                         'title' => __('First Steps After Installation'),
                         'summary' => __('Set up your CRM, configure your company, and invite your team.'),
                         'tags' => ['setup', 'onboarding', 'getting started', 'installation'],
-                        'body' => '<h3>Welcome to InsulaCRM</h3>
-<p>Congratulations on installing InsulaCRM! This guide will walk you through the essential first steps to get your ' . (BusinessModeService::isRealEstate() ? 'real estate brokerage' : 'real estate wholesaling business') . ' up and running.</p>
+                        'body' => '<h3>Welcome to Keystone</h3>
+<p>Congratulations on installing Keystone! This guide will walk you through the essential first steps to get your ' . (BusinessModeService::isRealEstate() ? 'real estate brokerage' : 'real estate wholesaling business') . ' up and running.</p>
 
 <h3>Step 1: Complete the Onboarding Wizard</h3>
 <p>When you first log in as an administrator, you\'ll see the <strong>Onboarding Wizard</strong>. This guided setup helps you configure the essential settings:</p>
@@ -133,11 +133,11 @@ class KnowledgeBaseController extends Controller
                     ],
                     [
                         'slug' => 'updating-insulacrm',
-                        'title' => __('Updating InsulaCRM'),
+                        'title' => __('Updating Keystone'),
                         'summary' => __('How normal upgrades work, what to preserve, and why a reinstall is not required.'),
                         'tags' => ['upgrade', 'update', 'version', 'release', 'maintenance'],
                         'body' => '<h3>Normal Upgrades Do Not Require Reinstalling</h3>
-<p>A standard InsulaCRM upgrade is a file-replacement and migration process, not a fresh installation.</p>
+<p>A standard Keystone upgrade is a file-replacement and migration process, not a fresh installation.</p>
 
 <h3>Before You Upgrade</h3>
 <ul>
@@ -150,9 +150,9 @@ class KnowledgeBaseController extends Controller
 
 <h3>Upgrade Steps</h3>
 <p>The preferred path is now the built-in updater in <strong>Settings &gt; System</strong>.</p>
-<div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Upload the official InsulaCRM release ZIP in the <strong>Safe Update Manager</strong>.</div></div>
+<div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Upload the official Keystone release ZIP in the <strong>Safe Update Manager</strong>.</div></div>
 <div class="kb-step"><span class="kb-step-num">2</span><div class="kb-step-content">Review the staged update warnings before applying it.</div></div>
-<div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content">Click <strong>Snapshot, Backup, and Apply Update</strong>. InsulaCRM will create a fresh database backup and a recovery snapshot automatically before patching the app.</div></div>
+<div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content">Click <strong>Snapshot, Backup, and Apply Update</strong>. Keystone will create a fresh database backup and a recovery snapshot automatically before patching the app.</div></div>
 <div class="kb-step"><span class="kb-step-num">4</span><div class="kb-step-content">The updater preserves <code>.env</code>, <code>storage/</code>, <code>public/storage</code>, and <code>plugins/</code>, then runs migrations and a post-update health check.</div></div>
 <div class="kb-step"><span class="kb-step-num">5</span><div class="kb-step-content">After the staging environment passes, apply the same release to production during a low-risk maintenance window.</div></div>
 <div class="kb-step"><span class="kb-step-num">6</span><div class="kb-step-content">If you cannot use the in-app updater, fall back to the manual file-replacement process from the upgrade guide.</div></div>
@@ -169,14 +169,14 @@ class KnowledgeBaseController extends Controller
 <p>Recovery snapshots are point-in-time restore points created immediately before the update starts. Use them to return the CRM to the last known-good state if an upgrade fails badly.</p>
 <p>The best time to create a snapshot is right before applying the update. That keeps the amount of newer code and data you would lose during a restore as small as possible.</p>
 <p>Administrators can also create manual recovery snapshots from <strong>Settings &gt; System</strong> before risky maintenance, custom development, or major configuration changes.</p>
-<p>When you create, apply, or restore a snapshot or update from the UI, keep the page open until the action finishes. InsulaCRM now shows a waiting overlay and blocks duplicate submits so the same action is not triggered multiple times by accident.</p>
+<p>When you create, apply, or restore a snapshot or update from the UI, keep the page open until the action finishes. Keystone now shows a waiting overlay and blocks duplicate submits so the same action is not triggered multiple times by accident.</p>
 <p>Snapshot restores support both <code>.sql</code> and <code>.sql.gz</code> backups on Windows and Linux. Windows users do not need an external <code>gunzip</code> binary for restores triggered by the product.</p>
 
 <h3>Version &amp; Update Visibility</h3>
 <p>Open <strong>Settings &gt; System</strong> to compare your installed version against the latest release metadata published on the website. The version reported there comes from the root <code>VERSION</code> file packaged with the CRM.</p>
 
 <h3>Installed Marker Recovery</h3>
-<p>If <code>storage/installed.lock</code> is missing but the application still points to the correct production database and that database already contains the expected tenant and user records, InsulaCRM recreates the marker automatically instead of forcing the installer again.</p>
+<p>If <code>storage/installed.lock</code> is missing but the application still points to the correct production database and that database already contains the expected tenant and user records, Keystone recreates the marker automatically instead of forcing the installer again.</p>
 
 <div class="kb-callout-warning kb-callout">
 <strong>Important:</strong> Do not rerun the installer for a normal upgrade. The Safe Update Manager reduces risk, but it does not replace testing production upgrades on staging first when staging is available. Restoring a recovery snapshot also replaces newer code and database changes created after the snapshot time.
@@ -188,7 +188,7 @@ class KnowledgeBaseController extends Controller
                         'summary' => __('How to fix the most common installer blockers such as .env, permissions, and PHP extension issues.'),
                         'tags' => ['installer', 'troubleshooting', 'permissions', '.env', 'php extensions'],
                         'body' => '<h3>Overview</h3>
-<p>If the installer shows <strong>Action Required</strong>, it means InsulaCRM found something the server needs before setup can continue. The most common issues are a missing <code>.env</code> file, unwritable folders, or missing PHP extensions.</p>
+<p>If the installer shows <strong>Action Required</strong>, it means Keystone found something the server needs before setup can continue. The most common issues are a missing <code>.env</code> file, unwritable folders, or missing PHP extensions.</p>
 
 <h3>How to Create the .env File</h3>
 <div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Open the application root and locate <code>.env.example</code>.</div></div>
@@ -215,7 +215,7 @@ chown -R www-data:www-data storage bootstrap/cache plugins</pre>
 <p>If <code>chmod</code> succeeds but the installer still reports the folder as not writable, the remaining problem is ownership rather than mode bits. In that case, the <code>chown</code> step requires sudo or server-admin access.</p>
 
 <h3>How to Enable MySQL PDO</h3>
-<p>InsulaCRM requires the <code>pdo_mysql</code> extension for the guided installer.</p>
+<p>Keystone requires the <code>pdo_mysql</code> extension for the guided installer.</p>
 <h4>Ubuntu / Debian</h4>
 <pre>sudo apt install -y php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '-mysql
 sudo systemctl restart apache2 php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '-fpm</pre>
@@ -238,7 +238,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Understand what each role can access and how to assign them.'),
                         'tags' => ['roles', 'permissions', 'team', 'access control'],
                         'body' => '<h3>Overview</h3>
-<p>InsulaCRM uses a role-based access control system with <strong>' . (BusinessModeService::isRealEstate() ? '4' : '5') . ' system roles</strong> and support for <strong>custom roles</strong>. Each role determines which sections of the CRM a user can see and interact with. Roles are assigned when inviting a user and can be changed by an admin at any time.</p>
+<p>Keystone uses a role-based access control system with <strong>' . (BusinessModeService::isRealEstate() ? '4' : '5') . ' system roles</strong> and support for <strong>custom roles</strong>. Each role determines which sections of the CRM a user can see and interact with. Roles are assigned when inviting a user and can be changed by an admin at any time.</p>
 
 <h3>Role Reference</h3>
 ' . (BusinessModeService::isRealEstate() ? '<table>
@@ -370,7 +370,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <p>Click the <strong>sun/moon icon</strong> in the top-right corner to toggle between light and dark themes. Your preference is saved automatically and persists across sessions.</p>
 
 <h3>Mobile Responsive</h3>
-<p>InsulaCRM is fully responsive. On mobile devices, the sidebar collapses into a hamburger menu. All features work on phones and tablets, including the Kanban boards, forms, and data tables.</p>
+<p>Keystone is fully responsive. On mobile devices, the sidebar collapses into a hamburger menu. All features work on phones and tablets, including the Kanban boards, forms, and data tables.</p>
 
 <h3>Impersonation (Admin)</h3>
 <p>Admins can impersonate any user to troubleshoot issues. Go to <strong>Settings &gt; Team</strong> and click the impersonate icon next to a user. A yellow banner appears at the top of the page while impersonating. Click <strong>Stop Impersonation</strong> to return to your admin account.</p>',
@@ -536,7 +536,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <h3>How to Import</h3>
 <div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Go to <strong>Lists</strong> in the sidebar and click <strong>Import</strong>.</div></div>
 <div class="kb-step"><span class="kb-step-num">2</span><div class="kb-step-content">Upload your CSV file. The system reads the column headers from the first row.</div></div>
-<div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content"><strong>Map columns</strong> &mdash; Match your CSV columns to InsulaCRM fields (first name, last name, phone, email, address, etc.). If AI is enabled, click <strong>AI Suggest Mapping</strong> to auto-detect column mappings.</div></div>
+<div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content"><strong>Map columns</strong> &mdash; Match your CSV columns to Keystone fields (first name, last name, phone, email, address, etc.). If AI is enabled, click <strong>AI Suggest Mapping</strong> to auto-detect column mappings.</div></div>
 <div class="kb-step"><span class="kb-step-num">4</span><div class="kb-step-content">Choose a <strong>list name</strong> to group the imported leads. Optionally set a default source and status.</div></div>
 <div class="kb-step"><span class="kb-step-num">5</span><div class="kb-step-content">Click <strong>Import</strong>. The system processes the file, skips duplicates (based on phone or email), and checks against the DNC list.</div></div>
 
@@ -697,7 +697,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __(BusinessModeService::isRealEstate() ? 'Property records, listing details, and property management.' : 'Property records, field scout submissions, and property details.'),
                         'tags' => BusinessModeService::isRealEstate() ? ['properties', 'listings', 'address', 'photos'] : ['properties', 'field scout', 'address', 'photos'],
                         'body' => '<h3>Overview</h3>
-<p>Properties in InsulaCRM represent physical real estate assets. ' . (BusinessModeService::isRealEstate() ? 'They are linked to leads and track listing details, pricing, and transaction history.' : 'They can be linked to leads (seller properties) or submitted independently by field scouts who find properties while driving for dollars.') . '</p>
+<p>Properties in Keystone represent physical real estate assets. ' . (BusinessModeService::isRealEstate() ? 'They are linked to leads and track listing details, pricing, and transaction history.' : 'They can be linked to leads (seller properties) or submitted independently by field scouts who find properties while driving for dollars.') . '</p>
 
 <h3>Property Fields</h3>
 <table>
@@ -1048,7 +1048,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Export your CRM calendar to Google Calendar, Outlook, or Apple Calendar.'),
                         'tags' => ['calendar', 'sync', 'Google', 'Outlook', 'iCal', 'Apple'],
                         'body' => '<h3>Overview</h3>
-<p>Sync your InsulaCRM tasks and activities with external calendar apps using the standard iCal feed format.</p>
+<p>Sync your Keystone tasks and activities with external calendar apps using the standard iCal feed format.</p>
 
 <h3>Generating Your Feed URL</h3>
 <div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Go to <strong>Calendar</strong> and click the <strong>Sync</strong> button</div></div>
@@ -1072,7 +1072,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content">Paste your feed URL and configure refresh interval</div></div>
 
 <h3>Importing External Calendars</h3>
-<p>You can also import events from an external calendar into InsulaCRM. On the Sync settings page, enter an external iCal URL and click <strong>Import</strong>. Each event is created as a task in your CRM.</p>
+<p>You can also import events from an external calendar into Keystone. On the Sync settings page, enter an external iCal URL and click <strong>Import</strong>. Each event is created as a task in your CRM.</p>
 
 <h3>Disconnecting</h3>
 <p>Click <strong>Disconnect</strong> on the Sync settings page to revoke your feed URL. External calendar apps will no longer receive updates. You can generate a new URL at any time.</p>
@@ -1177,7 +1177,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <tr><td>Timezone</td><td>Used for date display, scheduling, and timezone routing</td></tr>
 <tr><td>Currency</td><td>Display currency for monetary values (USD, EUR, GBP, etc.)</td></tr>
 <tr><td>Date Format</td><td>How dates are displayed throughout the CRM</td></tr>
-<tr><td>Company Logo</td><td>Upload a logo to replace the default InsulaCRM logo in the sidebar</td></tr>
+<tr><td>Company Logo</td><td>Upload a logo to replace the default Keystone logo in the sidebar</td></tr>
 <tr><td>Default Lead Status</td><td>Status assigned to new leads (default: "New")</td></tr>
 </tbody>
 </table>
@@ -1276,11 +1276,11 @@ sudo systemctl restart httpd php-fpm</pre>
 <p>Webhooks support <strong>HMAC signing</strong> for payload verification. Each webhook can be individually enabled/disabled.</p>
 
 <h3>Integration with Zapier</h3>
-<p>Use the REST API with Zapier\'s Webhooks integration to connect InsulaCRM with 5,000+ apps. Common integrations:</p>
+<p>Use the REST API with Zapier\'s Webhooks integration to connect Keystone with 5,000+ apps. Common integrations:</p>
 <ul>
-<li>New lead from Facebook Lead Ads &rarr; Create lead in InsulaCRM</li>
-<li>New lead from Google Forms &rarr; Create lead in InsulaCRM</li>
-<li>Lead status changes in InsulaCRM &rarr; Send Slack notification</li>
+<li>New lead from Facebook Lead Ads &rarr; Create lead in Keystone</li>
+<li>New lead from Google Forms &rarr; Create lead in Keystone</li>
+<li>Lead status changes in Keystone &rarr; Send Slack notification</li>
 </ul>',
                     ],
                     [
@@ -1341,7 +1341,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Configure 2FA enforcement, SSO providers, and related access controls.'),
                         'tags' => ['security', 'SSO', '2FA', 'Google login', 'password'],
                         'body' => '<h3>Two-Factor Authentication</h3>
-<p>InsulaCRM supports TOTP-based two-factor authentication. Users can enable 2FA from their <strong>Profile</strong> page:</p>
+<p>Keystone supports TOTP-based two-factor authentication. Users can enable 2FA from their <strong>Profile</strong> page:</p>
 <div class="kb-step"><span class="kb-step-num">1</span><div class="kb-step-content">Go to <strong>Profile &gt; Two-Factor Authentication</strong></div></div>
 <div class="kb-step"><span class="kb-step-num">2</span><div class="kb-step-content">Scan the QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.)</div></div>
 <div class="kb-step"><span class="kb-step-num">3</span><div class="kb-step-content">Enter the 6-digit code to confirm and activate 2FA</div></div>
@@ -1358,7 +1358,7 @@ sudo systemctl restart httpd php-fpm</pre>
 </table>
 
 <h3>Single Sign-On (SSO)</h3>
-<p>InsulaCRM includes an SSO framework, but SSO providers are added through plugins or custom integrations. That means there are no built-in Google, Microsoft, or Okta sign-in providers in the base package.</p>
+<p>Keystone includes an SSO framework, but SSO providers are added through plugins or custom integrations. That means there are no built-in Google, Microsoft, or Okta sign-in providers in the base package.</p>
 <p>Once an SSO plugin is installed, users can sign in with the provider configured for your tenant. Typical examples include:</p>
 <ul>
 <li><strong>Google</strong> &mdash; Sign in with Google Workspace or personal Gmail</li>
@@ -1368,7 +1368,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <p>Configure SSO in <strong>Settings &gt; Integrations</strong> after installing the relevant provider plugin. You\'ll need the provider\'s client credentials and callback configuration required by that plugin.</p>
 
 <h3>Security Headers</h3>
-<p>InsulaCRM automatically sends security headers on every response:</p>
+<p>Keystone automatically sends security headers on every response:</p>
 <ul>
 <li><code>X-Content-Type-Options: nosniff</code></li>
 <li><code>X-Frame-Options: SAMEORIGIN</code></li>
@@ -1382,7 +1382,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Configure local or S3-compatible cloud storage for files and photos.'),
                         'tags' => ['storage', 'S3', 'cloud', 'files', 'uploads', 'DigitalOcean', 'MinIO'],
                         'body' => '<h3>Storage Drivers</h3>
-<p>Configure file storage in <strong>Settings &gt; Storage</strong>. InsulaCRM supports two storage drivers:</p>
+<p>Configure file storage in <strong>Settings &gt; Storage</strong>. Keystone supports two storage drivers:</p>
 
 <h4>Local Storage (Default)</h4>
 <p>Files are stored on the server filesystem in the <code>storage/app/public</code> directory. This is the simplest option and requires no additional configuration.</p>
@@ -1452,7 +1452,7 @@ sudo systemctl restart httpd php-fpm</pre>
 <li><strong>Regular backups</strong> &mdash; Create backups before making major changes (bulk imports, plugin installations, updates)</li>
 <li><strong>Offsite copies</strong> &mdash; Always download backups and store them somewhere other than the server (cloud storage, external drive, another server)</li>
 <li><strong>Test restores</strong> &mdash; Periodically verify that your backups can be restored successfully</li>
-<li><strong>Before updates</strong> &mdash; Always backup before updating InsulaCRM</li>
+<li><strong>Before updates</strong> &mdash; Always backup before updating Keystone</li>
 <li><strong>Before risky changes</strong> &mdash; Use a manual recovery snapshot in <strong>Settings &gt; System</strong> when you need a point-in-time restore package, not just a database backup</li>
 </ul>
 
@@ -1466,7 +1466,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Export and anonymize user and contact data for privacy compliance.'),
                         'tags' => ['GDPR', 'privacy', 'data export', 'anonymize', 'compliance', 'right to erasure'],
                         'body' => '<h3>Overview</h3>
-<p>InsulaCRM provides built-in tools to help you comply with GDPR and other data protection regulations. Access these in <strong>Settings &gt; GDPR</strong>.</p>
+<p>Keystone provides built-in tools to help you comply with GDPR and other data protection regulations. Access these in <strong>Settings &gt; GDPR</strong>.</p>
 
 <h3>Available Tools</h3>
 
@@ -1518,7 +1518,7 @@ sudo systemctl restart httpd php-fpm</pre>
 </ul>
 
 <h3>Language & Localization</h3>
-<p>InsulaCRM supports multiple languages. Manage translations in <strong>Settings &gt; Languages</strong>:</p>
+<p>Keystone supports multiple languages. Manage translations in <strong>Settings &gt; Languages</strong>:</p>
 
 <h4>Viewing Available Languages</h4>
 <p>The language manager lists all installed language files with their completion percentage.</p>
@@ -1548,10 +1548,10 @@ sudo systemctl restart httpd php-fpm</pre>
                     [
                         'slug' => 'plugin-system',
                         'title' => __('Plugin System Overview'),
-                        'summary' => __('Extend InsulaCRM with plugins for SMS, integrations, and custom features.'),
+                        'summary' => __('Extend Keystone with plugins for SMS, integrations, and custom features.'),
                         'tags' => ['plugins', 'extensions', 'hooks', 'customization'],
                         'body' => '<h3>Overview</h3>
-<p>InsulaCRM has a powerful plugin system that lets you extend functionality without modifying core code. Plugins can add new pages, sidebar menu items, dashboard widgets, settings tabs, and hook into CRM events.</p>
+<p>Keystone has a powerful plugin system that lets you extend functionality without modifying core code. Plugins can add new pages, sidebar menu items, dashboard widgets, settings tabs, and hook into CRM events.</p>
 
 <h3>Managing Plugins</h3>
 <p>Go to <strong>Plugins</strong> in the sidebar (admin only) to see all installed plugins. Each plugin shows:</p>
@@ -1613,7 +1613,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Access captured error logs, export bug reports, and send them to support.'),
                         'tags' => ['errors', 'bugs', 'troubleshooting', 'support', 'debug'],
                         'body' => '<h3>Automatic Error Capture</h3>
-<p>InsulaCRM automatically captures all application errors and logs them to the <strong>Bug Reports</strong> page. When something goes wrong, the system records:</p>
+<p>Keystone automatically captures all application errors and logs them to the <strong>Bug Reports</strong> page. When something goes wrong, the system records:</p>
 <ul>
 <li>Error message and exception type</li>
 <li>File and line number where the error occurred</li>
@@ -1745,7 +1745,7 @@ sudo systemctl restart httpd php-fpm</pre>
                         'summary' => __('Set up the server cron job and understand what runs automatically.'),
                         'tags' => ['cron', 'schedule', 'automation', 'server', 'artisan'],
                         'body' => '<h3>Setting Up the Cron Job</h3>
-<p>InsulaCRM requires a single cron entry on your server to run all scheduled tasks. Add this to your server\'s crontab:</p>
+<p>Keystone requires a single cron entry on your server to run all scheduled tasks. Add this to your server\'s crontab:</p>
 <pre style="background: rgba(98,105,118,.08); padding: 0.75rem; border-radius: 4px; font-size: 0.85rem;"><code>* * * * * cd /path/to/insulacrm && php artisan schedule:run >> /dev/null 2>&1</code></pre>
 <p>Replace <code>/path/to/insulacrm</code> with the actual path to your installation.</p>
 
@@ -1777,10 +1777,10 @@ sudo systemctl restart httpd php-fpm</pre>
         ];
 
         $appName = config('app.name');
-        if ($appName !== 'InsulaCRM') {
+        if ($appName !== 'Keystone') {
             array_walk_recursive($articles, function (&$value) use ($appName) {
                 if (is_string($value)) {
-                    $value = str_replace('InsulaCRM', $appName, $value);
+                    $value = str_replace('Keystone', $appName, $value);
                 }
             });
         }

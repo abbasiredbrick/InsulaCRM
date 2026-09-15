@@ -6,12 +6,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if ! command -v php >/dev/null 2>&1; then
-  echo "PHP is required to run the InsulaCRM installer."
+  echo "PHP is required to run the Keystone installer."
   exit 1
 fi
 
 if [[ ! -f artisan ]]; then
-  echo "Run this script from an extracted InsulaCRM release."
+  echo "Run this script from an extracted Keystone release."
   exit 1
 fi
 
@@ -53,7 +53,7 @@ secret_prompt() {
   echo "$value"
 }
 
-APP_NAME="$(prompt "Application name" "InsulaCRM")"
+APP_NAME="$(prompt "Application name" "Keystone")"
 APP_URL="$(prompt "Application URL" "http://localhost")"
 COMPANY_NAME="$(prompt "Company name")"
 ADMIN_NAME="$(prompt "Administrator name")"
@@ -61,7 +61,7 @@ ADMIN_EMAIL="$(prompt "Administrator email")"
 ADMIN_PASSWORD="$(secret_prompt "Administrator password")"
 DB_HOST="$(prompt "Database host" "127.0.0.1")"
 DB_PORT="$(prompt "Database port" "3306")"
-DB_NAME="$(prompt "Database name" "insulacrm")"
+DB_NAME="$(prompt "Database name" "keystone")"
 DB_USER="$(prompt "Database username" "root")"
 DB_PASSWORD="$(secret_prompt "Database password (leave blank if none)")"
 
@@ -122,7 +122,7 @@ echo
 echo "Running a post-install health check..."
 php artisan system:doctor || true
 echo
-echo "InsulaCRM installation completed."
+echo "Keystone installation completed."
 echo "Next steps:"
 echo "  1. Point your web root at the public/ directory."
 echo "  2. Add the Laravel scheduler cron entry."

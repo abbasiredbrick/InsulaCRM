@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-    <title>{{ __('Server Error') }} - {{ config('app.name', 'InsulaCRM') }}</title>
+    <title>{{ __('Server Error') }} - {{ config('app.name', 'Keystone') }}</title>
     <link rel="icon" type="image/png" href="{{ asset('images/favicon.png') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
 </head>
@@ -51,7 +51,7 @@
                 </div>
             </div>
             <div class="text-center text-muted mt-3 small">
-                {{ config('app.name', 'InsulaCRM') }}
+                {{ config('app.name', 'Keystone') }}
             </div>
         </div>
     </div>

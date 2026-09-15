@@ -11,11 +11,11 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var APP_ASSET_VERSION = '1.2.0';
+var APP_ASSET_VERSION = '1.2.1';
 var CACHE_VERSION = 'v' + APP_ASSET_VERSION;
-var STATIC_CACHE = 'insulacrm-static-' + CACHE_VERSION;
-var DYNAMIC_CACHE = 'insulacrm-dynamic-' + CACHE_VERSION;
-var APP_SHELL_CACHE = 'insulacrm-app-shell-' + CACHE_VERSION;
+var STATIC_CACHE = 'keystone-static-' + CACHE_VERSION;
+var DYNAMIC_CACHE = 'keystone-dynamic-' + CACHE_VERSION;
+var APP_SHELL_CACHE = 'keystone-app-shell-' + CACHE_VERSION;
 
 // Derive base path from service worker location (supports subdirectory installs)
 var BASE_PATH = self.location.pathname.replace(/\/service-worker\.js$/, '') + '/';
@@ -84,7 +84,7 @@ self.addEventListener('activate', function(event) {
         caches.keys().then(function(cacheNames) {
             return Promise.all(
                 cacheNames.filter(function(name) {
-                    return name.startsWith('insulacrm-') && name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== APP_SHELL_CACHE;
+                    return (name.startsWith('insulacrm-') || name.startsWith('keystone-')) && name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== APP_SHELL_CACHE;
                 }).map(function(name) {
                     return caches.delete(name);
                 })
@@ -183,7 +183,7 @@ function networkFirstWithAppShellFallback(request) {
             return caches.match(BASE_PATH + 'offline').then(function(fallback) {
                 if (fallback) return fallback;
                 // Return minimal app shell
-                return new Response('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0054a6"><link rel="manifest" href="/manifest.json"></head><body class="p-4"><h1>InsulaCRM</h1><p>Working offline</p></body></html>', {
+                return new Response('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0054a6"><link rel="manifest" href="/manifest.json"></head><body class="p-4"><h1>Keystone</h1><p>Working offline</p></body></html>', {
                     status: 200,
                     headers: { 'Content-Type': 'text/html', 'Content-Encoding': 'gzip' }
                 });

@@ -56,7 +56,7 @@ class TotpService
      */
     public function getQrUri(string $secret, string $email, ?string $issuer = null): string
     {
-        $issuer = $issuer ?? config('app.name', 'InsulaCRM');
+        $issuer = $issuer ?? config('app.name', 'Keystone');
 
         return sprintf(
             'otpauth://totp/%s:%s?secret=%s&issuer=%s&digits=6&period=30',

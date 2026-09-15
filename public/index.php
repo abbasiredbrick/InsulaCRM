@@ -25,12 +25,12 @@ if (! function_exists('insulaRenderPreflightError')) {
         }
 
         echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
-            . '<title>InsulaCRM Setup Check</title><style>'
+            . '<title>Keystone Setup Check</title><style>'
             . 'body{margin:0;padding:32px;font:16px/1.6 Arial,sans-serif;background:#f5f1e8;color:#1e1e1e;}'
             . '.panel{max-width:760px;margin:0 auto;background:#fff;border:1px solid #d9d0c1;border-radius:16px;padding:32px;box-shadow:0 12px 32px rgba(0,0,0,.08);}'
             . 'h1{margin-top:0;font-size:28px;}code,pre{background:#f4f4f4;border-radius:6px;}code{padding:2px 6px;}pre{padding:14px;overflow:auto;}'
             . 'ul{padding-left:20px;}'
-            . '</style></head><body><div class="panel"><h1>InsulaCRM cannot start yet</h1>'
+            . '</style></head><body><div class="panel"><h1>Keystone cannot start yet</h1>'
             . '<p>The web server cannot write one or more required paths, so Laravel cannot boot the installer safely.</p>'
             . '<ul>' . $issueItems . '</ul>'
             . '<p>Fix the permissions for <code>storage/</code> and <code>bootstrap/cache</code>, then refresh this page.</p>'

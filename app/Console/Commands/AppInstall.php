@@ -25,7 +25,7 @@ class AppInstall extends Command
         {--load-demo-data : Seed optional demo data after install}
         {--force : Continue even if the app already appears installed}';
 
-    protected $description = 'Install InsulaCRM from the command line using the current or supplied environment settings';
+    protected $description = 'Install Keystone from the command line using the current or supplied environment settings';
 
     public function handle(InstallerService $installer): int
     {
@@ -36,7 +36,7 @@ class AppInstall extends Command
         }
 
         $payload = [
-            'app_name' => $this->option('app-name') ?: $this->ask('Application name', 'InsulaCRM'),
+            'app_name' => $this->option('app-name') ?: $this->ask('Application name', 'Keystone'),
             'app_url' => $this->option('app-url') ?: $this->ask('Application URL', config('app.url')),
             'company_name' => $this->option('company-name') ?: $this->ask('Company name'),
             'admin_name' => $this->option('admin-name') ?: $this->ask('Administrator name'),

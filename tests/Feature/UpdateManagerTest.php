@@ -34,7 +34,7 @@ class UpdateManagerTest extends TestCase
         File::makeDirectory(config('update-manager.install_root') . '/plugins/custom-plugin', 0755, true);
         File::makeDirectory(config('update-manager.install_root') . '/app', 0755, true);
 
-        File::put(config('update-manager.install_root') . '/.env', "APP_NAME=InsulaCRM\nAPP_KEY=base64:test\n");
+        File::put(config('update-manager.install_root') . '/.env', "APP_NAME=Keystone\nAPP_KEY=base64:test\n");
         File::put(config('update-manager.install_root') . '/VERSION', '1.0.1');
         File::put(config('update-manager.install_root') . '/storage/app/public/data.txt', 'keep-me');
         File::put(config('update-manager.install_root') . '/plugins/custom-plugin/plugin.json', '{"name":"Custom"}');
@@ -98,7 +98,7 @@ class UpdateManagerTest extends TestCase
         $this->assertNotNull($prepared->snapshot_created_at);
         $this->assertFileExists($prepared->snapshot_archive_path);
         $this->assertFileExists($prepared->snapshot_manifest_path);
-        $this->assertStringContainsString('APP_NAME=InsulaCRM', File::get(config('update-manager.install_root') . '/.env'));
+        $this->assertStringContainsString('APP_NAME=Keystone', File::get(config('update-manager.install_root') . '/.env'));
         $this->assertSame('keep-me', File::get(config('update-manager.install_root') . '/storage/app/public/data.txt'));
         $this->assertFileExists(config('update-manager.install_root') . '/plugins/custom-plugin/plugin.json');
         $this->assertFileDoesNotExist(config('update-manager.install_root') . '/plugins/hello-world/plugin.json');

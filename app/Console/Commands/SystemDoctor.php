@@ -11,7 +11,7 @@ class SystemDoctor extends Command
 {
     protected $signature = 'system:doctor {--json : Output the report as JSON} {--strict : Return a non-zero exit code when any critical check fails}';
 
-    protected $description = 'Run installation and runtime health checks for this InsulaCRM instance';
+    protected $description = 'Run installation and runtime health checks for this Keystone instance';
 
     public function handle(): int
     {

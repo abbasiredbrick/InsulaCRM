@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# InsulaCRM manual deployment helper
+# Keystone manual deployment helper
 #
 # Usage:
 #   bash scripts/deploy.sh [--skip-migrate] [--skip-fpm-reload]
@@ -32,7 +32,7 @@ cd "$(dirname "$0")/.."
 PHP=${PHP_BINARY:-php}
 
 echo ""
-echo "==> InsulaCRM deployment"
+echo "==> Keystone deployment"
 echo "    Root: $(pwd)"
 echo ""
 

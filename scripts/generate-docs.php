@@ -73,7 +73,7 @@ foreach ($documents as $document) {
 $indexHtml = renderDocument(
     'Documentation',
     buildNavigation($documents, ''),
-    '<h1>InsulaCRM Documentation</h1><p>Use the links in the sidebar to browse the documentation included with this release.</p>'
+    '<h1>Keystone Documentation</h1><p>Use the links in the sidebar to browse the documentation included with this release.</p>'
 );
 
 if (file_put_contents($outputDir . '/index.html', $indexHtml) === false) {
@@ -143,7 +143,7 @@ function renderDocument(string $title, string $navigation, string $htmlBody): st
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{$safeTitle} | InsulaCRM</title>
+    <title>{$safeTitle} | Keystone</title>
     <style>
         :root {
             color-scheme: light;
@@ -301,7 +301,7 @@ function renderDocument(string $title, string $navigation, string $htmlBody): st
 <body>
     <div class="layout">
         <aside class="sidebar">
-            <h1>InsulaCRM Docs</h1>
+            <h1>Keystone Docs</h1>
             <p>Documentation included with this release.</p>
             {$navigation}
         </aside>
