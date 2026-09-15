@@ -358,7 +358,7 @@ class InstallController extends Controller
             config([
                 'database.connections.mysql.host' => $envValues['DB_HOST'] ?? '127.0.0.1',
                 'database.connections.mysql.port' => $envValues['DB_PORT'] ?? '3306',
-                'database.connections.mysql.database' => $envValues['DB_DATABASE'] ?? 'insulacrm',
+                'database.connections.mysql.database' => $envValues['DB_DATABASE'] ?? 'keystone',
                 'database.connections.mysql.username' => $envValues['DB_USERNAME'] ?? 'root',
                 'database.connections.mysql.password' => $envValues['DB_PASSWORD'] ?? '',
             ]);

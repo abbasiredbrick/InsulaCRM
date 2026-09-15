@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Table density toggle
 (function() {
-    var STORAGE_KEY = 'insulacrm_table_density';
+    var STORAGE_KEY = 'keystone_table_density';
     var table = document.querySelector('.table.card-table');
     if (!table) return;
 

@@ -68,7 +68,7 @@
             </div>
             <div class="mb-3">
                 <label class="form-label">{{ __('Database Name') }}</label>
-                <input type="text" name="db_database" id="db_database" class="form-control" value="{{ old('db_database', 'insulacrm') }}" required>
+                <input type="text" name="db_database" id="db_database" class="form-control" value="{{ old('db_database', 'keystone') }}" required>
                 <small class="form-hint">{{ __('Use the database already created for this app, or enter a new name if your MariaDB account can create databases.') }}</small>
             </div>
             <div class="mb-3">
@@ -96,7 +96,7 @@
                         <div class="row">
                             <div class="col-md-6 mb-2">
                                 <label class="form-label">{{ __('New Username') }}</label>
-                                <input type="text" name="secure_username" id="secure_username" class="form-control" value="{{ old('secure_username', 'insulacrm') }}">
+                                <input type="text" name="secure_username" id="secure_username" class="form-control" value="{{ old('secure_username', 'keystone') }}">
                                 <small class="form-hint">{{ __('The username for the new database user.') }}</small>
                             </div>
                             <div class="col-md-6 mb-2">
@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
     dbNameInput.addEventListener('input', function() {
         if (secureUsernameInput && !secureUsernameInput.dataset.userEdited) {
             var base = dbNameInput.value.replace(/[^a-zA-Z0-9_]/g, '').substring(0, 16);
-            secureUsernameInput.value = base || 'insulacrm';
+            secureUsernameInput.value = base || 'keystone';
         }
     });
 

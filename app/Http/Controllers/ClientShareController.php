@@ -33,7 +33,7 @@ class ClientShareController extends Controller
 
     protected function cookieName(Tenant $tenant): string
     {
-        return 'insulacrm_share_'.$tenant->id;
+        return 'keystone_share_'.$tenant->id;
     }
 
     /**

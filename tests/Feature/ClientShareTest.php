@@ -53,7 +53,7 @@ class ClientShareTest extends TestCase
     protected function shareCookie($response): object
     {
         return collect($response->headers->getCookies())->first(function ($cookie) {
-            return str_starts_with($cookie->getName(), 'insulacrm_share');
+            return str_starts_with($cookie->getName(), 'keystone_share');
         });
     }
 

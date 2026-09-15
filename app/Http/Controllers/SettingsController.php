@@ -248,7 +248,7 @@ class SettingsController extends Controller
             // Build a temporary S3 disk and attempt to write/read/delete a test file
             $disk = \Illuminate\Support\Facades\Storage::build($config);
 
-            $testFile = '.insulacrm-connection-test-'.uniqid();
+            $testFile = '.keystone-connection-test-'.uniqid();
             $disk->put($testFile, 'ok');
             $content = $disk->get($testFile);
             $disk->delete($testFile);

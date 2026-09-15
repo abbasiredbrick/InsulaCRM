@@ -132,7 +132,7 @@ class KnowledgeBaseController extends Controller
 </div>',
                     ],
                     [
-                        'slug' => 'updating-insulacrm',
+                        'slug' => 'updating-keystone',
                         'title' => __('Updating Keystone'),
                         'summary' => __('How normal upgrades work, what to preserve, and why a reinstall is not required.'),
                         'tags' => ['upgrade', 'update', 'version', 'release', 'maintenance'],
@@ -1746,8 +1746,8 @@ sudo systemctl restart httpd php-fpm</pre>
                         'tags' => ['cron', 'schedule', 'automation', 'server', 'artisan'],
                         'body' => '<h3>Setting Up the Cron Job</h3>
 <p>Keystone requires a single cron entry on your server to run all scheduled tasks. Add this to your server\'s crontab:</p>
-<pre style="background: rgba(98,105,118,.08); padding: 0.75rem; border-radius: 4px; font-size: 0.85rem;"><code>* * * * * cd /path/to/insulacrm && php artisan schedule:run >> /dev/null 2>&1</code></pre>
-<p>Replace <code>/path/to/insulacrm</code> with the actual path to your installation.</p>
+<pre style="background: rgba(98,105,118,.08); padding: 0.75rem; border-radius: 4px; font-size: 0.85rem;"><code>* * * * * cd /path/to/keystone && php artisan schedule:run >> /dev/null 2>&1</code></pre>
+ <p>Replace <code>/path/to/keystone</code> with the actual path to your installation.</p>
 
 <h3>Scheduled Commands</h3>
 <table>
