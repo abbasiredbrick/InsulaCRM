@@ -14,7 +14,10 @@
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-        navigator.serviceWorker.register('{{ asset("service-worker.js") }}', { scope: '{{ url("/") }}/' })
+        navigator.serviceWorker.register('{{ asset("service-worker.js") }}', {
+            scope: '{{ url("/") }}/',
+            updateViaCache: 'none'
+        })
             .then(function(registration) {
                 // Check for updates periodically
                 registration.addEventListener('updatefound', function() {

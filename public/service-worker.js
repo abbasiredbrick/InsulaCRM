@@ -11,7 +11,8 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var CACHE_VERSION = 'v1.4.0';
+var APP_ASSET_VERSION = '1.2.0';
+var CACHE_VERSION = 'v' + APP_ASSET_VERSION;
 var STATIC_CACHE = 'insulacrm-static-' + CACHE_VERSION;
 var DYNAMIC_CACHE = 'insulacrm-dynamic-' + CACHE_VERSION;
 var APP_SHELL_CACHE = 'insulacrm-app-shell-' + CACHE_VERSION;
@@ -20,11 +21,13 @@ var APP_SHELL_CACHE = 'insulacrm-app-shell-' + CACHE_VERSION;
 var BASE_PATH = self.location.pathname.replace(/\/service-worker\.js$/, '') + '/';
 
 // App shell resources to cache on install (HTML, CSS, JS)
+// Versioned URLs MUST match the ?v= querystrings emitted in layouts/app.blade.php
+// so cache-first serves the fresh files after a deploy.
 var APP_SHELL = [
     BASE_PATH + 'offline',
-    BASE_PATH + 'css/mobile.css',
-    BASE_PATH + 'css/mobile-app.css',
-    BASE_PATH + 'js/mobile-app.js',
+    BASE_PATH + 'css/mobile.css?v=' + APP_ASSET_VERSION,
+    BASE_PATH + 'css/mobile-app.css?v=' + APP_ASSET_VERSION,
+    BASE_PATH + 'js/mobile-app.js?v=' + APP_ASSET_VERSION,
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css',
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler-vendors.min.css',
     'https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js',

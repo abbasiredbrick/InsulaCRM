@@ -30,8 +30,8 @@
             color: #fff !important;
         }
     </style>
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/mobile-app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') . '?v=' . config('app.version') }}">
+    <link rel="stylesheet" href="{{ asset('css/mobile-app.css') . '?v=' . config('app.version') }}">
     @include('layouts._pwa')
     @stack('styles')
     <script>
@@ -705,8 +705,12 @@
 
             if (e.key === '/') {
                 e.preventDefault();
-                var searchInput = document.getElementById('global-search-input');
-                if (searchInput) searchInput.focus();
+                if (window.matchMedia('(max-width: 991.98px)').matches && window.MobileApp) {
+                    MobileApp.openSearch();
+                } else {
+                    var searchInput = document.getElementById('global-search-input');
+                    if (searchInput) searchInput.focus();
+                }
             } else if (e.key === 'c') {
                 window.location.href = '{{ route("leads.create") }}';
             } else if (e.key === 'j' || e.key === 'k') {
@@ -785,7 +789,7 @@
     }
     .notif-unread { background: var(--tblr-bg-surface-secondary, #f0f6ff); border-left: 3px solid var(--tblr-primary, #206bc4); }
     </style>
-    <script src="{{ asset('js/mobile-app.js') }}"></script>
+    <script src="{{ asset('js/mobile-app.js') . '?v=' . config('app.version') }}"></script>
     @include('layouts._broadcasting')
 </body>
 </html>

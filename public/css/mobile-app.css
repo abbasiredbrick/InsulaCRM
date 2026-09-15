@@ -14,9 +14,11 @@
 }
 
 /* ==========================================================================
-   MOBILE LAYOUT (< 768px)  — full native app experience
+   MOBILE/APP LAYOUT (< 992px)  — full native app experience
+   Native shell covers phones AND tablets; desktop chrome only at lg+ (992px)
+   where Tabler's vertical sidebar is active.
    ========================================================================== */
-@media (max-width: 767.98px) {
+@media (max-width: 991.98px) {
 
     /* ── Touch optimizations ── */
     html, body {
@@ -33,29 +35,39 @@
     }
 
     /* ─────────────────────────────────────────────────────────────────
-       HIDE ALL DESKTOP CHROME — sidebar, page-header toolbar, top bar
+       HIDE ALL DESKTOP CHROME — sidebar, page-header toolbar, top bar,
+       desktop quick-add FAB. Absolutely nothing from the desktop UI may
+       render inside the native app shell.
        ───────────────────────────────────────────────────────────────── */
 
-    /* Tabler vertical sidebar */
+    /* Tabler vertical sidebar (btw. Tabler collapses it below lg anyway) */
     aside.navbar-vertical,
     .navbar-vertical.navbar-expand-lg {
         display: none !important;
     }
 
-    /* Desktop page-header (contains page title, search, user dropdown, breadcrumbs) */
+    /* Desktop page-header (page title, search, user dropdown, breadcrumbs) */
+    .page-wrapper .page-header,
     .page-header.d-print-none {
         display: none !important;
     }
 
-    /* Reset page-wrapper left offset injected by Tabler for sidebar width */
+    /* Desktop quick-add FAB — replaced by the native bottom-nav + button */
+    #quick-add-fab {
+        display: none !important;
+    }
+
+    /* Reset page-wrapper left offset injected by Tabler for the sidebar width */
     .page-wrapper {
         margin-left: 0 !important;
         padding-left: 0 !important;
     }
 
-    /* The outer .page flex container — stop Tabler from applying sidebar spacing */
+    /* The outer .page flex container — stop Tabler's horizontal sidebar spacing */
     .page {
         flex-direction: column !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
 
     /* ── Container padding for native edge-to-edge feel ── */
@@ -120,9 +132,11 @@
 }
 
 /* ==========================================================================
-   DESKTOP / TABLET (>= 768px) — hide all mobile-only shell elements
+   DESKTOP (>= 992px) — hide all mobile-only shell elements.
+   Tabler's vertical sidebar only appears at lg (992px)+, so the native
+   mobile shell is what you see everywhere below that.
    ========================================================================== */
-@media (min-width: 768px) {
+@media (min-width: 992px) {
     .mobile-only-header,
     .mobile-only-bottom-nav,
     .mobile-bottom-sheet,

@@ -251,11 +251,14 @@
             var notifDot = document.getElementById('mobile-notif-dot');
             var desktopBadge = document.getElementById('notif-badge');
 
+            function sync() {
+                var hasUnread = desktopBadge.style.display !== 'none' && (parseInt(desktopBadge.textContent) || 0) > 0;
+                notifDot.style.display = hasUnread ? 'block' : 'none';
+            }
+
             if (notifDot && desktopBadge) {
-                var observer = new MutationObserver(function() {
-                    var hasUnread = desktopBadge.style.display !== 'none' && (parseInt(desktopBadge.textContent) || 0) > 0;
-                    notifDot.style.display = hasUnread ? 'block' : 'none';
-                });
+                sync();
+                var observer = new MutationObserver(sync);
                 observer.observe(desktopBadge, { attributes: true, childList: true, characterData: true });
             }
         },
