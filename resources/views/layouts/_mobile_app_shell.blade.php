@@ -145,6 +145,10 @@
     </div>
 </nav>
 
+<!-- iOS-style Bottom Action Bar (mobile only) — primary form actions
+     promoted here, pinned above the bottom nav. Populated by mobile-app.js. -->
+<div id="mobile-action-bar" class="mobile-action-bar" hidden></div>
+
 <!-- Backdrop Overlay for Mobile Sheets -->
 <div id="mobile-sheet-backdrop" class="mobile-backdrop" onclick="MobileApp.closeAllSheets()"></div>
 

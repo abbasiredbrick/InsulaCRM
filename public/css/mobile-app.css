@@ -230,6 +230,78 @@
     .steps {
         flex-wrap: wrap;
     }
+
+    /* ─────────────────────────────────────────────
+       Native-look page surface (mobile)
+       Touch-friendly controls + consistent iOS-style
+       bottom action bar for form submit actions.
+       ───────────────────────────────────────────── */
+
+    /* Softer, more "app" cards */
+    .card {
+        border-radius: 14px;
+    }
+
+    /* Native touch targets on form controls (keep the small
+       variants used in search/filters and header rows) */
+    form .form-control:not(.form-control-sm),
+    form .form-select:not(.form-select-sm) {
+        font-size: 16px;
+        min-height: 44px;
+    }
+    form .input-group .form-control:not(.form-control-sm),
+    form .input-group .form-select:not(.form-select-sm) {
+        min-height: 44px;
+    }
+
+    /* Hide the in-place button strip once it has been promoted
+       into the bottom action bar */
+    .mobile-duplicate {
+        display: none !important;
+    }
+
+    /* iOS-style bottom action bar, pinned above the tab bar */
+    .mobile-action-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+        z-index: 1039;
+        display: flex;
+        gap: 0.6rem;
+        padding: 0.65rem 0.9rem;
+        background: rgba(255, 255, 255, 0.97);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+    }
+    [data-bs-theme="dark"] .mobile-action-bar {
+        background: rgba(27, 36, 48, 0.97);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .mobile-action-bar .btn {
+        flex: 1 1 0;
+        min-height: 48px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0;
+    }
+    .mobile-action-bar .btn-primary {
+        flex: 1.5 1 0;
+    }
+    .mobile-action-bar .btn .icon + span {
+        margin-left: 0.4rem;
+    }
+
+    /* Extra scroll room once the action bar is present */
+    body.has-mobile-action-bar {
+        padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 88px) !important;
+    }
 }
 
 /* ==========================================================================
@@ -240,6 +312,7 @@
 @media (min-width: 992px) {
     .mobile-only-header,
     .mobile-only-bottom-nav,
+    .mobile-action-bar,
     .mobile-bottom-sheet,
     .mobile-drawer,
     .mobile-backdrop,

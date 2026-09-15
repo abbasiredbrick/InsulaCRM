@@ -29,8 +29,74 @@
 
             this.setupTouchGestures();
             this.setupSearch();
+            this.setupActionBars();
             this.syncNotifications();
             this.checkIosInstallGuide();
+        },
+
+        /**
+         * iOS-style bottom action bar.
+         * Promotes the primary submit buttons (and their Cancel/Back peers)
+         * of the page's main visible form into a fixed bar pinned above the
+         * bottom nav, so every form gets a consistent native action footer.
+         * The originals stay in the DOM (hidden on mobile only).
+         */
+        setupActionBars: function() {
+            var bar = document.getElementById('mobile-action-bar');
+            if (!bar || bar.dataset.promoted) return;
+
+            var isMobile = window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches;
+            if (!isMobile) return;
+
+            var forms = Array.prototype.slice.call(document.querySelectorAll('form'))
+                .filter(function(form) {
+                    if (form.hidden) return false;
+                    if (form.closest('.modal, .mobile-bottom-sheet, .mobile-drawer, .mobile-search-sheet, #mobile-action-bar')) return false;
+                    var rect = form.getBoundingClientRect();
+                    return rect.width > 0 && rect.height > 0;
+                });
+
+            for (var i = 0; i < forms.length; i++) {
+                if (this.promoteForm(forms[i], bar)) return;
+            }
+        },
+
+        promoteForm: function(form, bar) {
+            var submitButtons = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"]'));
+            if (!submitButtons.length) return false;
+
+            // Only promote the strip that directly wraps a submit button.
+            var strip = submitButtons[0].parentElement;
+            if (!strip || strip.querySelector('input, select, textarea')) return false;
+            if (strip.getBoundingClientRect().width === 0) return false;
+
+            var items = Array.prototype.slice.call(strip.querySelectorAll('button, a.btn'));
+            if (!items.some(function(el) { return el.getAttribute('type') === 'submit'; })) return false;
+
+            // iOS order: secondary actions first, primary submit last (right).
+            Array.prototype.slice.call(items)
+                .sort(function(a) { return a.getAttribute('type') === 'submit' ? 1 : -1; })
+                .forEach(function(original) {
+                    var clone = original.cloneNode(true);
+                    original.classList.add('mobile-duplicate');
+                    if (original.getAttribute('type') === 'submit') {
+                        clone.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (typeof form.requestSubmit === 'function') {
+                                form.requestSubmit(clone);
+                            } else {
+                                form.submit();
+                            }
+                        });
+                    }
+                    bar.appendChild(clone);
+                });
+
+            bar.hidden = false;
+            bar.dataset.promoted = '1';
+            document.body.classList.add('has-mobile-action-bar');
+            return true;
         },
 
         vibrate: function(ms) {
