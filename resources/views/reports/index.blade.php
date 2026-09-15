@@ -58,7 +58,7 @@
 
 <!-- KPI Cards -->
 <div class="row mb-3">
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card">
             <div class="card-body text-center">
                 <div class="subheader">{{ __('Conversion Rate') }}</div>
@@ -67,7 +67,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card">
             <div class="card-body text-center">
                 <div class="subheader">{{ __('Total Leads') }}</div>
@@ -75,7 +75,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-6 col-md-4">
         <div class="card">
             <div class="card-body text-center">
                 <div class="subheader">{{ $modeTerms['deal_label'] ?? __('Deals') }}s {{ __('Closed') }}</div>

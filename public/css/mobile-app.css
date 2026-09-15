@@ -125,6 +125,107 @@
         font-size: 1.5rem;
     }
 
+    /* ─────────────────────────────────────────────
+       Compact page-top summary counters (KPI tiles)
+       Shrink the stat cards inside the native shell so
+       they take ~half the height, keep the numbers,
+       and stop short words from wrapping onto their
+       own full lines.
+       ───────────────────────────────────────────── */
+
+    /* Less padding inside every compact stat tile */
+    .card-sm .card-body {
+        padding: 0.6rem 0.7rem !important;
+    }
+
+    /* The avatar + label row inside a KPI tile */
+    .card-sm .card-body > .row.align-items-center {
+        --bs-gutter-x: 0;
+        margin-left: 0;
+        margin-right: 0;
+        flex-wrap: nowrap;
+        gap: 0.55rem;
+    }
+
+    .card-sm .card-body > .row.align-items-center > .col-auto {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    /* Let the label column shrink so long text wraps
+       instead of overflowing or stacking word-per-line */
+    .card-sm .card-body > .row.align-items-center > .col {
+        min-width: 0;
+        padding-left: 0;
+    }
+
+    /* Smaller count badge / avatar */
+    .card-sm .card-body > .row.align-items-center .avatar {
+        width: 2rem;
+        height: 2rem;
+        line-height: 2rem;
+        font-size: 0.8rem;
+    }
+
+    .card-sm .card-body > .row.align-items-center .avatar .icon {
+        width: 1.05rem;
+        height: 1.05rem;
+        stroke-width: 2;
+    }
+
+    /* Label — compact, balanced, no orphan single words */
+    .card-sm .card-body > .row.align-items-center .font-weight-medium {
+        font-size: 0.85rem;
+        line-height: 1.22;
+        margin-bottom: 0.1rem !important;
+        overflow-wrap: normal;
+        text-wrap: balance;
+    }
+
+    /* Secondary line (e.g. pipeline value) — small, wraps to at most 2 lines */
+    .card-sm .card-body > .row.align-items-center .text-secondary,
+    .card-sm .card-body > .row.align-items-center .text-muted {
+        font-size: 0.72rem;
+        line-height: 1.25;
+        text-wrap: balance;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+    }
+
+    /* Tighten the KPI tile grid gutters slightly (scoped to counter rows only) */
+    .row.g-3.mb-3:has(> [class*="col-"] > .card-sm .card-body > .row.align-items-center) {
+        --bs-gutter-x: 0.55rem;
+        --bs-gutter-y: 0.55rem;
+    }
+
+    /* Even out tile heights so adjacent counters line up */
+    .row > [class*="col-"] > .card-sm {
+        height: 100%;
+    }
+
+    /* ── Team page datagrid summary — 2-up on phones ── */
+    .datagrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        row-gap: 0.7rem !important;
+    }
+    .datagrid-item .datagrid-title {
+        font-size: 0.78rem;
+    }
+    .datagrid-content {
+        font-size: 1.05rem;
+    }
+
+    /* ── Reports centered stat cards ── */
+    .card-body.text-center .h1 {
+        font-size: 1.6rem;
+        margin-bottom: 0.1rem !important;
+    }
+    .card-body.text-center .subheader {
+        font-size: 0.8rem;
+    }
+
     /* ── Steps ── */
     .steps {
         flex-wrap: wrap;
