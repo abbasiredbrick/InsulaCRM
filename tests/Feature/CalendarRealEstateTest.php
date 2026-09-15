@@ -67,7 +67,7 @@ class CalendarRealEstateTest extends TestCase
         $property = $this->createProperty();
 
         // Even if a showing record exists, wholesale should not display it
-        // (the showing route itself is blocked, but calendar events shouldn't show them)
+        // on the calendar feed.
 
         $response = $this->getJson(route('calendar.events', [
             'start' => now()->startOfMonth()->format('Y-m-d'),

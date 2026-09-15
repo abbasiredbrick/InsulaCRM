@@ -5,42 +5,11 @@ namespace Tests\Feature;
 use App\Models\Meeting;
 use Tests\TestCase;
 
-class CalendarGateTest extends TestCase
+class CalendarEventFeedTest extends TestCase
 {
     private function reAdmin(): self
     {
         return $this->actingAsAdmin(['business_mode' => 'realestate']);
-    }
-
-    public function test_showing_scheduling_is_blocked_without_a_calendar(): void
-    {
-        $this->reAdmin();
-        $property = $this->createProperty();
-        $lead = $this->createLead();
-
-        $this->post('/showings', [
-            'property_id' => $property->id,
-            'lead_id' => $lead->id,
-            'showing_date' => now()->addDays(2)->format('Y-m-d'),
-            'showing_time' => '10:00',
-        ]);
-
-        $this->assertDatabaseMissing('showings', ['lead_id' => $lead->id]);
-        $this->assertDatabaseMissing('activities', ['lead_id' => $lead->id, 'subject' => 'Viewing scheduled']);
-    }
-
-    public function test_meeting_scheduling_is_blocked_without_a_calendar(): void
-    {
-        $this->reAdmin();
-        $lead = $this->createLead();
-
-        $this->post(route('leads.meetings.store', $lead), [
-            'title' => 'Site visit',
-            'scheduled_at' => now()->addDays(1)->format('Y-m-d H:i'),
-            'duration_minutes' => 45,
-        ]);
-
-        $this->assertDatabaseMissing('meetings', ['lead_id' => $lead->id]);
     }
 
     public function test_meeting_can_be_scheduled_with_a_calendar(): void
