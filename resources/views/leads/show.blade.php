@@ -665,7 +665,9 @@
                     </div>
                     <div class="mb-2">
                         <select name="reminder_minutes" class="form-select form-select-sm" title="{{ __('Reminder') }}">
-                            @php($_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '') @endphp
+                            @php
+                                $_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '';
+                            @endphp
                             <option value="" @selected($_current === '')>{{ __('No reminder') }}</option>
                             @foreach([15, 30, 60, 120, 1440, 2880, 10080] as $_minutes)
                                 <option value="{{ $_minutes }}" @selected((string) $_current === (string) $_minutes)>
@@ -750,7 +752,9 @@
                     <div class="mb-2">
                         <label class="form-label small mb-1">{{ __('Reminder') }}</label>
                         <select name="reminder_minutes" class="form-select form-select-sm">
-                            @php($_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '') @endphp
+                            @php
+                                $_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '';
+                            @endphp
                             <option value="" @selected($_current === '')>{{ __('None') }}</option>
                             @foreach([15, 30, 60, 120, 1440, 2880, 10080] as $_minutes)
                                 <option value="{{ $_minutes }}" @selected((string) $_current === (string) $_minutes)>
