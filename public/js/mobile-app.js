@@ -36,45 +36,45 @@
 
         /**
          * iOS-style bottom action bar.
-         * Promotes the primary submit buttons (and their Cancel/Back peers)
-         * of the page's main visible form into a fixed bar pinned above the
-         * bottom nav, so every form gets a consistent native action footer.
-         * The originals stay in the DOM (hidden on mobile only).
+         * Promotes the action strip (primary submit buttons + their
+         * Cancel/Back peers) of the page's main POST form into a fixed bar
+         * pinned above the bottom nav, so every form gets a consistent
+         * native action footer. GET forms (searches/filters) are never
+         * promoted. The originals stay in the DOM (hidden on mobile only).
          */
         setupActionBars: function() {
             var bar = document.getElementById('mobile-action-bar');
             if (!bar || bar.dataset.promoted) return;
 
-            var isMobile = window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches;
-            if (!isMobile) return;
+            if (!window.matchMedia || !window.matchMedia('(max-width: 991.98px)').matches) return;
 
-            var forms = Array.prototype.slice.call(document.querySelectorAll('form'))
-                .filter(function(form) {
-                    if (form.hidden) return false;
-                    if (form.closest('.modal, .mobile-bottom-sheet, .mobile-drawer, .mobile-search-sheet, #mobile-action-bar')) return false;
-                    var rect = form.getBoundingClientRect();
-                    return rect.width > 0 && rect.height > 0;
-                });
-
-            for (var i = 0; i < forms.length; i++) {
-                if (this.promoteForm(forms[i], bar)) return;
+            var submits = Array.prototype.slice.call(document.querySelectorAll('form[method="POST"] button[type="submit"]'));
+            for (var i = 0; i < submits.length; i++) {
+                if (this.promoteAction(submits[i], bar)) return;
             }
         },
 
-        promoteForm: function(form, bar) {
-            var submitButtons = Array.prototype.slice.call(form.querySelectorAll('button[type="submit"]'));
-            if (!submitButtons.length) return false;
+        /**
+         * Attempt to promote a single submit button's action strip into the
+         * bottom action bar. Returns true when promoted.
+         */
+        promoteAction: function(submit, bar) {
+            var form = submit.closest('form');
+            if (!form) return false;
+            if (submit.closest('.modal, .mobile-bottom-sheet, .mobile-drawer, .mobile-search-sheet, nav, header, aside, #quick-add-fab, .page-header')) return false;
+            if (form.hasAttribute('data-mobile-actions-off')) return false;
+            // Only visible, interactive buttons (in a real browser display:none = 0x0)
+            if (!this.isVisible(submit)) return false;
 
-            // Only promote the strip that directly wraps a submit button.
-            var strip = submitButtons[0].parentElement;
-            if (!strip || strip.querySelector('input, select, textarea')) return false;
-            if (strip.getBoundingClientRect().width === 0) return false;
+            var strip = this.findActionStrip(submit, form);
+            if (!strip) return false;
 
             var items = Array.prototype.slice.call(strip.querySelectorAll('button, a.btn'));
             if (!items.some(function(el) { return el.getAttribute('type') === 'submit'; })) return false;
 
+            var self = this;
             // iOS order: secondary actions first, primary submit last (right).
-            Array.prototype.slice.call(items)
+            items
                 .sort(function(a) { return a.getAttribute('type') === 'submit' ? 1 : -1; })
                 .forEach(function(original) {
                     var clone = original.cloneNode(true);
@@ -83,11 +83,9 @@
                         clone.addEventListener('click', function(e) {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (typeof form.requestSubmit === 'function') {
-                                form.requestSubmit(clone);
-                            } else {
-                                form.submit();
-                            }
+                            // Click the original submit button — keeps HTML5
+                            // validation and the button's name/value payload.
+                            original.click();
                         });
                     }
                     bar.appendChild(clone);
@@ -97,6 +95,35 @@
             bar.dataset.promoted = '1';
             document.body.classList.add('has-mobile-action-bar');
             return true;
+        },
+
+        /**
+         * Find the action strip that directly wraps this submit button:
+         * walk up (max a few levels, never past the form) until we find a
+         * container holding buttons/links only (no inputs/selects).
+         */
+        findActionStrip: function(submit, form) {
+            var node = submit.parentElement;
+            var depth = 0;
+            while (node && node !== form && depth < 3 && node.querySelector('input, select, textarea')) {
+                node = node.parentElement;
+                depth++;
+            }
+            if (!node || node === form || !node.querySelector('button[type="submit"]')) return null;
+            if (node.querySelector('input, select, textarea')) return null;
+            return node;
+        },
+
+        isVisible: function(el) {
+            if (!el || el.getBoundingClientRect) {
+                var r = el.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) {
+                    return typeof getComputedStyle !== 'undefined'
+                        ? getComputedStyle(el).display !== 'none'
+                        : true;
+                }
+            }
+            return false;
         },
 
         vibrate: function(ms) {

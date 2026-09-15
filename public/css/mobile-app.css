@@ -254,6 +254,14 @@
         min-height: 44px;
     }
 
+    /* App-first: pages are data-only on mobile. Inline per-page search /
+       filter bars are hidden — searching happens in the shell's popup
+       search sheet instead (see #mobile-search-sheet). The shell's own
+       form is excluded via .mobile-search-form. */
+    main form[method="GET"]:has(input[name="search"]):not(.mobile-search-form) {
+        display: none !important;
+    }
+
     /* Hide the in-place button strip once it has been promoted
        into the bottom action bar */
     .mobile-duplicate {
