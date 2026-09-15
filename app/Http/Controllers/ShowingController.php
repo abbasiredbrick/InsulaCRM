@@ -84,11 +84,6 @@ class ShowingController extends Controller
     {
         $this->authorize('create', Showing::class);
 
-        if (! $calendar->schedulerAllowed(auth()->user())) {
-            return redirect()->route('showings.create', ['lead_id' => $request->input('lead_id')])
-                ->with('error', __('Connect a calendar (Google, Microsoft or iCal feed) in My Cloud before scheduling viewings.'));
-        }
-
         $data = $request->validated();
         $data['tenant_id'] = auth()->user()->tenant_id;
         $data['agent_id'] = $data['agent_id'] ?? auth()->id();

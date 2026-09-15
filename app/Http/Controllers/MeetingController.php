@@ -16,15 +16,11 @@ class MeetingController extends Controller
     {
         $this->authorize('update', $lead);
 
-        if (! $calendar->schedulerAllowed(auth()->user())) {
-            return redirect()->route('leads.show', $lead)
-                ->with('error', __('Connect a calendar (Google, Microsoft or iCal feed) in My Cloud before scheduling meetings.'));
-        }
-
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'scheduled_at' => 'required|date',
             'duration_minutes' => 'nullable|integer|min:15|max:480',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
             'notes' => 'nullable|string|max:5000',
         ]);
 
@@ -37,6 +33,7 @@ class MeetingController extends Controller
             'title' => $data['title'],
             'scheduled_at' => $data['scheduled_at'],
             'duration_minutes' => $data['duration_minutes'] ?? 60,
+            'reminder_minutes' => $data['reminder_minutes'] ?? null,
             'status' => 'scheduled',
             'notes' => $data['notes'] ?? null,
         ]);
@@ -57,6 +54,7 @@ class MeetingController extends Controller
             'title' => 'sometimes|string|max:255',
             'scheduled_at' => 'sometimes|date',
             'duration_minutes' => 'nullable|integer|min:15|max:480',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
             'status' => 'sometimes|in:scheduled,completed,cancelled',
             'notes' => 'nullable|string|max:5000',
         ]);

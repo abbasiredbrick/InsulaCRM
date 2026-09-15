@@ -83,6 +83,12 @@
                 <textarea name="notes" class="form-control" rows="3">{{ old('notes', $showing->notes) }}</textarea>
             </div>
 
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <x-reminder-minutes :selected="old('reminder_minutes', $showing->reminder_minutes)" />
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">{{ __('Update Viewing') }}</button>
                 <a href="{{ route('showings.show', $showing) }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>

@@ -16,6 +16,7 @@ class TaskRequest extends FormRequest
         return [
             'title' => 'required|string|max:255',
             'due_date' => 'required|date|after_or_equal:today',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
         ];
     }
 

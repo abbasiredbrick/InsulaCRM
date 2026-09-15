@@ -29,6 +29,7 @@ class ShowingRequest extends FormRequest
             'listing_agent_name' => 'nullable|string|max:255',
             'listing_agent_phone' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
         ];
     }
 }

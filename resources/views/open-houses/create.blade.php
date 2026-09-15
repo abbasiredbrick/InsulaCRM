@@ -67,6 +67,12 @@
                 @error('notes') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
 
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <x-reminder-minutes :selected="old('reminder_minutes')" />
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">{{ __('Schedule Open House') }}</button>
                 <a href="{{ route('open-houses.index') }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>

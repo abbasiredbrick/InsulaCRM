@@ -162,6 +162,31 @@ class SettingsController extends Controller
     }
 
     /**
+     * Save the tenant-level Google/Microsoft calendar integration toggle and
+     * the default reminder lead time used when a schedule has no override.
+     */
+    public function updateCalendarIntegration(Request $request)
+    {
+        $request->validate([
+            'calendar_sync_enabled' => 'sometimes|boolean',
+            'calendar_reminder_default_minutes' => 'nullable|integer|min:1|max:10080',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $tenant->update([
+            'calendar_sync_enabled' => $request->boolean('calendar_sync_enabled'),
+            'calendar_reminder_default_minutes' => $request->filled('calendar_reminder_default_minutes')
+                ? (int) $request->input('calendar_reminder_default_minutes')
+                : null,
+        ]);
+
+        AuditLog::log('settings.calendar_integration_updated', $tenant);
+
+        return redirect()->route('settings.index', ['tab' => 'integrations'])
+            ->with('success', __('Calendar integration settings updated.'));
+    }
+
+    /**
      * Test S3 connection with the provided or saved credentials.
      */
     public function testS3Connection(Request $request)
@@ -1163,6 +1188,7 @@ class SettingsController extends Controller
             'team_member_invited',
             'sequence_email',
             'lease_expiry_reminder',
+            'calendar_reminders',
         ];
 
         $preferences = [];

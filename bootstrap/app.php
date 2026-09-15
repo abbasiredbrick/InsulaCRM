@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('calendar:send-reminders')->everyMinute();
         $schedule->command('sequences:process')->daily();
         $schedule->command('deals:check-due-diligence')->daily();
         $schedule->command('leads:assign-unclaimed')->everyMinute();

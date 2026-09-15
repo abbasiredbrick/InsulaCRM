@@ -38,10 +38,13 @@ class Showing extends Model
         'notes',
         'calendar_provider',
         'calendar_event_id',
+        'reminder_minutes',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'showing_date' => 'date',
+        'reminder_sent_at' => 'datetime',
     ];
 
     protected static function booted(): void

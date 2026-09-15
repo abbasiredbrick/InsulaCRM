@@ -29,6 +29,8 @@ class Meeting extends Model
         'notes',
         'calendar_provider',
         'calendar_event_id',
+        'reminder_minutes',
+        'reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -36,6 +38,7 @@ class Meeting extends Model
         return [
             'scheduled_at' => 'datetime',
             'duration_minutes' => 'integer',
+            'reminder_sent_at' => 'datetime',
         ];
     }
 

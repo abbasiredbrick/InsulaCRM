@@ -41,6 +41,10 @@
             'label' => __('Lease Expiry Reminders'),
             'description' => __('Notify agents and their managers 45 days before a lease contract expires, so the client can renew or move.'),
         ],
+        'calendar_reminders' => [
+            'label' => __('Calendar / Schedule Reminders'),
+            'description' => __("Email and in-app reminders before viewings, meetings, follow-ups and open houses when they are not synced to a Google/Microsoft calendar."),
+        ],
         'availability_conflict' => [
             'label' => __('Listed Unit Decisions'),
             'description' => __($businessMode === 'realestate' ? "Notify the agent and admins when a PM availability sheet shows a currently-listed unit as leased, so they can decide to keep it listed or unlist it." : 'Notify agents when a PM availability sheet shows a currently-listed unit as leased.'),

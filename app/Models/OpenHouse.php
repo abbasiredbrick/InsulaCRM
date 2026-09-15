@@ -9,7 +9,7 @@ class OpenHouse extends Model
 {
     public const STATUSES = [
         'scheduled' => 'Scheduled',
-        'active'    => 'Active',
+        'active' => 'Active',
         'completed' => 'Completed',
         'cancelled' => 'Cancelled',
     ];
@@ -25,10 +25,13 @@ class OpenHouse extends Model
         'description',
         'notes',
         'attendee_count',
+        'reminder_minutes',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'event_date' => 'date',
+        'reminder_sent_at' => 'datetime',
     ];
 
     protected static function booted(): void

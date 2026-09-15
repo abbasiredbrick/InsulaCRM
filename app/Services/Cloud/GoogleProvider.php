@@ -44,7 +44,7 @@ class GoogleProvider extends CloudBaseProvider
             'response_type' => 'code',
             'scope' => $this->scopes($scope),
             'access_type' => 'offline',
-            'prompt' => 'consent',
+            'prompt' => 'consent select_account',
             'include_granted_scopes' => 'true',
             'state' => $state,
         ]);

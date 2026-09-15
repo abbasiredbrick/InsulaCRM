@@ -19,17 +19,13 @@ class TaskController extends Controller
     {
         $this->authorizeLead($lead);
 
-        if (! $this->calendar->schedulerAllowed(auth()->user())) {
-            return redirect()->route('leads.show', $lead)
-                ->with('error', __('Connect a calendar (Google, Microsoft or iCal feed) in My Cloud before scheduling follow-ups or reminders.'));
-        }
-
         $task = Task::create([
             'tenant_id' => auth()->user()->tenant_id,
             'lead_id' => $lead->id,
             'agent_id' => auth()->id(),
             'title' => $request->title,
             'due_date' => $request->due_date,
+            'reminder_minutes' => $request->input('reminder_minutes') ?? null,
         ]);
 
         AuditLog::log('task.created', $task);

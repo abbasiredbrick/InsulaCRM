@@ -19,11 +19,14 @@ class Task extends Model
         'is_completed',
         'calendar_provider',
         'calendar_event_id',
+        'reminder_minutes',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'is_completed' => 'boolean',
+        'reminder_sent_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -36,7 +39,7 @@ class Task extends Model
      */
     public function getIsOverdueAttribute(): bool
     {
-        return !$this->is_completed && $this->due_date && $this->due_date->isPast();
+        return ! $this->is_completed && $this->due_date && $this->due_date->isPast();
     }
 
     /**

@@ -663,6 +663,17 @@
                     <div class="mb-2">
                         <input type="date" name="due_date" class="form-control form-control-sm" required>
                     </div>
+                    <div class="mb-2">
+                        <select name="reminder_minutes" class="form-select form-select-sm" title="{{ __('Reminder') }}">
+                            @php($_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '') @endphp
+                            <option value="" @selected($_current === '')>{{ __('No reminder') }}</option>
+                            @foreach([15, 30, 60, 120, 1440, 2880, 10080] as $_minutes)
+                                <option value="{{ $_minutes }}" @selected((string) $_current === (string) $_minutes)>
+                                    {{ $_minutes === 60 ? __('1 hour') : ($_minutes === 120 ? __('2 hours') : ($_minutes === 1440 ? __('1 day') : ($_minutes === 2880 ? __('2 days') : ($_minutes === 10080 ? __('1 week') : __(':min minutes', ['min' => $_minutes]))))) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn-primary btn-sm w-100">{{ __('Add Task') }}</button>
                 </form>
             </div>
@@ -735,6 +746,18 @@
                     <div class="mb-2">
                         <label class="form-label small mb-1">{{ __('Duration (minutes)') }}</label>
                         <input type="number" name="duration_minutes" class="form-control form-control-sm" value="60" min="5" max="480">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">{{ __('Reminder') }}</label>
+                        <select name="reminder_minutes" class="form-select form-select-sm">
+                            @php($_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '') @endphp
+                            <option value="" @selected($_current === '')>{{ __('None') }}</option>
+                            @foreach([15, 30, 60, 120, 1440, 2880, 10080] as $_minutes)
+                                <option value="{{ $_minutes }}" @selected((string) $_current === (string) $_minutes)>
+                                    {{ $_minutes === 60 ? __('1 hour') : ($_minutes === 120 ? __('2 hours') : ($_minutes === 1440 ? __('1 day') : ($_minutes === 2880 ? __('2 days') : ($_minutes === 10080 ? __('1 week') : __(':min minutes', ['min' => $_minutes]))))) }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="mb-2">
                         <label class="form-label small mb-1">{{ __('Notes') }}</label>

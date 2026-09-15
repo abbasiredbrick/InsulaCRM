@@ -57,6 +57,8 @@ class Tenant extends Model
         'google_client_secret',
         'microsoft_client_id',
         'microsoft_client_secret',
+        'calendar_sync_enabled',
+        'calendar_reminder_default_minutes',
     ];
 
     protected function casts(): array
@@ -77,7 +79,27 @@ class Tenant extends Model
             'require_2fa' => 'boolean',
             'google_client_secret' => 'encrypted',
             'microsoft_client_secret' => 'encrypted',
+            'calendar_sync_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether external Google/Microsoft calendar sync is active for this
+     * tenant. When disabled, schedules stay on the system calendar and
+     * reminders are delivered in-app/by email.
+     */
+    public function calendarSyncEnabled(): bool
+    {
+        return (bool) ($this->calendar_sync_enabled ?? true);
+    }
+
+    /**
+     * Default lead time (minutes before an event) used when a schedule does
+     * not carry its own reminder override. Null disables reminders.
+     */
+    public function calendarReminderDefaultMinutes(): ?int
+    {
+        return $this->calendar_reminder_default_minutes;
     }
 
     /**
@@ -149,7 +171,7 @@ class Tenant extends Model
     {
         return array_merge(
             [
-                'unmatched'     => 'unassigned',
+                'unmatched' => 'unassigned',
                 'notify_admins' => true,
             ],
             $this->custom_options['portal_leads'] ?? []
@@ -165,9 +187,9 @@ class Tenant extends Model
     {
         return array_merge(
             [
-                'balance'   => 0,
+                'balance' => 0,
                 'auto_sync' => false,
-                'endpoint'  => null,
+                'endpoint' => null,
             ],
             $this->custom_options['portal_wallet'] ?? []
         );

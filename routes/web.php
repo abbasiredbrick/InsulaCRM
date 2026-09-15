@@ -672,6 +672,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::put('/settings/storage', [SettingsController::class, 'updateStorage'])->name('settings.updateStorage');
         Route::post('/settings/storage/test', [SettingsController::class, 'testS3Connection'])->name('settings.testS3');
         Route::put('/settings/cloud', [SettingsController::class, 'updateCloud'])->name('settings.updateCloud');
+        Route::put('/settings/calendar-integration', [SettingsController::class, 'updateCalendarIntegration'])->name('settings.updateCalendarIntegration');
 
         // SMS Test
         Route::post('/settings/sms/test', [SettingsController::class, 'testSms'])->name('settings.testSms');

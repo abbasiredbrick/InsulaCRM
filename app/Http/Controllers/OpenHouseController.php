@@ -79,6 +79,7 @@ class OpenHouseController extends Controller
             'status' => ['nullable', Rule::in(array_keys(OpenHouse::STATUSES))],
             'description' => 'nullable|string',
             'notes' => 'nullable|string',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
         ]);
 
         $data['tenant_id'] = auth()->user()->tenant_id;
@@ -126,6 +127,7 @@ class OpenHouseController extends Controller
             'status' => ['nullable', Rule::in(array_keys(OpenHouse::STATUSES))],
             'description' => 'nullable|string',
             'notes' => 'nullable|string',
+            'reminder_minutes' => 'nullable|integer|min:1|max:10080',
         ]);
 
         $openHouse->update($data);

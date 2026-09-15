@@ -13,19 +13,19 @@
         <div class="card">
             <div class="card-body">
                 <h5 class="card-title">{{ __('Calendar connections') }}</h5>
-                <p class="text-muted">{{ __('Connect your Google or Microsoft calendar so scheduled viewings, follow-ups, reminders and meetings appear on your phone. Scheduling is only allowed when a calendar is connected.') }}</p>
+                <p class="text-muted">{{ __('Connect your Google or Microsoft calendar so scheduled viewings, follow-ups, reminders and meetings appear on your phone. The CRM system calendar always holds your schedules, and reminders are sent in-app and by email when an event is not synced to a connected calendar.') }}</p>
 
                 @php
                     $calendarConnected = auth()->user()->hasCalendarConnection();
                 @endphp
                 @if(! $calendarConnected)
-                    <div class="alert alert-warning py-2">
+                    <div class="alert alert-info py-2">
                         <i class="bi bi-calendar-x"></i>
-                        {!! __('<strong>Blocked:</strong> connect a calendar below (or enable the iCal feed) before you can schedule viewings, reminders or meetings.') !!}
+                        {!! __('<strong>No calendar connected:</strong> your schedules stay on the CRM system calendar and reminders are delivered in-app and by email. Connect a calendar below (or enable the iCal feed) to also sync them to Google/Microsoft.') !!}
                     </div>
                 @else
                     <div class="alert alert-success py-2">
-                        <i class="bi bi-calendar-check"></i> {{ __('A calendar is connected. You can schedule viewings, reminders and meetings.') }}
+                        <i class="bi bi-calendar-check"></i> {{ __('A calendar is connected. Scheduled viewings, reminders and meetings sync to it.') }}
                     </div>
                 @endif
 

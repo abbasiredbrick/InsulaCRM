@@ -44,7 +44,7 @@ class MicrosoftProvider extends CloudBaseProvider
             'response_type' => 'code',
             'scope' => $this->scopes($scope),
             'response_mode' => 'query',
-            'prompt' => 'consent',
+            'prompt' => 'select_account',
             'state' => $state,
         ]);
     }

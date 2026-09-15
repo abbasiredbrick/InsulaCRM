@@ -5,6 +5,7 @@ namespace App\Services\Cloud;
 use App\Models\Meeting;
 use App\Models\Showing;
 use App\Models\Task;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\UserCloudConnection;
 use Carbon\Carbon;
@@ -16,13 +17,46 @@ class CloudCalendarService
     public function __construct(protected CloudProviderFactory $factory) {}
 
     /**
-     * Whether the acting user may schedule calendar-bound records. They need a
-     * Google/Microsoft calendar that will actually receive the event, or an
-     * iCal feed subscription ("other" calendar) as a fallback.
+     * Scheduling is never blocked: every viewing, meeting, task and open
+     * house lives on the system calendar regardless of external sync, with
+     * reminders delivered in-app and by email when the Google/Microsoft
+     * integration is disabled or no calendar is connected.
      */
     public function schedulerAllowed(?User $user): bool
     {
-        return $user !== null && $user->hasCalendarConnection();
+        return true;
+    }
+
+    /**
+     * Whether the tenant's Google/Microsoft calendar integration is active.
+     * When disabled, events stay on the system calendar and previously pushed
+     * external events are left untouched.
+     */
+    public function integrationEnabled(Model $record, ?User $actingUser = null): bool
+    {
+        $tenantId = $record->getAttribute('tenant_id') ?? $actingUser?->tenant_id;
+
+        if ($tenantId === null) {
+            return true;
+        }
+
+        $tenant = Tenant::withoutGlobalScopes()->find($tenantId);
+
+        return $tenant?->calendarSyncEnabled() ?? true;
+    }
+
+    /**
+     * Whether an event should be pushed to an external calendar right now:
+     * the integration must be active and the record's agent (or acting user)
+     * must have a connection to write to.
+     */
+    public function shouldSyncExternally(Model $record, ?User $actingUser = null): bool
+    {
+        if (! $this->integrationEnabled($record, $actingUser)) {
+            return false;
+        }
+
+        return $this->connectionFor($record, $actingUser) !== null;
     }
 
     /**
@@ -49,6 +83,10 @@ class CloudCalendarService
      */
     public function sync(Model $record, ?User $actingUser = null): void
     {
+        if (! $this->integrationEnabled($record, $actingUser)) {
+            return;
+        }
+
         $connection = $this->connectionFor($record, $actingUser);
 
         if ($this->shouldRemove($record)) {
@@ -90,6 +128,10 @@ class CloudCalendarService
      */
     public function removeEvent(Model $record): void
     {
+        if (! $this->integrationEnabled($record)) {
+            return;
+        }
+
         if (blank($record->calendar_event_id)) {
             return;
         }

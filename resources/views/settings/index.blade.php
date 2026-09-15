@@ -1839,13 +1839,48 @@ Content-Type: application/json</code></pre>
 
             <!-- Integrations Tab -->
             <div class="tab-pane" id="tab-integrations">
+                <!-- Calendar integration (system calendar + Google/Microsoft sync) -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ __('Calendar Integration') }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-secondary mb-3">{{ __('Schedule viewings, meetings, follow-ups and open houses are always saved to the CRM system calendar. When the Google/Microsoft integration is enabled, agents can also sync events to their connected Google or Microsoft calendar (any account type: personal, Workspace or Microsoft 365). When it is disabled, reminders are sent as in-app and email notifications instead.') }}</p>
+                        <form action="{{ route('settings.updateCalendarIntegration') }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <div class="mb-3">
+                                <label class="form-check form-switch">
+                                    <input type="hidden" name="calendar_sync_enabled" value="0">
+                                    <input class="form-check-input" type="checkbox" name="calendar_sync_enabled" value="1" {{ ($tenant->calendar_sync_enabled ?? true) ? 'checked' : '' }}>
+                                    <span class="form-check-label">{{ __('Enable Google/Microsoft calendar sync') }}</span>
+                                </label>
+                                <small class="form-hint">{{ __('Switch off to keep everything on the system calendar and use in-app + email reminders. Existing external events are left in place.') }}</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{{ __('Default reminder lead time') }}</label>
+                                <select name="calendar_reminder_default_minutes" class="form-select">
+                                    <option value="" @selected(blank($tenant->calendar_reminder_default_minutes))>{{ __('No reminder by default') }}</option>
+                                    @foreach([15, 30, 60, 120, 1440, 2880, 10080] as $minutes)
+                                        <option value="{{ $minutes }}" @selected((string) ($tenant->calendar_reminder_default_minutes ?? '') === (string) $minutes)>
+                                            {{ $minutes === 60 ? __('1 hour') : ($minutes === 120 ? __('2 hours') : ($minutes === 1440 ? __('1 day') : ($minutes === 2880 ? __('2 days') : ($minutes === 10080 ? __('1 week') : __(':min minutes', ['min' => $minutes]))))) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <small class="form-hint">{{ __('Used when an agent schedules without picking a reminder. Individual schedules can override it.') }}</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">{{ __('Save Calendar Integration') }}</button>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- Cloud / Google & Microsoft OAuth credentials -->
                 <div class="card mb-4">
                     <div class="card-header">
                         <h3 class="card-title">{{ __('Cloud Connections (Google & Microsoft)') }}</h3>
                     </div>
                     <div class="card-body">
-                        <p class="text-secondary mb-3">{{ __('Create an OAuth app in the Google Cloud Console and/or Microsoft Azure portal, then paste the credentials below. Agents use them to connect their own Google/Microsoft accounts for calendar sync and Drive/OneDrive inventory photo storage.') }}</p>
+                        <p class="text-secondary mb-3">{{ __('Create an OAuth app in the Google Cloud Console (user type: External) and/or Microsoft Azure portal, then paste the credentials below. Agents use them to connect any Google or Microsoft account (personal or work/school) for calendar sync and Drive/OneDrive inventory photo storage.') }}</p>
                         <form action="{{ route('settings.updateCloud') }}" method="POST">
                             @csrf
                             @method('PUT')
@@ -1877,7 +1912,7 @@ Content-Type: application/json</code></pre>
                             </div>
                             @if(! $tenant->cloudProviderConfigured('google') && ! $tenant->cloudProviderConfigured('microsoft'))
                             <div class="alert alert-warning mt-3 py-2">
-                                <i class="bi bi-info-circle"></i> {{ __('Until at least one provider is configured here, agents cannot connect their calendar and scheduling will remain blocked.') }}
+                                <i class="bi bi-info-circle"></i> {{ __('No provider is configured yet, so agents cannot sync to Google/Microsoft. Schedules still work on the system calendar with in-app and email reminders.') }}
                             </div>
                             @endif
                             <button type="submit" class="btn btn-primary mt-2">{{ __('Save Cloud Credentials') }}</button>
