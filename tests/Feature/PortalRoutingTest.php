@@ -29,10 +29,10 @@ class PortalRoutingTest extends TestCase
 
     public function test_lead_is_routed_to_agent_matching_listing_reference(): void
     {
-        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ07', 'is_active' => true]);
-        $other = $this->createUserWithRole('agent', ['name' => 'Bob Smith', 'agent_code' => 'BS04', 'is_active' => true]);
+        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ', 'is_active' => true]);
+        $other = $this->createUserWithRole('agent', ['name' => 'Bob Smith', 'agent_code' => 'BS', 'is_active' => true]);
 
-        $property = $this->createProperty(['bayut_listing_id' => 'AJ07-42']);
+        $property = $this->createProperty(['bayut_listing_id' => 'AJ-42']);
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
@@ -40,7 +40,7 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Sara Ahmed',
             'phone'     => '+971501234567',
             'email'     => '',
-            'reference' => 'AJ07-42',
+            'reference' => 'AJ-42',
             'url'       => 'https://bayut.com/en/property/details-42',
             'message'   => 'Interested',
         ]);
@@ -49,7 +49,7 @@ class PortalRoutingTest extends TestCase
         $this->assertSame($owner->id, $lead->agent_id);
         $this->assertNotSame($other->id, $lead->agent_id);
         $this->assertSame($property->id, $lead->custom_fields['listing_property_id'] ?? null);
-        $this->assertMatchesRegularExpression('/^\d{4}-AJ07-\d{4}$/', (string) $lead->reference);
+        $this->assertMatchesRegularExpression('/^AJ\d{7}$/', (string) $lead->reference);
         $this->assertDatabaseHas('lead_property', [
             'lead_id' => $lead->id, 'property_id' => $property->id,
         ]);
@@ -70,7 +70,7 @@ class PortalRoutingTest extends TestCase
 
         $this->assertNotNull($lead);
         $this->assertSame($property->id, $lead->custom_fields['listing_property_id'] ?? null);
-        $this->assertMatchesRegularExpression('/^\d{4}-NA00-\d{4}$/', (string) $lead->reference);
+        $this->assertMatchesRegularExpression('/^NA\d{7}$/', (string) $lead->reference);
         $this->assertNull($lead->agent_id);
     }
 
@@ -80,7 +80,7 @@ class PortalRoutingTest extends TestCase
             'portal_leads' => ['unmatched' => 'distribute', 'notify_admins' => true],
         ]]);
 
-        $property = $this->createProperty(['bayut_listing_id' => 'ZZ99-42']);
+        $property = $this->createProperty(['bayut_listing_id' => 'ZZ-42']);
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
@@ -88,12 +88,12 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Priya Sharma',
             'phone'     => '+971503333333',
             'email'     => '',
-            'reference' => 'ZZ99-42',
+            'reference' => 'ZZ-42',
         ]);
 
         $this->assertNotNull($lead);
 
-        // No active user has code ZZ99, so the lead flows through the tenant's
+        // No active user has code ZZ, so the lead flows through the tenant's
         // round-robin pool and gets assigned to an active agent.
         $this->assertNotNull($lead->agent_id);
         $this->assertSame($property->id, $lead->custom_fields['listing_property_id'] ?? null);
@@ -101,7 +101,7 @@ class PortalRoutingTest extends TestCase
 
     public function test_unmatched_lead_stays_unassigned_and_notifies_admins(): void
     {
-        $property = $this->createProperty(['bayut_listing_id' => 'ZZ99-42']);
+        $property = $this->createProperty(['bayut_listing_id' => 'ZZ-42']);
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
@@ -109,7 +109,7 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Priya Sharma',
             'phone'     => '+971503333333',
             'email'     => '',
-            'reference' => 'ZZ99-42',
+            'reference' => 'ZZ-42',
         ]);
 
         $this->assertNotNull($lead);
@@ -124,10 +124,10 @@ class PortalRoutingTest extends TestCase
     {
         $this->tenant->update(['country' => 'AE']);
 
-        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ07', 'is_active' => true]);
+        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ', 'is_active' => true]);
         $integration = $this->createIntegration();
 
-        $first = $this->createProperty(['bayut_listing_id' => 'AJ07-10']);
+        $first = $this->createProperty(['bayut_listing_id' => 'AJ-10']);
         $service = new PortalLeadService;
 
         $lead = $service->createFromPayload($integration, 'bayut', [
@@ -135,20 +135,20 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Sara Ahmed',
             'phone'     => '0501234567',
             'email'     => '',
-            'reference' => 'AJ07-10',
+            'reference' => 'AJ-10',
         ]);
 
         $this->assertNotNull($lead);
         $this->assertSame($owner->id, $lead->agent_id);
         $firstLeadId = $lead->id;
 
-        $second = $this->createProperty(['bayut_listing_id' => 'AJ07-42']);
+        $second = $this->createProperty(['bayut_listing_id' => 'AJ-42']);
         $again = $service->createFromPayload($integration, 'bayut', [
             'id'        => 'lead-6',
             'name'      => 'Sara Ahmed',
             'phone'     => '+971 50 123 4567',
             'email'     => '',
-            'reference' => 'AJ07-42',
+            'reference' => 'AJ-42',
         ]);
 
         // One portal record for the client; the new listing is attached as a second opportunity.
@@ -164,9 +164,9 @@ class PortalRoutingTest extends TestCase
 
     public function test_duplicate_same_listing_within_window_is_quiet(): void
     {
-        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ07', 'is_active' => true]);
+        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ', 'is_active' => true]);
         $integration = $this->createIntegration();
-        $this->createProperty(['bayut_listing_id' => 'AJ07-42']);
+        $this->createProperty(['bayut_listing_id' => 'AJ-42']);
         $service = new PortalLeadService;
 
         $payload = [
@@ -174,7 +174,7 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Sara Ahmed',
             'phone'     => '+971501234567',
             'email'     => '',
-            'reference' => 'AJ07-42',
+            'reference' => 'AJ-42',
         ];
 
         $first = $service->createFromPayload($integration, 'bayut', $payload);
@@ -191,7 +191,7 @@ class PortalRoutingTest extends TestCase
 
     public function test_dedup_prevents_duplicate_from_same_listing_reference(): void
     {
-        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ07', 'is_active' => true]);
+        $owner = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ', 'is_active' => true]);
         $integration = $this->createIntegration();
 
         $payload = [
@@ -199,7 +199,7 @@ class PortalRoutingTest extends TestCase
             'name'      => 'Sara Ahmed',
             'phone'     => '+971501234567',
             'email'     => '',
-            'reference' => 'AJ07-42',
+            'reference' => 'AJ-42',
         ];
 
         $service = new PortalLeadService;

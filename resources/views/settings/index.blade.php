@@ -606,7 +606,7 @@
                 <div class="mb-3">
                     <label class="form-label">{{ __('Reference Formula') }}</label>
                     <code class="d-block p-2 bg-body-tertiary rounded fs-5">{{ \App\Services\LeadReferenceService::FORMULA }}</code>
-                    <small class="text-secondary">{{ __('Year-Month - Agent Code - Sequence, e.g.') }} <strong>2609-AJ07-0001</strong> {{ __('(year-month - agent code - sequence, reset monthly per agent).') }}</small>
+                    <small class="text-secondary">{{ __('Agent Code - Year - Month - Sequence, e.g.') }} <strong>AJ2609001</strong> {{ __('(agent code - year-month - 3-digit sequence, reset monthly per agent).') }}</small>
                 </div>
                 <form action="{{ route('settings.updateLeadReferenceSettings') }}" method="POST">
                     @csrf
@@ -614,8 +614,8 @@
                     <div class="row">
                         <div class="col-md-5 mb-3">
                             <label class="form-label">{{ __('Fallback Agent Code') }}</label>
-                            <input type="text" name="fallback_agent_code" class="form-control" maxlength="8" value="{{ $tenant->defaultAgentCode() }}" placeholder="{{ \App\Services\AgentCodeService::FALLBACK_CODE }}">
-                            <small class="text-secondary">{{ __('Used when a lead has no assigned agent, e.g.') }} <code>{{ $tenant->defaultAgentCode() }}-202609-0001</code>.</small>
+                            <input type="text" name="fallback_agent_code" class="form-control" maxlength="2" value="{{ $tenant->defaultAgentCode() }}" placeholder="{{ \App\Services\AgentCodeService::FALLBACK_CODE }}">
+                            <small class="text-secondary">{{ __('Exactly two letters, used when a lead has no assigned agent, e.g.') }} <code>{{ $tenant->defaultAgentCode() }}{{ \Illuminate\Support\Carbon::now()->format('ym') }}001</code>.</small>
                         </div>
                         <div class="col-md-7 mb-3">
                             <label class="form-label">{{ __('Next Reference Preview') }}</label>

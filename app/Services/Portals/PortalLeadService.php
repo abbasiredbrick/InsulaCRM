@@ -360,10 +360,18 @@ class PortalLeadService
 
     /**
      * Extract the agent code and property id embedded in a listing reference.
+     *
+     * Accepts both the current two-letter codes (AJ-42) and the legacy
+     * four-character codes (AJ07-42) used by listings published before the
+     * two-letter changeover.
      */
     protected function parseListingReference(?string $reference): array
     {
         if (is_string($reference) && preg_match('/^([A-Z]{2}\d{2})-(\d+)$/', $reference, $m)) {
+            return [$m[1], (int) $m[2]];
+        }
+
+        if (is_string($reference) && preg_match('/^([A-Z]{2})-(\d+)$/', $reference, $m)) {
             return [$m[1], (int) $m[2]];
         }
 

@@ -163,15 +163,8 @@
                 <tr>
                     <td>
                         <div class="fw-bold">{{ $unit->display_name }}</div>
-                        <div class="text-muted small">
-                            {{ $unit->unit_no ? __('Unit') . ' ' . $unit->unit_no . ' • ' : '' }}{{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
-                            @if($unit->bedrooms || $unit->square_footage)
-                                • @if($unit->bedrooms){{ $unit->bedrooms }} {{ __('bd') }}@endif
-                                @if($unit->square_footage) / {{ Fmt::area($unit->square_footage) }}@endif
-                            @endif
-                        </div>
-                        @if($unit->furnishing)
-                            <div class="text-muted small">{{ __(\App\Models\Property::FURNISHING[$unit->furnishing] ?? $unit->furnishing) }}</div>
+                        @if($unit->unit_no)
+                            <div class="text-muted small">{{ __('Unit') }} {{ $unit->unit_no }}</div>
                         @endif
                     </td>
                     <td class="text-nowrap">

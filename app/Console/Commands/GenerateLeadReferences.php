@@ -8,9 +8,9 @@ use Illuminate\Console\Command;
 
 class GenerateLeadReferences extends Command
 {
-    protected $signature = 'leads:generate-references {--dry-run : Preview references without persisting} {--limit=200 : Max leads to process per run}';
+    protected $signature = 'leads:generate-references {--dry-run : Preview references without persisting} {--limit=200 : Max leads to process per run} {--all : Recompute every reference (backfill), overwriting existing ones}';
 
-    protected $description = 'Assign a human-readable reference to leads that are missing one';
+    protected $description = 'Assign a human-readable reference to leads that are missing one (or backfill all with --all)';
 
     public function handle(): int
     {
@@ -18,7 +18,7 @@ class GenerateLeadReferences extends Command
         $limit = (int) $this->option('limit');
 
         $leads = Lead::withoutGlobalScopes()
-            ->whereNull('reference')
+            ->when(! $this->option('all'), fn ($q) => $q->whereNull('reference'))
             ->orderBy('id')
             ->limit($limit)
             ->get();

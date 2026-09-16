@@ -149,11 +149,11 @@
             <thead>
                 <tr>
                     <th class="w-1"><input type="checkbox" id="select-all" class="form-check-input" aria-label="{{ __('Select all leads') }}"></th>
-                    <th class="w-1"><a href="{{ $sortUrl('id') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Ref') }}{!! $sortArrow('id') !!}</a></th>
                     <th><a href="{{ $sortUrl('first_name') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Name') }}{!! $sortArrow('first_name') !!}</a></th>
                     <th>{{ __('Phone') }}</th>
                     <th><a href="{{ $sortUrl('lead_source') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Source') }}{!! $sortArrow('lead_source') !!}</a></th>
                     <th><a href="{{ $sortUrl('status') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Status') }}{!! $sortArrow('status') !!}</a></th>
+                    <th><a href="{{ $sortUrl('reference') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Ref') }}{!! $sortArrow('reference') !!}</a></th>
                     <th><a href="{{ $sortUrl('temperature') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Temp') }}{!! $sortArrow('temperature') !!}</a></th>
                     @if(($businessMode ?? 'wholesale') === 'wholesale')
                     <th><a href="{{ $sortUrl('motivation_score') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Score') }}{!! $sortArrow('motivation_score') !!}</a></th>
@@ -167,7 +167,6 @@
                 @forelse($leads as $lead)
                 <tr>
                     <td><input type="checkbox" class="form-check-input lead-checkbox" value="{{ $lead->id }}" aria-label="{{ __('Select') }} {{ $lead->full_name }}"></td>
-                    <td class="text-secondary"><code>{{ $lead->reference ?? $lead->id }}</code></td>
                     <td>
                         <a href="{{ route('leads.show', $lead) }}">{{ $lead->full_name }}</a>
                         @if($lead->do_not_contact)
@@ -208,6 +207,7 @@
                             @endforeach
                         </select>
                     </td>
+                    <td class="text-secondary"><code>{{ $lead->reference ?? $lead->id }}</code></td>
                     <td>
                         @php
                             $tempColors = ['hot' => 'bg-red-lt', 'warm' => 'bg-yellow-lt', 'cold' => 'bg-azure-lt'];

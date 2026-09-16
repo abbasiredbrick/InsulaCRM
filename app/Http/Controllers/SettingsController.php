@@ -679,7 +679,7 @@ class SettingsController extends Controller
     public function updateLeadReferenceSettings(Request $request)
     {
         $request->validate([
-            'fallback_agent_code' => 'required|string|max:8|regex:/^[A-Za-z0-9]+$/',
+            'fallback_agent_code' => 'required|string|max:2|regex:/^[A-Za-z]{2}$/',
         ]);
 
         $tenant = auth()->user()->tenant;

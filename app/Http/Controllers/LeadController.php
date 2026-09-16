@@ -37,7 +37,8 @@ class LeadController extends Controller
                 $q->where('first_name', 'like', "%{$search}%")
                     ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('reference', 'like', "%{$search}%");
             });
         }
 
@@ -73,7 +74,7 @@ class LeadController extends Controller
 
         // Sorting
         if ($request->filled('sort')) {
-            $allowedSorts = ['id', 'first_name', 'lead_source', 'status', 'temperature', 'motivation_score', 'created_at'];
+            $allowedSorts = ['id', 'first_name', 'lead_source', 'status', 'reference', 'temperature', 'motivation_score', 'created_at'];
             $col = $request->input('sort');
             $dir = strtolower($request->input('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
             if (in_array($col, $allowedSorts)) {

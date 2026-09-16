@@ -12,33 +12,64 @@ class AgentCodeService
     /**
      * Default code used when a lead has no agent (or the agent has no code).
      */
-    public const FALLBACK_CODE = 'NA00';
+    public const FALLBACK_CODE = 'NA';
 
     /**
-     * Build a unique, stable agent code from the person's name.
+     * Build a unique, stable two-letter agent code from the person's name.
      *
-     * Format: two initials (first letter of the first and last words) followed
-     * by a two-digit discriminator, e.g. "AJ07" for Alice Johnson.
+     * Primary candidate: first letter of the first and second name.
+     * When that pair is already taken, we walk the same name's letters to
+     * derive the next unused pair (e.g. JS → JO → JH → JN), only resorting
+     * to a spare alphabetic pair when the name itself is exhausted.
      */
     public function generate(string $name): string
     {
-        $initials = $this->initials($name);
-
-        for ($i = 0; $i <= 99; $i++) {
-            $candidate = $initials . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+        foreach ($this->candidates($name) as $candidate) {
             if (! User::where('agent_code', $candidate)->exists()) {
                 return $candidate;
             }
         }
 
-        for ($i = 0; $i < 100; $i++) {
-            $candidate = $initials . str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT);
+        for ($i = 0; $i < 676; $i++) {
+            $candidate = chr(65 + intdiv($i, 26)) . chr(65 + ($i % 26));
             if (! User::where('agent_code', $candidate)->exists()) {
                 return $candidate;
             }
         }
 
-        return $initials . 'XX';
+        return 'ZZ';
+    }
+
+    /**
+     * Ordered candidate two-letter pairs derived from a name, deduplicated.
+     */
+    protected function candidates(string $name): array
+    {
+        $words = array_values(array_filter(preg_split('/\s+/', Str::ascii($name))));
+
+        $firstWord = $words[0] ?? '';
+        $a = $firstWord !== '' ? mb_substr($firstWord, 0, 1) : 'X';
+        $b = isset($words[1]) && $words[1] !== '' ? mb_substr($words[1], 0, 1) : 'X';
+
+        $candidates = [];
+        $seen = [];
+
+        $push = function (string $code) use (&$candidates, &$seen): void {
+            $code = strtoupper($code);
+            if (strlen($code) === 2 && ! isset($seen[$code])) {
+                $seen[$code] = true;
+                $candidates[] = $code;
+            }
+        };
+
+        $push($a . $b);
+
+        $pool = implode('', $words);
+        foreach (array_slice(str_split($pool), 1) as $letter) {
+            $push($a . $letter);
+        }
+
+        return $candidates;
     }
 
     /**

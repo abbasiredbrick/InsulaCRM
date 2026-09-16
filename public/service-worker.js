@@ -11,7 +11,7 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var APP_ASSET_VERSION = '1.2.5';
+var APP_ASSET_VERSION = '1.2.6';
 var CACHE_VERSION = 'v' + APP_ASSET_VERSION;
 var STATIC_CACHE = 'keystone-static-' + CACHE_VERSION;
 var DYNAMIC_CACHE = 'keystone-dynamic-' + CACHE_VERSION;

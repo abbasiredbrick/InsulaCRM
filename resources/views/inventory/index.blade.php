@@ -326,15 +326,9 @@
                 <tr>
                     <td>
                         <div class="fw-bold">{{ $unit->display_name }}</div>
-                        <div class="text-muted small">
-                            {{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
-                            @if($unit->bedrooms || $unit->bathrooms)
-                                • @if($unit->bedrooms){{ $unit->bedrooms }} {{ __('bd') }}@endif
-                                @if($unit->bathrooms) / {{ $unit->bathrooms }} {{ __('ba') }}@endif
-                            @endif
-                            @if($unit->square_footage) • {{ \App\Helpers\TenantFormatHelper::area($unit->square_footage) }}@endif
-                        </div>
-                        <div class="text-muted small">{{ $unit->unit_no ? __('Unit') . ' ' . $unit->unit_no . ' • ' : '' }}{{ __(\App\Models\Property::MARKET_CLASSES[$unit->market_class] ?? $unit->market_class) }}</div>
+                        @if($unit->unit_no)
+                            <div class="text-muted small">{{ __('Unit') }} {{ $unit->unit_no }}</div>
+                        @endif
                     </td>
                     <td>
                         @php

@@ -10,13 +10,13 @@ use Illuminate\Support\Carbon;
 class LeadReferenceService
 {
     /**
-     * Human-readable lead identifier: {YY}{MM}-{AGENTCODE}-{SEQ} e.g. 2609-AJ07-0001.
+     * Human-readable lead identifier: {CODE}{YY}{MM}{SEQ} e.g. AJ2609001.
      */
-    public const FORMULA = '{YY}{MM}-{AGENTCODE}-{SEQ}';
+    public const FORMULA = '{CODE}{YY}{MM}{SEQ}';
 
     public function format(string $yearMonth, string $agentCode, int $sequence): string
     {
-        return $yearMonth . '-' . $agentCode . '-' . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+        return $agentCode . $yearMonth . str_pad((string) $sequence, 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -82,19 +82,19 @@ class LeadReferenceService
 
     protected function nextSequence(?int $tenantId, string $yearMonth, string $agentCode): int
     {
-        $prefix = $yearMonth . '-' . $agentCode . '-';
+        $prefix = $agentCode . $yearMonth;
 
-        $last = Lead::withoutGlobalScopes()
+        $max = 0;
+        foreach (Lead::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('reference', 'like', $prefix . '%')
-            ->max('reference');
-
-        if ($last === null) {
-            return 1;
+            ->pluck('reference') as $reference) {
+            $tail = substr((string) $reference, strlen($prefix));
+            if ($tail !== '' && ctype_digit($tail)) {
+                $max = max($max, (int) $tail);
+            }
         }
 
-        $parts = explode('-', (string) $last);
-
-        return ((int) end($parts)) + 1;
+        return $max + 1;
     }
 }
