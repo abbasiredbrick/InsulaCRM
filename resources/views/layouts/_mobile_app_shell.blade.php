@@ -4,6 +4,18 @@
     $isRealEstate = $currentMode === 'realestate';
     $user = auth()->user();
     $isSubPage = !request()->is('dashboard') && !request()->is('leads') && !request()->is('pipeline') && !request()->is('calendar') && !request()->is('inventory') && !request()->is('showings');
+
+    // Top-bar "+": context-sensitive. On each list page it jumps straight to
+    // that page's "create" action; on every other page it is hidden.
+    $topAddHref = null;
+    $topAddLabel = null;
+    if (request()->is('leads')) { $topAddHref = route('leads.create'); $topAddLabel = __('Add Lead'); }
+    elseif (request()->is('buyers')) { $topAddHref = route('buyers.create'); $topAddLabel = __('Add Buyer'); }
+    elseif (request()->is('inventory') || request()->is('listings')) { $topAddHref = route('inventory.create'); $topAddLabel = __('New Unit'); }
+    elseif (request()->is('showings')) { $topAddHref = route('showings.create'); $topAddLabel = __('Schedule Viewing'); }
+    elseif (request()->is('open-houses')) { $topAddHref = route('open-houses.create'); $topAddLabel = __('New Open House'); }
+    elseif (request()->is('leases')) { $topAddHref = route('leases.create'); $topAddLabel = __('New Lease'); }
+    elseif (request()->is('properties')) { $topAddHref = null; $topAddLabel = null; }
 @endphp
 
 <!-- Mobile App Top Bar -->
@@ -36,14 +48,16 @@
         </div>
 
         <div class="mobile-header-right">
-            <!-- Quick Add -->
-            <button type="button" class="mobile-btn-icon mobile-btn-new" onclick="MobileApp.openActions()" aria-label="{{ __('New') }}">
+            <!-- Contextual Quick Add — only on list pages, openstraight to that page's create form -->
+            @if($topAddHref)
+            <a href="{{ $topAddHref }}" class="mobile-btn-icon mobile-btn-new" aria-label="{{ $topAddLabel }}" title="{{ $topAddLabel }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="22" height="22" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-            </button>
+            </a>
+            @endif
             <!-- Search Trigger -->
             <button type="button" class="mobile-btn-icon" onclick="MobileApp.openSearch()" aria-label="{{ __('Search') }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
