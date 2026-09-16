@@ -442,6 +442,21 @@
     background: rgba(255, 255, 255, 0.08);
 }
 
+/* Primary "New" action in the app top bar — accent pill so users always
+   know where the add-an-item action lives on handhelds */
+.mobile-btn-new {
+    background: var(--mobile-accent-gradient);
+    color: #ffffff;
+}
+[data-bs-theme="dark"] .mobile-btn-new {
+    color: #ffffff;
+}
+.mobile-btn-new:active {
+    background: var(--mobile-accent-gradient);
+    transform: scale(0.92);
+    opacity: 0.85;
+}
+
 .mobile-avatar-circle {
     display: inline-flex;
     align-items: center;

@@ -54,7 +54,11 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Contact') : __('Lead') }}</div>
                         <div class="datagrid-content">
-                            <a href="{{ route('leads.show', $property->lead_id) }}">{{ $property->lead->full_name }}</a>
+                            @if($property->lead)
+                                <a href="{{ route('leads.show', $property->lead_id) }}">{{ $property->lead->full_name }}</a>
+                            @else
+                                <span class="text-secondary">&mdash;</span>
+                            @endif
                         </div>
                     </div>
                 </div>

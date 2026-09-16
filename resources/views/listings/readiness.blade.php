@@ -4,7 +4,7 @@
 @section('page-title', __('Bayut Readiness'))
 
 @section('content')
-<div class="row mb-3">
+<div class="row mb-3 d-none d-md-flex">
     <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
             <div class="card-body">

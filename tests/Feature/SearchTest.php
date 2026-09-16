@@ -113,4 +113,88 @@ class SearchTest extends TestCase
         $dealResults = $results->where('type', 'deal');
         $this->assertCount(0, $dealResults);
     }
+
+    public function test_scope_inventory_returns_only_properties(): void
+    {
+        $this->actingAsAdmin();
+        $this->createLead(['first_name' => 'ScopeLead', 'last_name' => 'Person']);
+        Property::create([
+            'tenant_id' => $this->tenant->id,
+            'address' => 'Scope Unit 42, Testville',
+            'city' => 'Testville',
+            'state' => 'TX',
+            'zip_code' => '75001',
+        ]);
+
+        $response = $this->getJson(route('search', ['q' => 'Scope', 'scope' => 'inventory']));
+
+        $results = collect($response->json('results'));
+        $this->assertTrue($results->count() > 0);
+        $this->assertFalse($results->contains('type', 'lead'));
+        $this->assertTrue($results->contains('type', 'property'));
+    }
+
+    public function test_scope_leads_returns_only_leads(): void
+    {
+        $this->actingAsAdmin();
+        $this->createLead(['first_name' => 'ScopeLead', 'last_name' => 'Person']);
+        Property::create([
+            'tenant_id' => $this->tenant->id,
+            'address' => 'Scope Unit 42, Testville',
+            'city' => 'Testville',
+            'state' => 'TX',
+            'zip_code' => '75001',
+        ]);
+
+        $response = $this->getJson(route('search', ['q' => 'Scope', 'scope' => 'leads']));
+
+        $results = collect($response->json('results'));
+        $this->assertTrue($results->contains('type', 'lead'));
+        $this->assertFalse($results->contains('type', 'property'));
+    }
+
+    public function test_inventory_search_matches_community_and_unit_fields(): void
+    {
+        $this->actingAsAdmin();
+        Property::create([
+            'tenant_id' => $this->tenant->id,
+            'marketing_title' => '2BR in Palm Jumeirah',
+            'community' => 'Palm Jumeirah',
+            'sub_community' => 'Bey View Tower',
+            'unit_no' => '901',
+            'address' => 'Bey View Tower, Palm Jumeirah',
+            'city' => 'Dubai',
+            'state' => 'AE',
+            'zip_code' => '00000',
+        ]);
+
+        $response = $this->getJson(route('search', ['q' => 'Bey View', 'scope' => 'inventory']));
+
+        $results = collect($response->json('results'));
+        $property = $results->where('type', 'property')->first();
+        $this->assertNotNull($property);
+        // Wholesale mode links property matches to properties.show
+        $this->assertStringContainsString('/properties/', $property['url']);
+    }
+
+    public function test_realestate_property_results_link_to_inventory_show(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        Property::create([
+            'tenant_id' => $this->tenant->id,
+            'marketing_title' => 'Marina Unit One',
+            'community' => 'Dubai Marina',
+            'address' => 'Marina Unit One, Dubai Marina',
+            'city' => 'Dubai',
+            'state' => 'AE',
+            'zip_code' => '00000',
+        ]);
+
+        $response = $this->getJson(route('search', ['q' => 'Marina Unit', 'scope' => 'inventory']));
+
+        $results = collect($response->json('results'));
+        $property = $results->where('type', 'property')->first();
+        $this->assertNotNull($property);
+        $this->assertStringContainsString('/inventory/', $property['url']);
+    }
 }

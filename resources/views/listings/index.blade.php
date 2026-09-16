@@ -4,8 +4,8 @@
 @section('page-title', __('Listed Units'))
 
 @section('content')
-{{-- KPI Cards --}}
-<div class="row mb-3">
+{{-- KPI Cards (desktop/tablet only — hidden in the mobile PWA) --}}
+<div class="row mb-3 d-none d-md-flex">
     <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
             <div class="card-body">

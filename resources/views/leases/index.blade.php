@@ -15,7 +15,7 @@
     ];
 @endphp
 
-<div class="row g-3 mb-3">
+<div class="row g-3 mb-3 d-none d-md-flex">
     <div class="col-6 col-md-3">
         <a href="{{ route('leases.index', ['status' => 'active']) }}" class="card card-sm">
             <div class="card-body">

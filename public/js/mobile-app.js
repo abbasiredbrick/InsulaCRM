@@ -14,6 +14,7 @@
     var searchClearBtn = null;
     var searchList = null;
     var searchHint = null;
+    var searchForm = null;
     var searchTimer = null;
 
     var MobileApp = {
@@ -26,6 +27,7 @@
             searchClearBtn = document.querySelector('.mobile-search-clear');
             searchList = document.getElementById('mobile-search-list');
             searchHint = document.getElementById('mobile-search-hint');
+            searchForm = document.querySelector('.mobile-search-form');
 
             this.setupTouchGestures();
             this.setupSearch();
@@ -219,12 +221,43 @@
         onSearchSubmit: function(e) {
             if (!searchInput || !searchInput.value.trim()) {
                 e.preventDefault();
+                return;
             }
+            if (searchForm) {
+                searchForm.setAttribute('action', (window.location.origin || '') + '/search?scope=' + this.searchScope());
+            }
+        },
+
+        /**
+         * The current page's search domain. Search is page-specific so it
+         * finds units (inventory), leads, deals or buyers instantly without
+         * a submit click. Overridable with data-search-scope on <body>.
+         */
+        searchScope: function() {
+            var explicit = document.body && document.body.getAttribute('data-search-scope');
+            if (explicit) return explicit;
+            var path = window.location.pathname || '';
+            if (/^\/leads(\/|$)/.test(path)) return 'leads';
+            if (/^\/inventory(\/|$)/.test(path) || /^\/listings(\/|$)/.test(path)) return 'inventory';
+            if (/^\/buyers(\/|$)/.test(path)) return 'buyers';
+            if (/^\/deals(\/|$)/.test(path) || /^\/pipeline(\/|$)/.test(path)) return 'deals';
+            return 'all';
+        },
+
+        searchScopeLabel: function() {
+            var labels = { 'inventory': 'units', 'leads': 'leads', 'deals': 'deals', 'buyers': 'buyers' };
+            return labels[this.searchScope()] || 'all records';
         },
 
         setupSearch: function() {
             var self = this;
             if (!searchInput) return;
+            if (searchForm) {
+                searchForm.setAttribute('action', (window.location.origin || '') + '/search?scope=' + this.searchScope());
+            }
+            if (searchHint) {
+                searchHint.textContent = 'Search ' + this.searchScopeLabel() + ' — results appear as you type.';
+            }
 
             searchInput.addEventListener('input', function() {
                 var query = searchInput.value.trim();
@@ -246,66 +279,66 @@
         },
 
         performLiveSearch: function(query) {
-            var searchUrl = (window.location.origin || '') + '/search?q=' + encodeURIComponent(query);
+            var urlBase = (window.location.origin || '') + '/search?q=' + encodeURIComponent(query) + '&scope=' + this.searchScope();
+            var fullUrl = urlBase.replace('&scope=', '&scope=');
             if (searchHint) searchHint.style.display = 'none';
             if (searchList) {
                 searchList.innerHTML = '<div class="text-center py-4 text-muted small"><div class="spinner-border spinner-border-sm me-2"></div>Searching...</div>';
             }
 
-            fetch(searchUrl, {
+            var colors = { 'lead': 'blue', 'deal': 'purple', 'buyer': 'green', 'property': 'orange' };
+            var self = this;
+
+            fetch(urlBase, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'text/html, application/xhtml+xml'
+                    'Accept': 'application/json'
                 }
             })
-            .then(function(res) { return res.text(); })
-            .then(function(html) {
-                var parser = new DOMParser();
-                var doc = parser.parseFromString(html, 'text/html');
-                var resultsContainer = doc.querySelector('.container-xl') || doc.body;
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (!searchList) return;
+                var items = (data && data.results) || [];
 
-                // Extract grouped search cards or list items
-                var cards = resultsContainer.querySelectorAll('.card, .list-group-item, table tr');
-                if (cards.length > 0 && searchList) {
-                    var output = '<div class="p-2">';
-                    // If full search results found, provide link to complete results
-                    output += '<div class="mb-3 d-flex justify-content-between align-items-center">' +
-                              '<span class="small fw-bold text-muted">RESULTS FOR "' + MobileApp.escapeHtml(query) + '"</span>' +
-                              '<a href="' + searchUrl + '" class="small text-primary fw-bold">View all &rarr;</a>' +
-                              '</div>';
+                var live = query === (searchInput.value || '').trim();
+                if (!live) return;
 
-                    // Parse individual links
-                    var links = resultsContainer.querySelectorAll('a[href*="/leads/"], a[href*="/deals/"], a[href*="/pipeline/"], a[href*="/properties/"], a[href*="/inventory/"], a[href*="/buyers/"]');
-                    var seen = {};
-                    var count = 0;
-
-                    links.forEach(function(link) {
-                        var href = link.getAttribute('href');
-                        var text = (link.textContent || '').trim();
-                        if (href && text && !seen[href] && count < 8) {
-                            seen[href] = true;
-                            count++;
-                            output += '<a href="' + href + '" class="d-flex align-items-center gap-3 p-3 mb-2 rounded-3 bg-body-tertiary text-decoration-none text-reset border">' +
-                                      '<div class="flex-fill"><strong class="d-block">' + MobileApp.escapeHtml(text) + '</strong>' +
-                                      '<span class="small text-muted">' + MobileApp.escapeHtml(href.split('/')[1] || '') + '</span></div>' +
-                                      '<span class="text-muted">&rsaquo;</span></a>';
-                        }
-                    });
-
-                    if (count === 0) {
-                        output += '<div class="text-center py-4 text-muted small">No direct records found. <a href="' + searchUrl + '">Open full search</a></div>';
-                    }
-
-                    output += '</div>';
-                    searchList.innerHTML = output;
-                } else if (searchList) {
-                    searchList.innerHTML = '<div class="text-center py-4 text-muted small">No matches found for "' + MobileApp.escapeHtml(query) + '"</div>';
+                if (items.length === 0) {
+                    searchList.innerHTML = '<div class="text-center py-4 text-muted small">No results for "' +
+                        MobileApp.escapeHtml(query) + '" in ' + self.searchScopeLabel() + '.<br>' +
+                        '<span class="text-secondary">Try a community, unit number, building or client name.</span></div>';
+                    return;
                 }
+
+                var output = '<div class="p-2">' +
+                    '<div class="mb-2 d-flex justify-content-between align-items-center px-1">' +
+                    '<span class="small fw-bold text-muted">' + items.length + ' in ' + self.searchScopeLabel() + ' &middot; "' + MobileApp.escapeHtml(query) + '"</span>' +
+                    '<a href="' + fullUrl + '" class="small text-primary fw-bold">View all &rarr;</a>' +
+                    '</div>';
+
+                items.forEach(function(r) {
+                    if (!r || !r.url) return;
+                    var type = r.type || 'property';
+                    var label = type === 'property'
+                        ? (self.searchScope() === 'inventory' ? 'Unit' : 'Property')
+                        : (type.charAt(0).toUpperCase() + type.slice(1));
+                    var color = colors[type] || 'secondary';
+                    output += '<a href="' + r.url + '" class="d-flex align-items-center gap-3 p-3 mb-2 rounded-3 bg-body-tertiary text-decoration-none text-reset border">' +
+                        '<span class="badge text-uppercase bg-' + color + '-lt text-' + color + '" style="font-size:10px;flex:0 0 auto;">' + MobileApp.escapeHtml(label) + '</span>' +
+                        '<div class="flex-fill" style="min-width:0;">' +
+                        '<strong class="d-block text-truncate">' + MobileApp.escapeHtml(r.title) + '</strong>' +
+                        (r.subtitle ? '<span class="small text-muted text-truncate d-block">' + MobileApp.escapeHtml(r.subtitle) + '</span>' : '') +
+                        '</div>' +
+                        '<span class="text-muted">&rsaquo;</span></a>';
+                });
+
+                output += '</div>';
+                searchList.innerHTML = output;
             })
-            .catch(function(err) {
-                if (searchList) {
-                    searchList.innerHTML = '<div class="text-center py-4 text-muted small">Search preview unavailable. <a href="' + searchUrl + '">Search full page</a></div>';
-                }
+            .catch(function() {
+                if (!searchList) return;
+                searchList.innerHTML = '<div class="text-center py-4 text-muted small">Search preview unavailable. ' +
+                    '<a href="' + fullUrl + '">Open search results</a></div>';
             });
         },
 

@@ -1,6 +1,6 @@
 @props(['totalLeads', 'leadsThisMonth', 'activeDeals', 'totalPipelineValue', 'closedThisMonth', 'feesThisMonth', 'hotLeads', 'overdueTasks'])
 
-<div class="row row-deck row-cards mb-4">
+<div class="row row-deck row-cards mb-4 d-none d-md-flex">
     <div class="col-sm-6 col-lg-3">
         <a href="{{ route('leads.index') }}" class="card card-sm text-decoration-none" style="color: inherit;">
             <div class="card-body">

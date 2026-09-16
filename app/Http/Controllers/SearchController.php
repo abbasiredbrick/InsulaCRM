@@ -6,6 +6,7 @@ use App\Models\Buyer;
 use App\Models\Deal;
 use App\Models\Lead;
 use App\Models\Property;
+use App\Services\BusinessModeService;
 use Illuminate\Http\Request;
 
 class SearchController extends Controller
@@ -13,19 +14,20 @@ class SearchController extends Controller
     public function search(Request $request)
     {
         $q = trim($request->input('q', ''));
+        $scope = strtolower($request->input('scope', 'all'));
 
         if (strlen($q) < 2) {
-            if ($request->expectsJson()) {
-                return response()->json(['results' => []]);
-            }
-            return view('search.results', ['query' => $q, 'results' => collect()]);
+            return $request->expectsJson()
+                ? response()->json(['results' => []])
+                : view('search.results', ['query' => $q, 'results' => collect()]);
         }
 
         $user = auth()->user();
         $results = collect();
+        $isRealEstate = BusinessModeService::isRealEstate();
 
-        // Search leads (if user can manage leads)
-        if ($user->canManageLeads()) {
+        // Leads (supports scope=leads or all)
+        if (in_array($scope, ['leads', 'all']) && $user->canManageLeads()) {
             $leads = Lead::where(function ($query) use ($q) {
                 $query->where('first_name', 'like', "%{$q}%")
                     ->orWhere('last_name', 'like', "%{$q}%")
@@ -45,8 +47,8 @@ class SearchController extends Controller
             $results = $results->merge($leads);
         }
 
-        // Search deals
-        if (!$user->isFieldScout()) {
+        // Deals (scope=deals or all)
+        if (in_array($scope, ['deals', 'all']) && !$user->isFieldScout()) {
             $deals = Deal::where(function ($outer) use ($q) {
                 $outer->whereHas('lead', function ($query) use ($q) {
                     $query->where('first_name', 'like', "%{$q}%")
@@ -68,8 +70,8 @@ class SearchController extends Controller
             $results = $results->merge($deals);
         }
 
-        // Search buyers (if user can manage buyers)
-        if ($user->canManageBuyers()) {
+        // Buyers (scope=buyers or all)
+        if (in_array($scope, ['buyers', 'all']) && $user->canManageBuyers()) {
             $buyers = Buyer::where(function ($query) use ($q) {
                 $query->where('first_name', 'like', "%{$q}%")
                     ->orWhere('last_name', 'like', "%{$q}%")
@@ -89,22 +91,32 @@ class SearchController extends Controller
             $results = $results->merge($buyers);
         }
 
-        // Search properties
-        $properties = Property::where(function ($query) use ($q) {
-            $query->where('address', 'like', "%{$q}%")
-                ->orWhere('city', 'like', "%{$q}%")
-                ->orWhere('zip_code', 'like', "%{$q}%");
-        })
-        ->limit(5)
-        ->get()
-        ->map(fn ($property) => [
-            'type' => 'property',
-            'title' => $property->address,
-            'subtitle' => trim(($property->city ?? '') . ', ' . ($property->state ?? '') . ' ' . ($property->zip_code ?? ''), ', '),
-            'url' => route('properties.show', $property),
-        ]);
+        // Properties / inventory units (scope=inventory or all)
+        if (in_array($scope, ['inventory', 'all'])) {
+            $properties = Property::where(function ($query) use ($q) {
+                $query->where('address', 'like', "%{$q}%")
+                    ->orWhere('city', 'like', "%{$q}%")
+                    ->orWhere('zip_code', 'like', "%{$q}%")
+                    ->orWhere('marketing_title', 'like', "%{$q}%")
+                    ->orWhere('community', 'like', "%{$q}%")
+                    ->orWhere('sub_community', 'like', "%{$q}%")
+                    ->orWhere('unit_no', 'like', "%{$q}%")
+                    ->orWhere('developer_name', 'like', "%{$q}%")
+                    ->orWhere('owner_name', 'like', "%{$q}%");
+            })
+            ->limit(5)
+            ->get()
+            ->map(fn ($property) => [
+                'type' => 'property',
+                'title' => $property->marketing_title ?: $property->address,
+                'subtitle' => trim(($property->sub_community ?? $property->community ?? '') . ($property->unit_no ? ' #' . $property->unit_no : ''), ', '),
+                'url' => $isRealEstate
+                    ? route('inventory.show', $property)
+                    : route('properties.show', $property),
+            ]);
 
-        $results = $results->merge($properties);
+            $results = $results->merge($properties);
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['results' => $results->values()]);
