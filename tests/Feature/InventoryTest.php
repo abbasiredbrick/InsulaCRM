@@ -185,6 +185,93 @@ class InventoryTest extends TestCase
             ->assertSee('Premium 3BR');
     }
 
+    public function test_index_sorts_by_price(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Priciest Penthouse',
+            'intent' => 'sale',
+            'availability' => 'ready_to_list',
+            'list_price' => 2500000,
+            'asking_price' => 2500000,
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Apt in Old Town',
+            'intent' => 'sale',
+            'availability' => 'ready_to_list',
+            'list_price' => 1200000,
+            'asking_price' => 1200000,
+        ]);
+
+        $asc = $this->get(route('inventory.index').'?sort=price&direction=asc')
+            ->assertOk()
+            ->getContent();
+
+        $this->assertLessThan(
+            strpos($asc, 'Priciest Penthouse'),
+            strpos($asc, 'Apt in Old Town'),
+            'Ascending price sort must list the cheaper unit first.'
+        );
+    }
+
+    public function test_index_ignores_unknown_sort_columns(): void
+    {
+        $this->createProperty([
+            'marketing_title' => 'Fort Knox',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'rent_price' => 80000,
+            'rent_period' => 'yearly',
+        ]);
+
+        $this->get(route('inventory.index').'?sort=users.password&direction=desc')
+            ->assertOk()
+            ->assertSee('Fort Knox');
+    }
+
+    public function test_filter_options_are_cascaded(): void
+    {
+        $web = \App\Models\AvailabilitySource::create(['tenant_id' => $this->tenant->id, 'name' => 'Web']);
+        $walkIn = \App\Models\AvailabilitySource::create(['tenant_id' => $this->tenant->id, 'name' => 'Walk In']);
+
+        $alice = $this->createUserWithRole('agent', ['name' => 'Alice Smith']);
+        $bob = $this->createUserWithRole('agent', ['name' => 'Bob Jones']);
+
+        $this->createProperty([
+            'marketing_title' => 'Marina Rent',
+            'intent' => 'rent',
+            'availability' => 'ready_to_list',
+            'availability_source_id' => $web->id,
+            'assigned_agent_id' => $alice->id,
+            'community' => 'Dubai Marina',
+            'sub_community' => 'Marina Heights',
+        ]);
+        $this->createProperty([
+            'marketing_title' => 'Desert Villa',
+            'intent' => 'sale',
+            'availability' => 'ready_to_list',
+            'availability_source_id' => $walkIn->id,
+            'assigned_agent_id' => $bob->id,
+            'community' => 'Al Barari',
+            'sub_community' => '',
+        ]);
+
+        $response = $this->getJson(route('inventory.filterOptions').'?source='.$web->id)
+            ->assertOk()
+            ->json();
+
+        $this->assertContains('Dubai Marina', $response['communities'], 'Community list must cascade off the chosen source.');
+        $this->assertNotContains('Al Barari', $response['communities']);
+        $this->assertContains('Marina Heights', $response['sub_communities']);
+
+        $agentNames = array_column($response['agents'], 'name');
+        $this->assertContains('Alice Smith', $agentNames);
+        $this->assertNotContains('Bob Jones', $agentNames, 'Agent options must cascade off the chosen source too.');
+
+        $sourceNames = array_column($response['sources'], 'name');
+        $this->assertContains('Web', $sourceNames);
+        $this->assertContains('Walk In', $sourceNames, 'The chosen source must stay navigable in its own dropdown.');
+    }
+
     public function test_advanced_search_filters_by_community_furnishing_and_photos(): void
     {
         $this->createProperty([

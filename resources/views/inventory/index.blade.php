@@ -4,6 +4,19 @@
 @section('page-title', __('Inventory'))
 
 @section('content')
+@php
+    $currentSort = $sort ?? '';
+    $currentDir = $direction ?? 'desc';
+    $sortMeta = function (string $key, string $label) use ($currentSort, $currentDir): string {
+        $sorting = $currentSort === $key;
+        $nextDir = ($sorting && $currentDir === 'asc') ? 'desc' : 'asc';
+        $url = route('inventory.index', array_merge(request()->query(), ['sort' => $key, 'direction' => $nextDir]));
+        $arrow = $sorting
+            ? ($currentDir === 'asc' ? '<span class="text-primary">▲</span>' : '<span class="text-primary">▼</span>')
+            : '<span class="text-muted">⇅</span>';
+        return '<a href="'.e($url).'" class="text-reset text-decoration-none d-inline-flex align-items-center gap-1">'.e($label).' '.$arrow.'</a>';
+    };
+@endphp
 {{-- KPI Cards (desktop/tablet only — hidden in the mobile PWA) --}}
 <div class="row mb-3 d-none d-md-flex">
     <div class="col-sm-6 col-lg-3">
@@ -311,12 +324,12 @@
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
-                    <th>{{ __('Unit') }}</th>
-                    <th>{{ __('Intent') }}</th>
-                    <th>{{ __('Price') }}</th>
-                    <th>{{ __('Availability') }}</th>
-                    <th>{{ __('Leads') }}</th>
-                    <th>{{ __('Agent') }}</th>
+                    <th>{!! $sortMeta('unit', __('Unit')) !!}</th>
+                    <th>{!! $sortMeta('intent', __('Intent')) !!}</th>
+                    <th>{!! $sortMeta('price', __('Price')) !!}</th>
+                    <th>{!! $sortMeta('availability', __('Availability')) !!}</th>
+                    <th>{!! $sortMeta('leads', __('Leads')) !!}</th>
+                    <th>{!! $sortMeta('agent', __('Agent')) !!}</th>
                     <th>{{ __('Portals') }}</th>
                     <th class="w-1"></th>
                 </tr>
@@ -422,6 +435,82 @@ document.getElementById('copy-share-link')?.addEventListener('click', function (
         setTimeout(function () { btn.innerHTML = original; }, 1500);
     });
 });
+</script>
+@endpush
+@push('scripts')
+<script>
+// Cascading advanced search: as any filter changes, refresh the data-driven
+// dropdowns (source / agent / community / building) so their options only
+// show values available under the filters already chosen.
+(function () {
+    var form = document.getElementById('inventory-search-form');
+    var advanced = document.getElementById('advancedSearch');
+    if (!form || !advanced) return;
+
+    var allLabels = {
+        'source': '{{ __('All') }}',
+        'agent': '{{ __('All Agents') }}',
+        'community': '{{ __('All') }}',
+        'sub_community': '{{ __('All') }}'
+    };
+
+    var timer = null;
+
+    function refreshOptions() {
+        var params = new URLSearchParams();
+        var els = form.querySelectorAll('select[name], input[name]');
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            if (!el.name) continue;
+            if (el.type === 'checkbox') {
+                if (el.checked) params.set(el.name, el.value);
+            } else if (el.value !== '') {
+                params.set(el.name, el.value);
+            }
+        }
+        params.delete('sort');
+        params.delete('direction');
+
+        fetch('{{ route('inventory.filterOptions') }}?' + params.toString(), { headers: { 'Accept': 'application/json' } })
+            .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+            .then(function (data) {
+                rebuildSelect(form.querySelector('select[name="source"]'), data.sources, 'id', 'name');
+                rebuildSelect(form.querySelector('select[name="agent"]'), data.agents, 'id', 'name');
+                rebuildSelect(form.querySelector('select[name="community"]'), data.communities, null, null);
+                rebuildSelect(form.querySelector('select[name="sub_community"]'), data.sub_communities, null, null);
+            })
+            .catch(function () {
+                // Keep the currently rendered options on any failure.
+            });
+    }
+
+    function rebuildSelect(select, items, valueKey, labelKey) {
+        if (!select) return;
+        var keep = select.value;
+        var label = allLabels[select.name] || '{{ __('All') }}';
+        var list = Array.isArray(items) ? items : [];
+        select.innerHTML = '';
+        var all = document.createElement('option');
+        all.value = '';
+        all.textContent = label;
+        select.appendChild(all);
+        for (var i = 0; i < list.length; i++) {
+            var item = list[i];
+            var val = valueKey ? item[valueKey] : item;
+            var lbl = labelKey ? item[labelKey] : item;
+            var opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = lbl;
+            if (String(keep) === String(val)) opt.selected = true;
+            select.appendChild(opt);
+        }
+    }
+
+    advanced.addEventListener('change', function () {
+        clearTimeout(timer);
+        timer = setTimeout(refreshOptions, 150);
+    });
+})();
 </script>
 @endpush
 @endsection

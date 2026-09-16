@@ -17,6 +17,14 @@
     var searchForm = null;
     var searchTimer = null;
 
+    function ssGet(key) {
+        try { return JSON.parse(sessionStorage.getItem('navstate|' + key) || 'null'); } catch (e) { return null; }
+    }
+
+    function ssSet(key, val) {
+        try { sessionStorage.setItem('navstate|' + key, JSON.stringify(val)); } catch (e) {}
+    }
+
     var MobileApp = {
         init: function() {
             backdrop = document.getElementById('mobile-sheet-backdrop');
@@ -33,8 +41,134 @@
             this.setupSearch();
             this.setupActionBars();
             this.setupClickableRows();
+            this.setupNavStateRestore();
             this.syncNotifications();
             this.checkIosInstallGuide();
+        },
+
+        /**
+         * Keep the applied search alive across back/forward navigation.
+         * The shell search sheet (the only search on phones/tablets) and
+         * every inline GET filter form write their state to sessionStorage;
+         * when the browser returns to a list view the previous search is
+         * restored instead of forcing the user to type it again.
+         */
+        setupNavStateRestore: function() {
+            var navHandled = false;
+
+            function isBackNav(e) {
+                if (e && e.persisted === true) return true;
+                try {
+                    var entries = performance.getEntriesByType && performance.getEntriesByType('navigation');
+                    if (entries.length && entries[0].type === 'back_forward') return true;
+                } catch (err) {}
+                return false;
+            }
+
+            function pathOf(url) {
+                try { return new URL(url, window.location.origin).pathname; } catch (e) { return ''; }
+            }
+
+            function drainForm(form) {
+                var data = {};
+                var els = form.elements;
+                for (var i = 0; i < els.length; i++) {
+                    var el = els[i];
+                    if (!el.name) continue;
+                    var type = (el.type || '').toLowerCase();
+                    if (type === 'checkbox' || type === 'radio') {
+                        if (el.checked) data[el.name] = el.value;
+                    } else if (type !== 'submit' && type !== 'button' && type !== 'reset') {
+                        if (el.value !== '') data[el.name] = el.value;
+                    }
+                }
+                return data;
+            }
+
+            function hasValues(form) {
+                return Object.keys(drainForm(form)).length > 0;
+            }
+
+            // Inline GET filter forms: remember what was applied, and on back
+            // re-apply it if the returned page came in without any filters.
+            var tracked = [];
+            var forms = document.querySelectorAll('main form[method="GET"]');
+            for (var i = 0; i < forms.length; i++) {
+                var form = forms[i];
+                if (form.classList.contains('mobile-search-form')) continue;
+                if (!form.querySelector('input[name="search"]')) continue;
+
+                var key = 'liststate|' + pathOf(form.action);
+                var debounce = null;
+                var save = function() { ssSet(key, drainForm(form)); };
+                form.addEventListener('submit', save);
+                form.addEventListener('change', function() {
+                    clearTimeout(debounce);
+                    debounce = setTimeout(save, 400);
+                });
+                tracked.push({ form: form, key: key });
+            }
+
+            function restoreListForms() {
+                for (var i = 0; i < tracked.length; i++) {
+                    if (navHandled) return;
+                    var entry = tracked[i];
+                    var saved = ssGet(entry.key);
+                    if (!saved || Object.keys(saved).length === 0) continue;
+                    if (hasValues(entry.form)) continue;
+                    var els = entry.form.elements;
+                    for (var j = 0; j < els.length; j++) {
+                        var el = els[j];
+                        if (!el.name || !(el.name in saved)) continue;
+                        if (el.type === 'checkbox' || el.type === 'radio') {
+                            el.checked = String(el.value) === String(saved[el.name]);
+                        } else if (el.type !== 'submit' && el.type !== 'button' && el.type !== 'reset') {
+                            el.value = saved[el.name];
+                        }
+                    }
+                    navHandled = true;
+                    try {
+                        if (entry.form.requestSubmit) entry.form.requestSubmit();
+                        else entry.form.submit();
+                    } catch (err) {}
+                }
+            }
+
+            var self = this;
+            window.addEventListener('pageshow', function(e) {
+                if (navHandled || !isBackNav(e)) return;
+                if (searchSheet && searchInput && !/^\/search(\/|$)/.test(window.location.pathname || '')) {
+                    var scope = self.searchScope();
+                    if (scope) {
+                        var saved = ssGet('sheetstate|' + scope);
+                        if (saved && saved.shown === true && (Date.now() - (saved.ts || 0) <= 5 * 60 * 1000)) {
+                            navHandled = true;
+                            searchInput.value = saved.q;
+                            self.openSearch();
+                            self.performLiveSearch(saved.q);
+                        }
+                    }
+                }
+                restoreListForms();
+            });
+        },
+
+        /**
+         * Remember the current successful sheet query so a back navigation
+         * back to this section can restore it.
+         */
+        storeSheetQuery: function(q) {
+            var scope = this.searchScope();
+            if (scope) ssSet('sheetstate|' + scope, { q: q, ts: Date.now(), shown: true });
+        },
+
+        /**
+         * Forget the stored sheet query — the user cleared it or closed the
+         * sheet without acting, so it must not come back.
+         */
+        storeSheetClear: function() {
+            var scope = this.searchScope();
+            if (scope) ssSet('sheetstate|' + scope, { q: '', ts: Date.now(), shown: false });
         },
 
         /**
@@ -225,6 +359,7 @@
                 searchInput.blur();
             }
             document.body.style.overflow = '';
+            this.storeSheetClear();
         },
 
         clearSearch: function() {
@@ -235,6 +370,7 @@
             if (searchClearBtn) searchClearBtn.style.display = 'none';
             if (searchList) searchList.innerHTML = '';
             if (searchHint) searchHint.style.display = 'block';
+            this.storeSheetClear();
         },
 
         onSearchSubmit: function(e) {
@@ -321,6 +457,8 @@
 
                 var live = query === (searchInput.value || '').trim();
                 if (!live) return;
+
+                self.storeSheetQuery(query);
 
                 if (items.length === 0) {
                     searchList.innerHTML = '<div class="text-center py-4 text-muted small">No results for "' +

@@ -148,7 +148,19 @@ class ListingController extends Controller
             $query->where('availability_source_id', $request->source);
         }
 
-        $units = (clone $query)->latest('updated_at')->paginate(20);
+        $sort = $request->input('sort');
+        $direction = $request->input('direction', $sort ? 'asc' : 'desc');
+        if (! in_array(strtolower((string) $direction), ['asc', 'desc'], true)) {
+            $direction = $sort ? 'asc' : 'desc';
+        }
+
+        if ($sort === 'leads') {
+            $query->withCount('leads');
+        }
+
+        $this->applySort($query, $sort, $direction);
+
+        $units = (clone $query)->paginate(20);
 
         $kpis = [
             'total' => (clone $query)->count(),
@@ -163,21 +175,10 @@ class ListingController extends Controller
                 })->count(),
         ];
 
-        $agents = $this->canFilterByAgent()
-            ? \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', \App\Services\BusinessModeService::getRoles()))
-                ->orderBy('name')->get(['id', 'name'])
-            : collect();
-
-        $sources = \App\Models\AvailabilitySource::orderBy('name')->get(['id', 'name']);
-        $communities = Property::withoutGlobalScopes()
-            ->where('tenant_id', auth()->user()->tenant_id)
-            ->whereNotNull('community')->where('community', '!=', '')
-            ->distinct()->orderBy('community')->pluck('community')->take(500);
-        $subCommunities = Property::withoutGlobalScopes()
-            ->where('tenant_id', auth()->user()->tenant_id)
-            ->whereNotNull('sub_community')->where('sub_community', '!=', '')
-            ->distinct()->orderBy('sub_community')->pluck('sub_community')->take(500);
+        $agents = $this->filterableAgents($request);
+        $sources = $this->filterableSources($request);
+        $communities = $this->optionValues($request, 'community');
+        $subCommunities = $this->optionValues($request, 'sub_community');
 
         return view('inventory.index', [
             'units' => $units,
@@ -187,7 +188,170 @@ class ListingController extends Controller
             'communities' => $communities,
             'subCommunities' => $subCommunities,
             'canFilterByAgent' => $this->canFilterByAgent(),
+            'sort' => $request->input('sort'),
+            'direction' => $direction,
         ]);
+    }
+
+    /**
+     * JSON source of truth for the advanced-search dropdowns. Returns the
+     * available source / agent / community / sub-community options honoring
+     * every selected advanced filter. Used to live-update the option lists
+     * as the user changes filters (cascading values).
+     */
+    public function filterOptions(Request $request)
+    {
+        return response()->json([
+            'sources' => $this->filterableSources($request),
+            'agents' => $this->filterableAgents($request),
+            'communities' => $this->optionValues($request, 'community'),
+            'sub_communities' => $this->optionValues($request, 'sub_community'),
+        ]);
+    }
+
+    /**
+     * Available agents considering the currently selected advanced filters
+     * (an agent column is only offered when the role scope permits it).
+     */
+    protected function filterableAgents(Request $request): \Illuminate\Support\Collection
+    {
+        if (! $this->canFilterByAgent()) {
+            return collect();
+        }
+
+        $agentIds = (clone $this->optionQuery($request, ['agent']))
+            ->whereNotNull('assigned_agent_id')
+            ->where('assigned_agent_id', '!=', '')
+            ->distinct()
+            ->pluck('assigned_agent_id');
+
+        return \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
+            ->whereIn('id', $agentIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * Available availability sources considering the currently selected
+     * advanced filters.
+     */
+    protected function filterableSources(Request $request): \Illuminate\Support\Collection
+    {
+        $sourceIds = (clone $this->optionQuery($request, ['source']))
+            ->whereNotNull('availability_source_id')
+            ->where('availability_source_id', '!=', '')
+            ->distinct()
+            ->pluck('availability_source_id');
+
+        return \App\Models\AvailabilitySource::whereIn('id', $sourceIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * Distinct values for a data-driven dropdown column. The column's own
+     * filter is excluded so the currently selected value stays navigable;
+     * every other selected advanced filter narrows the candidate list.
+     */
+    protected function optionValues(Request $request, string $column): array
+    {
+        return (array) (clone $this->optionQuery($request, [$column]))
+            ->whereNotNull($column)->where($column, '!=', '')
+            ->distinct()->orderBy($column)->take(500)->pluck($column)->values()->all();
+    }
+
+    /**
+     * Tenant-scoped property query mirroring index()'s visibility rules and
+     * every advanced filter except the excluded ones. Used to build the
+     * cascading dropdown option lists.
+     */
+    protected function optionQuery(Request $request, array $exclude = []): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = Property::withoutGlobalScopes()->where('tenant_id', auth()->user()->tenant_id);
+
+        if (! auth()->user()->isAdmin() && auth()->user()->isAgent()) {
+            $query->where(fn ($q) => $q->where('assigned_agent_id', auth()->id())->orWhereNull('assigned_agent_id'));
+        }
+
+        $filters = [
+            'intent' => fn ($v) => $query->where('intent', $v),
+            'availability' => fn ($v) => $query->where('availability', $v),
+            'market_class' => fn ($v) => $query->where('market_class', $v),
+            'category' => fn ($v) => $query->where('property_category', $v),
+            'furnishing' => fn ($v) => $query->where('furnishing', $v),
+            'rent_period' => fn ($v) => $query->where('rent_period', $v),
+            'community' => fn ($v) => $query->where('community', $v),
+            'sub_community' => fn ($v) => $query->where('sub_community', $v),
+            'building_no' => fn ($v) => $query->where('building_no', $v),
+            'floor_no' => fn ($v) => $query->where('floor_no', $v),
+            'bedrooms_min' => fn ($v) => $query->where('bedrooms', '>=', (int) $v),
+            'bedrooms_max' => fn ($v) => $query->where('bedrooms', '<=', (int) $v),
+            'bathrooms' => fn ($v) => $query->where('bathrooms', (int) $v),
+            'rent_min' => fn ($v) => $query->where('rent_price', '>=', (float) $v),
+            'rent_max' => fn ($v) => $query->where('rent_price', '<=', (float) $v),
+            'sale_min' => fn ($v) => $query->where('list_price', '>=', (float) $v),
+            'sale_max' => fn ($v) => $query->where('list_price', '<=', (float) $v),
+            'area_min' => fn ($v) => $query->where('square_footage', '>=', (int) $v),
+            'area_max' => fn ($v) => $query->where('square_footage', '<=', (int) $v),
+            'developer_name' => fn ($v) => $query->where('developer_name', 'like', "%{$v}%"),
+            'rera_permit_no' => fn ($v) => $query->where('rera_permit_no', 'like', "%{$v}%"),
+            'title_deed_no' => fn ($v) => $query->where('title_deed_no', 'like', "%{$v}%"),
+            'plot_no' => fn ($v) => $query->where('plot_no', 'like', "%{$v}%"),
+            'owner_name' => fn ($v) => $query->where('owner_name', 'like', "%{$v}%"),
+            'parking' => fn ($v) => $query->where('parking', '>=', (int) $v),
+            'source' => fn ($v) => $query->where('availability_source_id', $v),
+            'agent' => function ($v) use ($query) {
+                if ($this->canFilterByAgent()) {
+                    $query->where('assigned_agent_id', $v);
+                }
+            },
+            'has_photos' => function () use ($query) {
+                $query->whereHas('media', function ($q) { $q->where('type', 'photo'); });
+            },
+            'has_portal_live' => function () use ($query) {
+                $query->where(function ($q) {
+                    $q->where('bayut_status', 'live')
+                        ->orWhere('dubizzle_status', 'live')
+                        ->orWhere('propertyfinder_status', 'live');
+                });
+            },
+        ];
+
+        foreach ($filters as $key => $apply) {
+            if (in_array($key, $exclude, true)) {
+                continue;
+            }
+            if (in_array($key, ['has_photos', 'has_portal_live'], true)) {
+                if ($request->filled($key)) {
+                    $apply();
+                }
+            } elseif ($request->filled($key)) {
+                $apply($request->input($key));
+            }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Apply a whitelisted column sort. Only user-facing sortable columns are
+     * accepted; anything else falls back to the default newest-first order.
+     */
+    protected function applySort($query, ?string $sort, string $direction): void
+    {
+        $sortable = [
+            'unit' => "CASE WHEN marketing_title IS NOT NULL AND marketing_title != '' THEN marketing_title ELSE COALESCE(sub_community, community, address, '') END",
+            'intent' => 'intent',
+            'price' => "CASE WHEN intent IN ('rent','both') THEN rent_price ELSE COALESCE(list_price, asking_price) END",
+            'availability' => 'availability',
+            'leads' => 'leads_count',
+            'agent' => "(SELECT name FROM users WHERE users.id = properties.assigned_agent_id)",
+        ];
+
+        $column = $sortable[$sort] ?? 'updated_at';
+        $dir = strtolower($direction) === 'asc' ? 'asc' : 'desc';
+
+        $query->orderByRaw($column.' '.$dir);
     }
 
     /**

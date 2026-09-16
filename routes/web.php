@@ -232,6 +232,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/inventory/export/dubizzle', [ListingController::class, 'exportDubizzle'])->name('inventory.export.dubizzle');
         Route::get('/inventory/export/propertyfinder', [ListingController::class, 'exportPropertyFinder'])->name('inventory.export.propertyfinder');
         Route::get('/inventory/search', [ListingController::class, 'searchForLead'])->name('inventory.search');
+        Route::get('/inventory/filter-options', [ListingController::class, 'filterOptions'])->name('inventory.filterOptions');
         Route::get('/inventory/{property}', [ListingController::class, 'show'])->name('inventory.show');
         Route::get('/inventory/{property}/edit', [ListingController::class, 'edit'])->name('inventory.edit');
         Route::put('/inventory/{property}', [ListingController::class, 'update'])->name('inventory.update');
