@@ -120,7 +120,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Property') }}</th>
@@ -135,10 +135,10 @@
             <tbody>
                 @forelse($listings as $deal)
                 @php $property = $deal->lead?->property; @endphp
-                <tr>
+                <tr data-href="{{ url('/pipeline/' . $deal->id) }}">
                     <td>
                         @if($property)
-                            <div class="fw-bold">{{ $property->address }}</div>
+                            <div class="fw-bold"><a href="{{ url('/pipeline/' . $deal->id) }}">{{ $property->address }}</a></div>
                             <div class="text-muted small">{{ $property->city }}, {{ $property->state }} {{ $property->zip_code }}</div>
                             @if($property->bedrooms || $property->bathrooms || $property->square_footage)
                             <div class="text-muted small">

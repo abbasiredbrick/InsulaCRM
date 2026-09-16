@@ -54,7 +54,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Property') }}</th>
@@ -68,7 +68,7 @@
             </thead>
             <tbody>
                 @forelse($openHouses as $openHouse)
-                <tr>
+                <tr data-href="{{ route('open-houses.show', $openHouse) }}">
                     <td>
                         @if($openHouse->property)
                             <a href="{{ route('properties.show', $openHouse->property) }}">{{ $openHouse->property->address }}</a>

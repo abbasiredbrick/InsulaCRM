@@ -98,16 +98,33 @@
         </a>
         @endif
 
-        <!-- Tab 3: Center FAB (Quick Action) -->
-        <div class="mobile-fab-container">
-            <button type="button" class="mobile-fab-btn" id="mobile-fab-trigger" onclick="MobileApp.openActions()" aria-label="{{ __('Quick Actions') }}">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon fab-icon-plus" width="26" height="26" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-            </button>
-        </div>
+        <!-- Tab 3: Center Slot — Viewings (real estate) / Calendar (wholesale).
+             The + quick-add button always lives in the top bar, so no FAB here. -->
+        @if($isRealEstate)
+            <a href="{{ route('showings.index') }}" class="mobile-nav-tab {{ request()->is('showings*') || request()->is('open-houses*') ? 'active' : '' }}" data-tab="viewings">
+                <span class="mobile-tab-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="22" height="22" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/>
+                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>
+                    </svg>
+                </span>
+                <span class="mobile-tab-label">{{ __('Viewings') }}</span>
+            </a>
+        @else
+            <a href="{{ route('calendar.index') }}" class="mobile-nav-tab {{ request()->is('calendar*') ? 'active' : '' }}" data-tab="calendar">
+                <span class="mobile-tab-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="22" height="22" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <rect x="4" y="5" width="16" height="16" rx="2"/>
+                        <line x1="16" y1="3" x2="16" y2="7"/>
+                        <line x1="8" y1="3" x2="8" y2="7"/>
+                        <line x1="4" y1="11" x2="20" y2="11"/>
+                    </svg>
+                </span>
+                <span class="mobile-tab-label">{{ __('Calendar') }}</span>
+            </a>
+        @endif
 
         <!-- Tab 4: Pipeline / Inventory -->
         @if($isRealEstate)
@@ -307,6 +324,11 @@
 
         <!-- System Controls -->
         <div class="drawer-actions">
+            <button type="button" class="btn btn-outline-secondary w-100 mb-2 d-flex align-items-center justify-content-center gap-2" onclick="checkForAppUpdate()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg>
+                <span>{{ __('Check for Updates') }}</span>
+            </button>
+            <div id="mobile-update-status" class="text-center small mb-2" style="color:var(--tblr-secondary, #667382);" hidden></div>
             <button type="button" class="btn btn-outline-secondary w-100 mb-2 d-flex align-items-center justify-content-center gap-2" onclick="toggleTheme()">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/></svg>
                 <span>{{ __('Toggle Dark / Light') }}</span>

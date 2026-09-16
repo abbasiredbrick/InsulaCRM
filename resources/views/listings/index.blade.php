@@ -142,7 +142,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Unit') }}</th>
@@ -160,9 +160,9 @@
                     $portalDates = [$unit->bayut_listed_at, $unit->dubizzle_listed_at, $unit->propertyfinder_listed_at];
                     $listedOn = $unit->listed_at ?: collect($portalDates)->filter()->max();
                 @endphp
-                <tr>
+                <tr data-href="{{ route('inventory.show', $unit) }}">
                     <td>
-                        <div class="fw-bold">{{ $unit->display_name }}</div>
+                        <div class="fw-bold"><a href="{{ route('inventory.show', $unit) }}">{{ $unit->display_name }}</a></div>
                         @if($unit->unit_no)
                             <div class="text-muted small">{{ __('Unit') }} {{ $unit->unit_no }}</div>
                         @endif

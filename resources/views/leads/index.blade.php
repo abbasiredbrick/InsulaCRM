@@ -145,13 +145,12 @@
         };
     @endphp
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>
                 <tr>
                     <th class="w-1"><input type="checkbox" id="select-all" class="form-check-input" aria-label="{{ __('Select all leads') }}"></th>
                     <th><a href="{{ $sortUrl('first_name') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Name') }}{!! $sortArrow('first_name') !!}</a></th>
                     <th>{{ __('Phone') }}</th>
-                    <th><a href="{{ $sortUrl('lead_source') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Source') }}{!! $sortArrow('lead_source') !!}</a></th>
                     <th><a href="{{ $sortUrl('status') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Status') }}{!! $sortArrow('status') !!}</a></th>
                     <th><a href="{{ $sortUrl('reference') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Ref') }}{!! $sortArrow('reference') !!}</a></th>
                     <th><a href="{{ $sortUrl('temperature') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Temp') }}{!! $sortArrow('temperature') !!}</a></th>
@@ -159,13 +158,14 @@
                     <th><a href="{{ $sortUrl('motivation_score') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Score') }}{!! $sortArrow('motivation_score') !!}</a></th>
                     @endif
                     <th>{{ __('Agent') }}</th>
+                    <th><a href="{{ $sortUrl('lead_source') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Source') }}{!! $sortArrow('lead_source') !!}</a></th>
                     <th><a href="{{ $sortUrl('created_at') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Date Added') }}{!! $sortArrow('created_at') !!}</a></th>
                     <th class="w-1"></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($leads as $lead)
-                <tr>
+                <tr data-href="{{ route('leads.show', $lead) }}">
                     <td><input type="checkbox" class="form-check-input lead-checkbox" value="{{ $lead->id }}" aria-label="{{ __('Select') }} {{ $lead->full_name }}"></td>
                     <td>
                         <a href="{{ route('leads.show', $lead) }}">{{ $lead->full_name }}</a>
@@ -177,29 +177,6 @@
                         @endif
                     </td>
                     <td class="text-secondary">@if($lead->phone)<a href="tel:{{ $lead->phone }}" class="text-reset text-decoration-none">{{ $lead->phone }}</a>@else - @endif</td>
-                    <td>
-                        @php
-                            $sourceColors = [
-                                'referral' => 'bg-green-lt',
-                                'open_house' => 'bg-teal-lt',
-                                'sign_call' => 'bg-orange-lt',
-                                'zillow' => 'bg-blue-lt',
-                                'realtor_com' => 'bg-red-lt',
-                                'sphere' => 'bg-cyan-lt',
-                                'past_client' => 'bg-purple-lt',
-                                'social_media' => 'bg-pink-lt',
-                                'website' => 'bg-indigo-lt',
-                                'driving_for_dollars' => 'bg-orange-lt',
-                                'direct_mail' => 'bg-green-lt',
-                                'cold_calling' => 'bg-cyan-lt',
-                                'bandit_sign' => 'bg-yellow-lt',
-                                'mls' => 'bg-red-lt',
-                                'auction' => 'bg-purple-lt',
-                                'other' => 'bg-secondary-lt',
-                            ];
-                        @endphp
-                        <span class="badge {{ $sourceColors[$lead->lead_source] ?? 'bg-blue-lt' }}">{{ __(ucwords(str_replace('_', ' ', $lead->lead_source))) }}</span>
-                    </td>
                     <td>
                         <select class="form-select form-select-sm status-select" data-lead-id="{{ $lead->id }}" aria-label="{{ __('Status for') }} {{ $lead->full_name }}" style="width: auto; min-width: 120px;">
                             @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
@@ -224,6 +201,29 @@
                     </td>
                     @endif
                     <td class="text-secondary">{{ $lead->agent->name ?? '-' }}</td>
+                    <td>
+                        @php
+                            $sourceColors = [
+                                'referral' => 'bg-green-lt',
+                                'open_house' => 'bg-teal-lt',
+                                'sign_call' => 'bg-orange-lt',
+                                'zillow' => 'bg-blue-lt',
+                                'realtor_com' => 'bg-red-lt',
+                                'sphere' => 'bg-cyan-lt',
+                                'past_client' => 'bg-purple-lt',
+                                'social_media' => 'bg-pink-lt',
+                                'website' => 'bg-indigo-lt',
+                                'driving_for_dollars' => 'bg-orange-lt',
+                                'direct_mail' => 'bg-green-lt',
+                                'cold_calling' => 'bg-cyan-lt',
+                                'bandit_sign' => 'bg-yellow-lt',
+                                'mls' => 'bg-red-lt',
+                                'auction' => 'bg-purple-lt',
+                                'other' => 'bg-secondary-lt',
+                            ];
+                        @endphp
+                        <span class="badge {{ $sourceColors[$lead->lead_source] ?? 'bg-blue-lt' }}">{{ __(ucwords(str_replace('_', ' ', $lead->lead_source))) }}</span>
+                    </td>
                     <td class="text-secondary">{{ $lead->created_at->format('M d, Y') }}</td>
                     <td>
                         <div class="dropdown">

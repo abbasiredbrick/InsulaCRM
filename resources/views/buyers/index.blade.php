@@ -77,7 +77,7 @@
     </div>
     <x-saved-views-bar entity-type="buyers" />
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>
                 <tr>
                     <th class="w-1"><input type="checkbox" id="select-all" class="form-check-input" aria-label="{{ $businessMode === 'realestate' ? __('Select all clients') : __('Select all buyers') }}"></th>
@@ -93,7 +93,7 @@
             </thead>
             <tbody>
                 @forelse($buyers as $buyer)
-                <tr>
+                <tr data-href="{{ route('buyers.show', $buyer) }}">
                     <td><input type="checkbox" class="form-check-input buyer-checkbox" value="{{ $buyer->id }}" aria-label="{{ __('Select') }} {{ $buyer->full_name }}"></td>
                     <td>
                         <a href="{{ route('buyers.show', $buyer) }}">{{ $buyer->full_name }}</a>

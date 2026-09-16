@@ -64,7 +64,7 @@
         </form>
     </div>
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Address') }}</th>
@@ -90,8 +90,8 @@
             </thead>
             <tbody>
                 @forelse($properties as $property)
-                <tr>
-                    <td>{{ $property->full_address }}</td>
+                <tr data-href="{{ route('properties.show', $property) }}">
+                    <td><a href="{{ route('properties.show', $property) }}">{{ $property->full_address }}</a></td>
                     <td>
                         @if($property->lead_id)
                             <a href="{{ route('leads.show', $property->lead_id) }}">{{ $property->lead->full_name ?? '-' }}</a>

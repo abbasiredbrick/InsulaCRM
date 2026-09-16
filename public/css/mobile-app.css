@@ -34,6 +34,17 @@
         overflow-x: hidden;
     }
 
+    /* Clear the fixed bottom tab bar: keep the last rows/lines fully
+       scrolled above it in every view. The extra slack lives on the flex
+       main wrapper too, so short/sticky page layouts never tuck content
+       under the bar. */
+    main.page-wrapper {
+        padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 24px);
+    }
+    html {
+        scroll-padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
+    }
+
     /* ─────────────────────────────────────────────────────────────────
        HIDE ALL DESKTOP CHROME — sidebar, page-header toolbar, top bar,
        desktop quick-add FAB. Absolutely nothing from the desktop UI may
@@ -79,7 +90,8 @@
 
     /* ── Page body — fill the available space ── */
     .page-body {
-        padding-top: 0.75rem !important;
+        /* List views start immediately below the fixed top bar — no gap */
+        padding-top: 0 !important;
         padding-bottom: 0 !important;
         min-height: 0 !important;
     }
@@ -260,6 +272,36 @@
        form is excluded via .mobile-search-form. */
     main form[method="GET"]:has(input[name="search"]):not(.mobile-search-form) {
         display: none !important;
+    }
+
+    /* App-first: compact list tables. Show the first 3 data columns plus
+       the trailing row-action (⋯) menu. The bulk-selection checkbox is
+       hidden entirely (.mobile-cols-3 th/td:has(input[type=checkbox])).
+       Tables that lead with a checkbox use .mobile-cols-check so exactly
+       three data columns remain (Name, Phone, Status …), not just two. */
+    .mobile-cols-3 thead th:has(input[type="checkbox"]),
+    .mobile-cols-3 tbody td:has(input[type="checkbox"]) {
+        display: none;
+    }
+    .mobile-cols-3 thead th:nth-child(n+4),
+    .mobile-cols-3 tbody td:nth-child(n+4) {
+        display: none;
+    }
+    .mobile-cols-check thead th:nth-child(n+5),
+    .mobile-cols-check tbody td:nth-child(n+5) {
+        display: none;
+    }
+    .mobile-cols-3 thead th:last-child,
+    .mobile-cols-3 tbody td:last-child,
+    .mobile-cols-check thead th:last-child,
+    .mobile-cols-check tbody td:last-child {
+        display: table-cell;
+    }
+
+    /* Tapping a row anywhere opens that record's detail page */
+    table.mobile-cols-3 tbody tr[data-href],
+    table.mobile-cols-3 tbody tr[data-href] td {
+        cursor: pointer;
     }
 
     /* Hide the in-place button strip once it has been promoted

@@ -106,7 +106,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Client') }}</th>
@@ -120,7 +120,7 @@
             </thead>
             <tbody>
                 @forelse($leases as $lease)
-                <tr>
+                <tr data-href="{{ $lease->property ? route('properties.show', $lease->property) : '#' }}">
                     <td>
                         @if($lease->buyer)
                             <a href="{{ route('buyers.show', $lease->buyer) }}">{{ $lease->buyer->full_name }}</a>

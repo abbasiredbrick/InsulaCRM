@@ -32,8 +32,27 @@
             this.setupTouchGestures();
             this.setupSearch();
             this.setupActionBars();
+            this.setupClickableRows();
             this.syncNotifications();
             this.checkIosInstallGuide();
+        },
+
+        /**
+         * Native app feel: tapping anywhere on a list row opens that
+         * record's detail page. Users interactions with real controls
+         * (links, buttons, checkboxes, modals) are never hijacked.
+         * Rows opt in via data-href. Desktop keeps its normal behaviour.
+         */
+        setupClickableRows: function() {
+            if (!window.matchMedia || !window.matchMedia('(max-width: 991.98px)').matches) return;
+            var self = this;
+            document.addEventListener('click', function(e) {
+                var tr = e.target && e.target.closest ? e.target.closest('tbody tr[data-href]') : null;
+                if (!tr) return;
+                if (e.target.closest('a, button, input, select, textarea, label, [data-bs-toggle], [data-bs-dismiss]')) return;
+                self.vibrate(8);
+                window.location.href = tr.dataset.href;
+            });
         },
 
         /**

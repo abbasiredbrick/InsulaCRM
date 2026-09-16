@@ -59,7 +59,7 @@
     <x-saved-views-bar entity-type="showings" />
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Property') }}</th>
@@ -73,7 +73,7 @@
             </thead>
             <tbody>
                 @forelse($showings as $showing)
-                <tr>
+                <tr data-href="{{ route('showings.show', $showing) }}">
                     <td>
                         @if($showing->property)
                             <a href="{{ route('properties.show', $showing->property) }}">{{ $showing->property->address }}</a>

@@ -11,6 +11,82 @@
 <meta name="mobile-web-app-capable" content="yes">
 
 <script>
+// Deployed app version (mirrors VERSION + service-worker.js APP_ASSET_VERSION)
+window.CRM_APP_VERSION = '{{ config('app.version') }}';
+
+// Manual update check: proactively calls registration.update() (network-refreshes
+// the service worker script, bypassing caches) and races install/activate of a
+// changed worker against a timeout so we can report "up to date".
+window.AppUpdater = {
+    check: function(done) {
+        if (!('serviceWorker' in navigator)) {
+            if (done) done({ state: 'unsupported' });
+            return;
+        }
+        navigator.serviceWorker.getRegistration().then(function(reg) {
+            if (!reg || !reg.active) {
+                if (done) done({ state: 'unsupported' });
+                return;
+            }
+            var settled = false;
+            var timeout = null;
+            var finish = function(result) {
+                if (settled) return;
+                settled = true;
+                if (timeout) clearTimeout(timeout);
+                if (done) done(result);
+            };
+            // If no changed worker installs within 4s we assume we are current.
+            timeout = setTimeout(function() {
+                finish({ state: 'up-to-date', version: window.CRM_APP_VERSION });
+            }, 4000);
+            reg.addEventListener('updatefound', function() {
+                var newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', function() {
+                    if (newWorker.state === 'activated') {
+                        finish({ state: 'available' });
+                    }
+                });
+            });
+            reg.update().catch(function() {
+                finish({ state: 'offline' });
+            });
+        }).catch(function() {
+            if (done) done({ state: 'offline' });
+        });
+    }
+};
+
+function checkForAppUpdate() {
+    var statusEl = document.getElementById('mobile-update-status');
+    if (statusEl) {
+        statusEl.hidden = false;
+        statusEl.textContent = 'Checking for updates\u2026';
+    }
+    if (!window.AppUpdater) {
+        if (statusEl) statusEl.textContent = 'Updates are not available in this browser.';
+        return;
+    }
+    window.AppUpdater.check(function(result) {
+        if (statusEl) {
+            if (result.state === 'available') {
+                statusEl.textContent = 'Update available \u2014 reload to apply.';
+            } else if (result.state === 'up-to-date') {
+                statusEl.textContent = 'You are up to date on v' + result.version + '.';
+            } else if (result.state === 'offline') {
+                statusEl.textContent = 'Offline \u2014 could not check for updates.';
+            } else {
+                statusEl.textContent = 'PWA updates are not supported in this browser.';
+            }
+        }
+        // Offer the one-tap refresh banner whenever a new version landed.
+        if (result.state === 'available') {
+            showUpdateBanner();
+        }
+    });
+}
+
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {

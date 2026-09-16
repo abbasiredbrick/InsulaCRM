@@ -78,7 +78,7 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-vcenter card-table">
+        <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
                     <th>{{ __('Unit') }}</th>
@@ -92,9 +92,9 @@
             <tbody>
                 @forelse($report['rows'] as $row)
                     @php($p = $row['property'])
-                    <tr>
+                    <tr data-href="{{ route('inventory.show', $p) }}">
                         <td>
-                            <div class="fw-bold">{{ $p->display_name }}</div>
+                            <div class="fw-bold"><a href="{{ route('inventory.show', $p) }}">{{ $p->display_name }}</a></div>
                             <div class="text-muted small">
                                 {{ __(\App\Models\Property::AVAILABILITIES[$p->availability] ?? $p->availability) }}
                                 @if($p->intent) • {{ __(\App\Models\Property::INTENTS[$p->intent] ?? $p->intent) }}@endif
