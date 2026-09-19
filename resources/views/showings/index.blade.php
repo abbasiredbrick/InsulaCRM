@@ -17,7 +17,7 @@
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('showings.index') }}" class="row g-2 align-items-end">
+        <form method="GET" action="{{ route('showings.index') }}" class="row g-2 align-items-end" data-live-filter>
             <div class="col-md-2">
                 <label class="form-label">{{ __('Status') }}</label>
                 <select name="status" class="form-select form-select-sm">
@@ -51,13 +51,13 @@
                 <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Address, client...') }}">
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
                 <a href="{{ route('showings.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
             </div>
         </form>
     </div>
     <x-saved-views-bar entity-type="showings" />
 
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
@@ -112,6 +112,7 @@
                     </td>
                     <td>
                         <a href="{{ route('showings.show', $showing) }}" class="btn btn-sm btn-outline-primary">{{ __('View') }}</a>
+                        <a href="{{ route('showings.edit', $showing) }}" class="btn btn-sm btn-outline-secondary">{{ __('Edit') }}</a>
                     </td>
                 </tr>
                 @empty
@@ -128,5 +129,6 @@
         {{ $showings->appends(request()->query())->links('vendor.pagination.tabler') }}
     </div>
     @endif
+    </div>
 </div>
 @endsection

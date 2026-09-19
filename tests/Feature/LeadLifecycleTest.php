@@ -278,6 +278,7 @@ class LeadLifecycleTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Schedule Viewing');
-        $response->assertSee(route('showings.create', ['lead_id' => $lead->id]));
+        $response->assertSee(route('leads.showings.store', $lead));
+        $response->assertSee(route('leads.followups.index', $lead));
     }
 }

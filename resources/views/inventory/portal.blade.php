@@ -6,7 +6,7 @@
 @section('content')
 <div class="alert alert-info">
     {{ __('Use the list/unlist toggle per unit to record portal status — including units that are already live on a portal after a manual upload.') }}
-    {{ __('Pushing via the API requires portal-ready units (') }}<strong>{{ __('Ready to List') }}</strong>/<strong>{{ __('Listed') }}</strong>, {{ __('a RERA permit number and a category') }}<strong>.</strong>
+    {{ __('Pushing via the API requires portal-ready units (') }}<strong>{{ __('Ready to List') }}</strong>/<strong>{{ __('Listed') }}</strong>, {{ __('a permit number and a category') }}<strong>.</strong>
     <span class="d-block mt-1">
         <strong class="me-2">{{ __('Bayut credits:') }} {{ number_format($wallet) }}</strong>
         @if(auth()->user()->isAdmin())
@@ -112,7 +112,7 @@
                     $ready = $unit->is_portal_ready;
                     $missing = [];
                     if (!$unit->intent) $missing[] = __('intent');
-                    if (!$ready && empty($unit->rera_permit_no)) $missing[] = __('RERA permit');
+                    if (!$ready && empty($unit->rera_permit_no)) $missing[] = __('permit');
                     if (!$ready && empty($unit->property_category)) $missing[] = __('category');
                 @endphp
                 <tr class="{{ !$ready ? 'table-active' : '' }}">
@@ -131,7 +131,17 @@
                     </td>
                     <td class="text-nowrap">{{ $unit->price_line }}</td>
                     <td>{{ $unit->rera_permit_no ?: '—' }}</td>
-                    <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'bayut', 'label' => 'Bayut']])</td>
+                    <td>
+                        @include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'bayut', 'label' => 'Bayut']])
+                        @if($unit->bayut_location_label)
+                        <div class="text-muted small mt-1">{{ $unit->bayut_location_label }}</div>
+                        @elseif(in_array('bayut', $enabled_portals) && $unit->is_portal_ready)
+                        <div class="text-muted small mt-1">{{ __('no location set') }}</div>
+                        @endif
+                        @if(($unit->market_class ?? 'ready') === 'off_plan' && in_array($unit->intent, ['rent', 'both'], true))
+                        <div class="small text-warning mt-1">{{ __('Off-plan: sale only on Bayut') }}</div>
+                        @endif
+                    </td>
                     <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'dubizzle', 'label' => 'Dubizzle']])</td>
                     <td>@include('inventory._portal-toggle', ['unit' => $unit, 'portal' => ['key' => 'propertyfinder', 'label' => 'Property Finder']])</td>
                     <td>

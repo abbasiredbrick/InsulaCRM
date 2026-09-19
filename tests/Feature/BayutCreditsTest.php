@@ -169,7 +169,10 @@ class BayutCreditsTest extends TestCase
         $this->wallet(['balance' => 100]);
 
         Http::fake([
-            'https://push.bayut.example/listings' => Http::response(['reference' => 'BN-991', 'url' => 'https://www.bayut.com/bn-991'], 200),
+            'https://push.bayut.example/agents' => Http::response([
+                'data' => [['id' => 2848922, 'status' => 'on', 'name' => 'Admin']],
+            ], 200),
+            'https://push.bayut.example/listings' => Http::response(['id' => 'BN-991', 'url' => 'https://www.bayut.com/bn-991'], 200),
         ]);
 
         $property = $this->portalReadyProperty();
@@ -196,6 +199,7 @@ class BayutCreditsTest extends TestCase
             'base_url'  => 'https://push.bayut.example',
             'api_token' => 'bayut-token',
             'is_active' => true,
+            'default_location_id' => '29965',
         ]);
     }
 }

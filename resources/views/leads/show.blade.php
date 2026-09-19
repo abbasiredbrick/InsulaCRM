@@ -47,9 +47,13 @@
                 <h3 class="card-title">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Contact Details') : __('Lead Information') }}</h3>
                 <div class="card-actions">
                     @if(($businessMode ?? 'wholesale') === 'realestate')
-                    <a href="{{ route('showings.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-orange btn-sm me-1">
+                    <a href="#schedule-viewing-card" class="btn btn-outline-orange btn-sm me-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/><line x1="11" y1="15" x2="12" y2="15"/><line x1="12" y1="15" x2="12" y2="18"/></svg>
                         {{ __('Schedule Viewing') }}
+                    </a>
+                    <a href="{{ route('leads.followups.index', $lead) }}" class="btn btn-outline-blue btn-sm me-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 17v-4"/><path d="M15 17v-2"/></svg>
+                        {{ __('Follow-ups') }}
                     </a>
                     @endif
                     @if($canReassign)
@@ -145,8 +149,93 @@
                         </div>
                     </div>
                     <div class="datagrid-item">
-                        <div class="datagrid-title">{{ __('Assigned Agent') }}</div>
-                        <div class="datagrid-content">{{ $lead->agent->name ?? '-' }}</div>
+                        <div class="datagrid-title">
+                            {{ __('Agents') }}
+                            @can('shareAgents', $lead)
+                            <button type="button" class="btn btn-icon btn-ghost-secondary btn-sm ms-1" data-bs-toggle="collapse" data-bs-target="#shareAgentsForm" aria-expanded="false" title="{{ __('Share this lead with a colleague') }}" style="height:1.1rem;width:1.1rem;padding:0;">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>
+                            </button>
+                            @endcan
+                        </div>
+                        <div class="datagrid-content">
+                            <div class="d-flex align-items-center">
+                                <span class="me-1">{{ $lead->agent?->name ?? __('Unassigned') }}</span>
+                                @if($lead->agent)
+                                    <span class="badge bg-green-lt">{{ __('Main') }}</span>
+                                @endif
+                            </div>
+                            @foreach($lead->activeLeadAgents as $la)
+                            <div class="d-flex align-items-center justify-content-between mt-1">
+                                <span class="text-secondary">{{ $la->display_name }}
+                                    @if($la->isExternal())
+                                        <span class="badge bg-cyan-lt ms-1">{{ __('External') }}</span>
+                                    @else
+                                        <span class="badge bg-azure-lt ms-1">{{ __('Co-agent') }}</span>
+                                    @endif
+                                    @if($la->commission_pct !== null)
+                                    <small class="text-secondary">· {{ __(':pct% of commission', ['pct' => rtrim(rtrim($la->commission_pct, '0'), '.')]) }}</small>
+                                    @endif
+                                </span>
+                                @can('shareAgents', $lead)
+                                <form method="POST" action="{{ route('leads.coAgents.destroy', [$lead, $la]) }}" class="d-inline ms-2" onsubmit="return confirm('{{ __('Remove this co-agent from the lead?') }}')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-icon btn-ghost-danger btn-sm" title="{{ __('Remove') }}" style="height:1.1rem;width:1.1rem;padding:0;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>
+                                    </button>
+                                </form>
+                                @endcan
+                            </div>
+                            @endforeach
+
+                            @can('shareAgents', $lead)
+                            <div class="collapse mt-2" id="shareAgentsForm">
+                                @php $coAgentIds = $lead->activeLeadAgents->pluck('agent_id')->filter()->all(); @endphp
+                                <form method="POST" action="{{ route('leads.coAgents.store', $lead) }}" class="border p-2 rounded">
+                                    @csrf
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">{{ __('Colleague') }}</label>
+                                        <select name="agent_id" class="form-select form-select-sm">
+                                            <option value="">{{ __('— select an internal agent —') }}</option>
+                                            @foreach($reassignAgents as $_agent)
+                                                @if($_agent->id !== $lead->agent_id && ! in_array($_agent->id, $coAgentIds, true))
+                                                <option value="{{ $_agent->id }}">{{ $_agent->name }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">{{ __('Or external collaborator (email)') }}</label>
+                                        <input type="text" name="external_name" class="form-control form-control-sm mb-1" placeholder="{{ __('Name') }}">
+                                        <input type="email" name="external_email" class="form-control form-control-sm mb-1" placeholder="{{ __('Email') }}">
+                                        <input type="text" name="external_company" class="form-control form-control-sm" placeholder="{{ __('Company') }}">
+                                    </div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-6">
+                                            <label class="form-label small mb-1">{{ __('Commission % (optional)') }}</label>
+                                            <input type="number" name="commission_pct" class="form-control form-control-sm" min="0" max="100" step="0.01" placeholder="e.g. 20">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label small mb-1">{{ __('Share funded by') }}</label>
+                                            <select name="share_funding" class="form-select form-select-sm">
+                                                <option value="">{{ __('—') }}</option>
+                                                <option value="from_agent">{{ __('Main agent') }}</option>
+                                                <option value="from_company">{{ __('Company') }}</option>
+                                                <option value="from_both">{{ __('Company + agent') }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    @error('co_agent')
+                                        <div class="alert alert-danger py-1 px-2 small">{{ $message }}</div>
+                                    @enderror
+                                    <div class="text-end">
+                                        <button type="button" class="btn btn-sm btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#shareAgentsForm">{{ __('Cancel') }}</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">{{ __('Share lead') }}</button>
+                                    </div>
+                                </form>
+                            </div>
+                            @endcan
+                        </div>
                     </div>
                     @if(($businessMode ?? 'wholesale') === 'wholesale')
                     <div class="datagrid-item">
@@ -234,6 +323,115 @@
             </div>
         </div>
 
+        @if(($businessMode ?? 'wholesale') === 'realestate')
+        <!-- Commission Panel -->
+        <div class="card mb-3" id="commission-panel">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Commission') }}</h3>
+                <div class="card-actions">
+                    @php $commissionService = app(\App\Services\CommissionCalculationService::class); @endphp
+                    <span class="badge bg-blue-lt me-1">{{ $commissionService->splitLabel($lead) }}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                @if(session('commission_warnings'))
+                    <div class="alert alert-warning py-2">
+                        @foreach(session('commission_warnings') as $warning)
+                            <div class="small">{{ $warning }}</div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @php $basis = $lead->commissionBasis(); $hasSnapshot = $lead->hasCommissionSnapshot(); @endphp
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">{{ __('Gross commission') }}</label>
+                        @if($hasSnapshot)
+                            <div class="fw-bold h3 mb-0">{{ $basis !== null ? \App\Helpers\TenantFormatHelper::currency($basis) : '—' }}</div>
+                        @else
+                            <div class="input-group">
+                                <span class="input-group-text">{{ \App\Helpers\TenantFormatHelper::currencySymbol() }}</span>
+                                <input type="number" name="commission_amount" form="commission-amount-form" class="form-control" step="0.01" min="0" value="{{ $basis ?? '' }}" placeholder="{{ __('From closed deals or set manually') }}">
+                            </div>
+                            @can('shareAgents', $lead)
+                            <form id="commission-amount-form" method="POST" action="{{ route('leads.commissionAmount', $lead) }}" class="mt-2">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Save basis') }}</button>
+                            </form>
+                            @endcan
+                        @endif
+                    </div>
+                    @if(! $hasSnapshot && $basis !== null)
+                    <div class="col-md-4">
+                        <label class="form-label d-block">&nbsp;</label>
+                        @can('shareAgents', $lead)
+                        <form method="POST" action="{{ route('leads.commissionCalculate', $lead) }}" onsubmit="return confirm('{{ __('Split and freeze this commission for everyone on the lead?') }}')">
+                            @csrf
+                            <button type="submit" class="btn btn-primary">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M9 7h6"/><path d="M8 9l6 6"/><path d="M16 9l-6 6"/></svg>
+                                {{ __('Calculate & snapshot split') }}
+                            </button>
+                        </form>
+                        @endcan
+                    </div>
+                    @endif
+                    <div class="col-md-4 text-md-end">
+                        @if($hasSnapshot)
+                            <span class="badge bg-green-lt">{{ __('Snapshot locked') }}</span>
+                        @else
+                            <span class="text-secondary small">{{ __('Snapshot freezes the split at close time.') }}</span>
+                        @endif
+                    </div>
+                </div>
+
+                @if($lead->commissions->isNotEmpty())
+                <div class="table-responsive">
+                    <table class="table table-sm table-vcenter">
+                        <thead>
+                            <tr><th>{{ __('Participant') }}</th><th>{{ __('Type') }}</th><th>{{ __('Share') }}</th><th class="text-end">{{ __('Amount') }}</th><th>{{ __('Funding') }}</th><th>{{ __('Status') }}</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach($lead->commissions as $cm)
+                            <tr>
+                                <td>
+                                    @if($cm->isCompany())
+                                        <strong>{{ $cm->participant_name ?: __('Company') }}</strong>
+                                    @else
+                                        {{ $cm->participant_name ?: ($cm->agent?->name ?: __('Agent') . ' #' . $cm->agent_id) }}
+                                    @endif
+                                </td>
+                                <td>
+                                    <span class="badge {{ $cm->participant_type === 'company' ? 'bg-secondary-lt' : ($cm->participant_type === 'external' ? 'bg-cyan-lt' : 'bg-azure-lt') }}">
+                                        {{ $cm->participant_type === 'company' ? __('Company') : ($cm->participant_type === 'external' ? __('External') : __('Agent')) }}
+                                    </span>
+                                </td>
+                                <td>{{ rtrim(rtrim((string) $cm->share_pct, '0'), '.') }}%</td>
+                                <td class="text-end fw-bold">{{ \App\Helpers\TenantFormatHelper::currency($cm->amount) }}</td>
+                                <td class="text-secondary small">{{ $cm->funding_label }}</td>
+                                <td>
+                                    <span class="badge {{ $cm->isPaid() ? 'bg-green-lt' : ($cm->status === 'void' ? 'bg-secondary-lt' : 'bg-yellow-lt') }}">{{ ucfirst($cm->status) }}</span>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @else
+                    <p class="text-secondary mb-0">
+                        {{ __('No commission split yet.') }}
+                        @php $auto = $lead->closedDealsCommissionTotal(); @endphp
+                        @if($auto !== null)
+                            {{ __(':amount auto-pulled from the closed deal(s) — review it and snapshot.', ['amount' => \App\Helpers\TenantFormatHelper::currency($auto)]) }}
+                        @else
+                            {{ __('Set the gross commission above, then calculate the split.') }}
+                        @endif
+                    </p>
+                @endif
+            </div>
+        </div>
+        @endif
+
         <!-- Property Section -->
         <div id="property-details"></div>
         @if(($businessMode ?? 'wholesale') === 'realestate')
@@ -248,7 +446,8 @@
             <div class="card-header">
                 <h3 class="card-title">{{ __('Viewings') }}</h3>
                 <div class="card-actions">
-                    <a href="{{ route('showings.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-orange btn-sm">{{ __('+ Schedule Viewing') }}</a>
+                    <a href="{{ route('leads.followups.index', $lead) }}" class="btn btn-outline-blue btn-sm">{{ __('View & log feedback') }}</a>
+                    <a href="#schedule-viewing-card" class="btn btn-outline-orange btn-sm">{{ __('+ Schedule Viewing') }}</a>
                 </div>
             </div>
             <div class="card-body">
@@ -290,10 +489,19 @@
                 </div>
             </div>
             <div class="card-body collapse show" id="section-log-activity">
-                {{-- Quick-log buttons --}}
-                @unless($lead->do_not_contact)
-                <div class="d-flex gap-2 mb-3 flex-wrap">
-                    <button type="button" class="btn btn-sm btn-outline-green quick-log-btn" data-type="call">
+                @if($lead->do_not_contact)
+                <div class="alert alert-danger mb-3">
+                    <div class="d-flex align-items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9"/><line x1="5.7" y1="5.7" x2="18.3" y2="18.3"/></svg>
+                        <div>
+                            <strong>{{ __('This lead is on the Do Not Contact list.') }}</strong> {{ __('Outreach activities are blocked.') }}
+                        </div>
+                    </div>
+                </div>
+                @else
+                {{-- Quick-log type cards: the tapped card is the activity type (no dropdown). --}}
+                <div class="d-flex gap-2 mb-3 flex-wrap" role="group" aria-label="{{ __('Activity type') }}">
+                    <button type="button" class="btn btn-sm btn-outline-green quick-log-btn active" data-type="call">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2"/></svg>
                         {{ __('Log Call') }}
                     </button>
@@ -309,37 +517,17 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>
                         {{ __('Log WhatsApp') }}
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-purple quick-log-btn" data-type="meeting">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg>
-                        {{ __('Log Meeting') }}
-                    </button>
                 </div>
-                @endunless
-                @if($lead->do_not_contact)
-                <div class="alert alert-danger mb-3">
-                    <div class="d-flex align-items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9"/><line x1="5.7" y1="5.7" x2="18.3" y2="18.3"/></svg>
-                        <div>
-                            <strong>{{ __('This lead is on the Do Not Contact list.') }}</strong> {{ __('Outreach activities are blocked.') }}
-                        </div>
-                    </div>
-                </div>
-                @endif
                 <form action="{{ route('leads.activities.store', $lead) }}" method="POST">
                     @csrf
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <select name="type" class="form-select" required id="activity-type-select">
-                                @php $outreach = \App\Services\CustomFieldService::$outreachActivityTypes; @endphp
-                                @foreach(\App\Services\CustomFieldService::getOptions('activity_type') as $val => $label)
-                                    @if($lead->do_not_contact && in_array($val, $outreach))
-                                        @continue
-                                    @endif
-                                    <option value="{{ $val }}" {{ $lead->do_not_contact && $val === 'meeting' ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
+                            <label class="form-label mb-1">{{ __('Type') }}</label>
+                            <input type="hidden" name="type" id="activity-type-input" value="call">
+                            <div class="form-control-plaintext fw-semibold py-1" id="activity-type-label">{{ __('Call') }}</div>
                         </div>
                         <div class="col-md-8">
+                            <label class="form-label mb-1">{{ __('Subject (optional)') }}</label>
                             <input type="text" name="subject" class="form-control" placeholder="{{ __('Subject (optional)') }}">
                         </div>
                     </div>
@@ -398,6 +586,7 @@
                         @endif
                     </div>
                 </form>
+                @endif
             </div>
         </div>
 
@@ -428,6 +617,8 @@
                                         'whatsapp' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-whatsapp" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>',
                                         'note' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-note" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="13" y1="20" x2="20" y2="13"/><path d="M13 20v-6a1 1 0 0 1 1 -1h6v-7a2 2 0 0 0 -2 -2h-12a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h7"/></svg>',
                                         'meeting' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-users" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg>',
+                                        'task' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clipboard-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 14l2 2l4 -4"/></svg>',
+                                        'viewing' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-eye" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg>',
                                         'stage_change' => '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="13" y1="18" x2="19" y2="12"/><line x1="13" y1="6" x2="19" y2="12"/></svg>',
                                     ];
                                     $colors = [
@@ -439,6 +630,8 @@
                                         'whatsapp' => 'bg-green-lt',
                                         'note' => 'bg-secondary-lt',
                                         'meeting' => 'bg-purple-lt',
+                                        'task' => 'bg-cyan-lt',
+                                        'viewing' => 'bg-orange-lt',
                                         'stage_change' => 'bg-cyan-lt',
                                     ];
                                 @endphp
@@ -661,9 +854,25 @@
                         <input type="text" name="title" class="form-control form-control-sm" placeholder="{{ __('Task title') }}" required>
                     </div>
                     <div class="mb-2">
-                        <input type="date" name="due_date" class="form-control form-control-sm" required>
+                        <label class="form-label small mb-1">{{ __('Assigned to') }}</label>
+                        <select name="assigned_to" class="form-select form-select-sm">
+                            @foreach($reassignAgents as $_agent)
+                                <option value="{{ $_agent->id }}" @selected((int) $_agent->id === (int) auth()->id())>{{ $_agent->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="mb-2">
+                    <div class="row g-2">
+                        <div class="col-7">
+                            <label class="form-label small mb-1">{{ __('Due date') }}</label>
+                            <input type="date" name="due_date" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-1">{{ __('Time') }} <span class="text-secondary">({{ __('optional') }})</span></label>
+                            <input type="time" name="due_time" class="form-control form-control-sm" title="{{ __('Optional due time') }}">
+                        </div>
+                    </div>
+                    <div class="mb-2 mt-2">
+                        <label class="form-label small mb-1">{{ __('Reminder') }}</label>
                         <select name="reminder_minutes" class="form-select form-select-sm" title="{{ __('Reminder') }}">
                             @php
                                 $_current = auth()->user()->tenant->calendar_reminder_default_minutes ?? '';
@@ -702,7 +911,7 @@
                 <div id="ai-task-suggestions-list"></div>
             </div>
             <div class="list-group list-group-flush">
-                @forelse($lead->tasks->sortBy('due_date') as $task)
+                @forelse($lead->tasks->sortBy(fn($t) => $t->dueAt()) as $task)
                 <div class="list-group-item">
                     <div class="d-flex align-items-center">
                         <div class="me-2">
@@ -714,14 +923,51 @@
                         <div class="flex-fill">
                             <div class="{{ $task->is_completed ? 'text-decoration-line-through text-secondary' : '' }}">
                                 {{ $task->title }}
+                                @if($task->agent)
+                                <span class="badge bg-azure-lt text-secondary ms-1" style="font-weight:400;">
+                                    {{ $task->agent->name }}{{ $task->agent_id === $task->created_by ? ' • '.__('owner') : '' }}
+                                </span>
+                                @endif
                             </div>
                             <small class="{{ $task->is_overdue ? 'text-danger' : 'text-secondary' }}">
-                                {{ __('Due') }}: {{ $task->due_date->format('M d, Y') }}
+                                {{ __('Due') }}: {{ $task->due_label }}
                             </small>
                         </div>
+                        <button class="btn btn-sm btn-ghost-secondary ms-1" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#task-activities-{{ $task->id }}"
+                                aria-expanded="false" aria-controls="task-activities-{{ $task->id }}"
+                                title="{{ __('Activity log') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l4 -4l4 4"/><path d="M16 15l-4 4l-4 -4"/></svg>
+                        </button>
                         <button type="button" class="btn btn-sm btn-ghost-danger task-delete-btn ms-1" data-task-id="{{ $task->id }}" title="{{ __('Delete task') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>
                         </button>
+                    </div>
+                    <!-- Task activity log -->
+                    <div class="collapse mt-2 ps-2" id="task-activities-{{ $task->id }}">
+                        <div class="list-group list-group-flush">
+                            @forelse($task->activities as $_activity)
+                            <div class="list-group-item py-2 px-2">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-fill">
+                                        <div style="font-size:13px;">{{ $_activity->body }}</div>
+                                        <small class="text-secondary">
+                                            {{ $_activity->agent?->name ?? __('System') }} &middot; {{ $_activity->created_at?->diffForHumans() }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            @empty
+                            <div class="list-group-item py-2 px-2 text-secondary">{{ __('No activity yet.') }}</div>
+                            @endforelse
+                        </div>
+                        <form action="{{ route('tasks.activity', $task) }}" method="POST" class="mt-2">
+                            @csrf
+                            <div class="input-group input-group-sm">
+                                <input type="text" name="body" class="form-control" placeholder="{{ __('Log progress note...') }}" maxlength="2000" required>
+                                <button type="submit" class="btn btn-primary">{{ __('Log') }}</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
                 @empty
@@ -730,6 +976,51 @@
             </div>
         </div>
         @if(($businessMode ?? 'wholesale') === 'realestate')
+        <!-- Schedule Viewing (inline, no separate form) -->
+        <div class="card mb-3" id="schedule-viewing-card">
+            <div class="card-header">
+                <h3 class="card-title">{{ __('Schedule Viewing') }}</h3>
+            </div>
+            <div class="card-body">
+                <form action="{{ route('leads.showings.store', $lead) }}" method="POST">
+                    @csrf
+                    <div class="mb-2">
+                        <label class="form-label small mb-1">{{ __('Property') }}</label>
+                        <x-searchable-select
+                            name="property_id"
+                            :options="$propertyOptions"
+                            :selected="old('property_id', '')"
+                            :invalid="$errors->has('property_id')"
+                            required
+                            :placeholder="__('Select property...')"
+                            :search-placeholder="__('Type title, community, unit...')"
+                        />
+                        @error('property_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-7">
+                            <label class="form-label small mb-1">{{ __('Date') }}</label>
+                            <input type="date" name="showing_date" class="form-control form-control-sm" value="{{ old('showing_date', date('Y-m-d')) }}" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-1">{{ __('Time') }}</label>
+                            <input type="time" name="showing_time" class="form-control form-control-sm" value="{{ old('showing_time', '10:00') }}" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <label class="form-label small mb-1">{{ __('Duration (minutes)') }}</label>
+                            <input type="number" name="duration_minutes" class="form-control form-control-sm" value="30" min="15" max="480">
+                        </div>
+                        <div class="col-6">
+                            <x-reminder-minutes :selected="old('reminder_minutes')" />
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">{{ __('Schedule Viewing') }}</button>
+                </form>
+            </div>
+        </div>
+
         <!-- Schedule Meeting -->
         <div class="card mb-3">
             <div class="card-header">
@@ -793,6 +1084,12 @@
                             </small>
                             @if($meeting->notes)
                             <div class="small text-secondary mt-1">{{ $meeting->notes }}</div>
+                            @endif
+                            @if($meeting->feedback)
+                            <div class="small text-secondary mt-1">
+                                <span class="badge bg-purple-lt me-1">{{ __('Feedback') }}</span>
+                                <span style="white-space:pre-line;">{{ $meeting->feedback }}</span>
+                            </div>
                             @endif
                         </div>
                         @if($meeting->status === 'scheduled')
@@ -950,7 +1247,8 @@
 
 @push('scripts')
 <script>
-// Quick-log buttons
+// Quick-log buttons (the tapped card IS the activity type)
+var activeTypeLabel = { call: '{{ __('Call') }}', sms: '{{ __('SMS') }}', email: '{{ __('Email') }}', whatsapp: '{{ __('WhatsApp') }}' };
 document.querySelectorAll('.quick-log-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
         var type = this.dataset.type;
@@ -959,11 +1257,14 @@ document.querySelectorAll('.quick-log-btn').forEach(function(btn) {
         if (section && !section.classList.contains('show')) {
             var bsCollapse = new bootstrap.Collapse(section, { toggle: true });
         }
-        // Set the activity type dropdown
-        var typeSelect = document.getElementById('activity-type-select');
-        if (typeSelect) {
-            typeSelect.value = type;
-        }
+        // Set the activity type (hidden input) and highlight the selected card
+        document.querySelectorAll('.quick-log-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        var typeInput = document.getElementById('activity-type-input');
+        if (typeInput) { typeInput.value = type; }
+        var typeLabel = document.getElementById('activity-type-label');
+        if (typeLabel && activeTypeLabel[type]) { typeLabel.textContent = activeTypeLabel[type]; }
+        lastDraftType = type;
         // Focus the notes textarea
         var textarea = section ? section.querySelector('textarea[name="body"]') : null;
         if (textarea) {
@@ -1194,8 +1495,8 @@ function aiRequest(url, data, title, showUseBtn) {
 var draftBtn = document.getElementById('ai-draft-btn');
 if (draftBtn) {
     draftBtn.addEventListener('click', function() {
-        var typeSelect = document.getElementById('activity-type-select');
-        var msgType = typeSelect ? typeSelect.value : 'sms';
+        var typeInput = document.getElementById('activity-type-input');
+        var msgType = typeInput ? typeInput.value : 'sms';
         var typeLabels = { sms: '{{ __('SMS Message') }}', email: '{{ __('Email') }}', voicemail: '{{ __('Voicemail Script') }}', call: '{{ __('Call Script') }}', direct_mail: '{{ __('Direct Mail') }}', note: '{{ __('Note') }}', meeting: '{{ __('Meeting Prep') }}' };
         var label = typeLabels[msgType] || msgType.toUpperCase();
         lastDraftType = msgType;

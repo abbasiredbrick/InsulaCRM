@@ -209,14 +209,17 @@ class CloudCalendarService
         }
 
         if ($record instanceof Task) {
-            $start = Carbon::parse($record->due_date->format('Y-m-d'), $tz);
+            $allDay = blank($record->due_time);
+            $start = $allDay
+                ? Carbon::parse($record->due_date->format('Y-m-d'), $tz)
+                : Carbon::parse($record->due_date->format('Y-m-d').' '.$record->due_time, $tz);
 
             return [
                 'summary' => __('Follow-up').': '.$record->title,
                 'description' => $record->lead ? __('Client').': '.$record->lead->full_name : '',
                 'start' => $start,
-                'all_day' => true,
-                'duration_minutes' => 0,
+                'all_day' => $allDay,
+                'duration_minutes' => $allDay ? 0 : 60,
                 'attendee_email' => $record->lead?->email,
                 'attendee_name' => $record->lead?->full_name,
             ];

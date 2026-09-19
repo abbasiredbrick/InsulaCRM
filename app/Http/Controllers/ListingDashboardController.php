@@ -78,7 +78,7 @@ class ListingDashboardController extends Controller
         $agents = collect();
         if ($user->isAdmin()) {
             $agents = \App\Models\User::where('tenant_id', $user->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }

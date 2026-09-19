@@ -39,7 +39,7 @@ abstract class TestCase extends BaseTestCase
 
     protected function seedRoles(): void
     {
-        $roles = ['admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent', 'listing_agent', 'buyers_agent', 'marketing'];
+        $roles = ['owner', 'admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent', 'listing_agent', 'buyers_agent', 'marketing', 'cold_call_agent'];
         foreach ($roles as $name) {
             Role::updateOrCreate(['name' => $name], [
                 'display_name' => ucwords(str_replace('_', ' ', $name)),

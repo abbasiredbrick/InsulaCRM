@@ -39,7 +39,7 @@ class LostLeadNotifier
 
             $admins = User::where('tenant_id', $lead->tenant_id)
                 ->where('is_active', true)
-                ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
                 ->get();
 
             if ($admins->isEmpty()) {

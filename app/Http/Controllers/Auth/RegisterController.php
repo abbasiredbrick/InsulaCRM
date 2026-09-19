@@ -29,14 +29,16 @@ class RegisterController extends Controller
         $user = DB::transaction(function () use ($request) {
             $tenant = Tenant::create([
                 'name' => $request->company_name,
-                'slug' => Str::slug($request->company_name) . '-' . Str::random(5),
+                'slug' => Str::slug($request->company_name).'-'.Str::random(5),
                 'email' => $request->email,
                 'status' => 'active',
             ]);
 
-            $adminRole = Role::where('name', 'admin')->first();
+            // The first user of a workspace owns it.
+            $adminRole = Role::where('name', 'owner')->first()
+                ?? Role::where('name', 'admin')->first();
 
-        return User::create([
+            return User::create([
                 'tenant_id' => $tenant->id,
                 'role_id' => $adminRole->id,
                 'name' => $request->name,

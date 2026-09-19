@@ -71,7 +71,7 @@
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('leases.index') }}" class="row g-2 align-items-end">
+        <form method="GET" action="{{ route('leases.index') }}" class="row g-2 align-items-end" data-live-filter>
             <div class="col-md-2">
                 <label class="form-label">{{ __('Status') }}</label>
                 <select name="status" class="form-select form-select-sm">
@@ -99,12 +99,12 @@
                 <input type="text" name="search" class="form-control form-control-sm" value="{{ request('search') }}" placeholder="{{ __('Client, unit, community...') }}">
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
                 <a href="{{ route('leases.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
             </div>
         </form>
     </div>
 
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
@@ -266,5 +266,6 @@
         {{ $leases->appends(request()->query())->links('vendor.pagination.tabler') }}
     </div>
     @endif
+    </div>
 </div>
 @endsection

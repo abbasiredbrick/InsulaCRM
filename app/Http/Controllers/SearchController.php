@@ -34,7 +34,10 @@ class SearchController extends Controller
                     ->orWhere('email', 'like', "%{$q}%")
                     ->orWhere('phone', 'like', "%{$q}%");
             })
-            ->when(!$user->isAdmin(), fn ($query) => $query->where('agent_id', $user->id))
+            ->when(!$user->isAdmin(), fn ($query) => $query->where(function ($q) use ($user) {
+                $q->where('agent_id', $user->id)
+                    ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
+            }))
             ->limit(5)
             ->get()
             ->map(fn ($lead) => [

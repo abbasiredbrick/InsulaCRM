@@ -19,7 +19,7 @@
         </div>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('campaigns.index') }}" class="row g-2">
+        <form method="GET" action="{{ route('campaigns.index') }}" class="row g-2" data-live-filter>
             <div class="col-md-3">
                 <label for="filter-search" class="visually-hidden">{{ __('Search') }}</label>
                 <input type="text" name="search" id="filter-search" class="form-control" placeholder="{{ __('Search campaigns...') }}" value="{{ request('search') }}">
@@ -42,9 +42,6 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">{{ __('Filter') }}</button>
-            </div>
             @if(request()->hasAny(['search', 'status', 'type']))
             <div class="col-auto">
                 <a href="{{ route('campaigns.index') }}" class="btn btn-outline-secondary">{{ __('Clear') }}</a>
@@ -52,6 +49,7 @@
             @endif
         </form>
     </div>
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>
@@ -189,5 +187,6 @@
         </div>
     </div>
     @endif
+    </div>
 </div>
 @endsection

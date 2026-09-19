@@ -16,7 +16,8 @@ class LeadKanbanController extends Controller
         $query = Lead::with(['agent', 'tags']);
 
         if (!$user->isAdmin()) {
-            $query->where('agent_id', $user->id);
+            $query->where(fn ($q) => $q->where('agent_id', $user->id)
+                ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
         } elseif ($request->filled('agent_id')) {
             $query->where('agent_id', $request->agent_id);
         }

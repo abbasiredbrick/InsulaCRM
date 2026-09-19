@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Notification;
 class CheckDueDiligence extends Command
 {
     protected $signature = 'deals:check-due-diligence';
+
     protected $description = 'Check deals approaching due diligence deadline and log warnings';
 
     public function handle(): int
@@ -26,7 +27,7 @@ class CheckDueDiligence extends Command
 
         foreach ($deals as $deal) {
             $daysLeft = now()->diffInDays($deal->due_diligence_end_date, false);
-            $leadName = $deal->lead ? "{$deal->lead->first_name} {$deal->lead->last_name}" : "Unknown";
+            $leadName = $deal->lead ? "{$deal->lead->first_name} {$deal->lead->last_name}" : 'Unknown';
 
             $this->warn("Deal #{$deal->id} ({$leadName}): Due diligence ends in {$daysLeft} day(s) on {$deal->due_diligence_end_date->format('M j, Y')}");
 
@@ -41,9 +42,9 @@ class CheckDueDiligence extends Command
                 }
 
                 // Notify tenant admins
-                $adminRoleId = Role::where('name', 'admin')->value('id');
+                $adminRoleIds = Role::whereIn('name', ['owner', 'admin'])->pluck('id');
                 $admins = User::where('tenant_id', $tenant->id)
-                    ->where('role_id', $adminRoleId)
+                    ->whereIn('role_id', $adminRoleIds)
                     ->where('is_active', true)
                     ->get();
                 $recipients = $recipients->merge($admins)->unique('id');
@@ -65,7 +66,8 @@ class CheckDueDiligence extends Command
             $this->error("{$expired} deal(s) have EXPIRED due diligence periods!");
         }
 
-        $this->info("Checked " . $deals->count() . " deals approaching deadline, {$expired} expired.");
+        $this->info('Checked '.$deals->count()." deals approaching deadline, {$expired} expired.");
+
         return Command::SUCCESS;
     }
 }

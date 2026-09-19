@@ -42,7 +42,7 @@ class OpenHouseController extends Controller
         $agents = collect();
         if (auth()->user()->isAdmin()) {
             $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }
@@ -59,7 +59,7 @@ class OpenHouseController extends Controller
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -107,7 +107,7 @@ class OpenHouseController extends Controller
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 

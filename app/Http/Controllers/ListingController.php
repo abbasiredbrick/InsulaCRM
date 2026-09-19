@@ -7,6 +7,8 @@ use App\Models\Property;
 use App\Models\PropertyMedia;
 use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -427,9 +429,27 @@ class ListingController extends Controller
     {
         $property->load(['assignedAgent', 'media', 'leads', 'leads.deals']);
 
+        $bayut = \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
+        $bayutOptions = [];
+        $selectedId = (string) $property->bayut_location_id;
+        foreach (($bayut?->location_catalog ?? []) as $loc) {
+            if ($selectedId !== '' && (string) $loc['id'] === $selectedId) {
+                $bayutOptions[] = ['value' => (int) $loc['id'], 'label' => $loc['label']];
+                break;
+            }
+        }
+
         return view('inventory.show', [
             'property' => $property,
             'agents' => $this->agents(),
+            'bayut_locations' => $bayut?->location_catalog ?? [],
+            'bayut_locations_synced_at' => $bayut?->locations_synced_at,
+            'bayut_location_options' => $bayutOptions,
+            'bayut_location_search_url' => route('inventory.bayut-locations-search'),
         ]);
     }
 
@@ -515,6 +535,8 @@ class ListingController extends Controller
             $query->where('property_category', $request->category);
         }
 
+        $total = $query->count();
+
         $units = $query->with('leads')->latest('updated_at')->take(50)->get();
 
         $units = $units->map(function (Property $unit) {
@@ -534,7 +556,10 @@ class ListingController extends Controller
             ];
         })->values();
 
-        return response()->json($units);
+        return response()->json([
+            'units' => $units,
+            'total' => $total,
+        ]);
     }
 
     /**
@@ -679,6 +704,55 @@ class ListingController extends Controller
     }
 
     /**
+     * Choose a Bayut location (from the synced catalog) for a unit's push API listing.
+     */
+    public function updatePortalLocation(Request $request, Property $property)
+    {
+        $data = $request->validate([
+            'location_id' => 'required|string|max:100',
+            'location_label' => 'nullable|string|max:255',
+        ]);
+
+        $integration = \App\Models\PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
+        $label = null;
+        if ($integration !== null) {
+            foreach (($integration->location_catalog ?? []) as $location) {
+                if ((string) ($location['id'] ?? '') === $data['location_id']) {
+                    $label = $location['label'] ?? null;
+                    break;
+                }
+            }
+        }
+
+        if ($label === null && ! blank($data['location_label'] ?? null)) {
+            $label = trim($data['location_label']);
+
+            if ($integration !== null) {
+                $catalog = $integration->location_catalog ?? [];
+                $catalog[] = ['id' => (int) $data['location_id'], 'label' => $label];
+                $integration->update(['location_catalog' => array_values($catalog)]);
+            }
+        }
+
+        if ($label === null) {
+            return back()->with('error', __('This location could not be resolved. Search again and pick a result from Bayut.'));
+        }
+
+        $property->update([
+            'bayut_location_id' => $data['location_id'],
+            'bayut_location_label' => $label,
+        ]);
+
+        AuditLog::log('inventory.portal_location_updated', $property, ['location_id' => $data['location_id'], 'label' => $label]);
+
+        return back()->with('success', __('Bayut location set to :label.', ['label' => $label]));
+    }
+
+    /**
      * Quick list/unlist toggle for a portal, usable on any unit regardless of
      * portal readiness - units that are already live on a portal (uploaded
      * outside the CRM) can be flagged as such immediately.
@@ -760,18 +834,39 @@ class ListingController extends Controller
         if ($portal === 'bayut') {
             // Bayut owns Dubizzle: it auto-duplicates each listing, so a
             // successful Bayut push also publishes the unit on Dubizzle.
-            $property->update(array_filter([
-                'bayut_status' => 'live',
-                'bayut_listed_at' => now()->toDateString(),
+            $state = strtolower((string) ($result['status'] ?? 'live'));
+            $isLive = in_array($state, ['', 'live', 'published', 'active', 'approved', 'listed'], true);
+
+            $attributes = [
+                'bayut_status' => $isLive ? 'live' : $state,
                 'bayut_listing_id' => $result['reference'] ?? null,
                 'bayut_url' => $result['url'] ?? null,
-                'dubizzle_status' => 'live',
-                'dubizzle_listing_reference' => $result['reference'] ?? null,
-                'dubizzle_listed_at' => now()->toDateString(),
-                'dubizzle_url' => $result['url'] ?? null,
-            ]));
+            ];
+
+            if ($isLive) {
+                $attributes['bayut_listed_at'] = now()->toDateString();
+                $attributes['dubizzle_status'] = 'live';
+                $attributes['dubizzle_listing_reference'] = $result['reference'] ?? null;
+                $attributes['dubizzle_listed_at'] = now()->toDateString();
+                $attributes['dubizzle_url'] = $result['url'] ?? null;
+            } else {
+                $attributes['dubizzle_status'] = 'not_listed';
+            }
+
+            $property->update(array_filter($attributes, fn ($value) => $value !== null));
 
             app(\App\Services\Portals\BayutCreditsService::class)->consume($tenant, $property);
+
+            AuditLog::log('inventory.portal_pushed_'.$portal, $property, [
+                'reference' => $result['reference'] ?? null,
+                'status' => $state,
+            ]);
+
+            if ($isLive) {
+                return back()->with('success', __('Submitted to :portal.', ['portal' => $integration->portal_label]));
+            }
+
+            return back()->with('warning', $result['message'] ?? __('Bayut saved the listing as a draft; it is not live on the portal yet.'));
         } else {
             $property->update(array_filter([
                 'propertyfinder_status' => 'live',
@@ -883,6 +978,7 @@ class ListingController extends Controller
                 if ($file->isValid()) {
                     $stored = $cloud->store($file, 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
                     $uploads[] = [
+                        'tenant_id' => auth()->user()->tenant_id,
                         'type' => 'photo',
                         'path' => $stored['path'],
                         'external_url' => $stored['external_url'],
@@ -894,6 +990,7 @@ class ListingController extends Controller
         if ($request->hasFile('floor_plan') && $request->file('floor_plan')->isValid()) {
             $stored = $cloud->store($request->file('floor_plan'), 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
             $uploads[] = [
+                'tenant_id' => auth()->user()->tenant_id,
                 'type' => 'floor_plan',
                 'path' => $stored['path'],
                 'external_url' => $stored['external_url'],
@@ -904,7 +1001,7 @@ class ListingController extends Controller
             foreach (preg_split('/\R/', $request->external_photo_urls) as $line) {
                 $line = trim($line);
                 if ($line !== '') {
-                    $uploads[] = ['type' => 'photo', 'external_url' => $line];
+                    $uploads[] = ['tenant_id' => auth()->user()->tenant_id, 'type' => 'photo', 'external_url' => $line];
                 }
             }
         }
@@ -927,15 +1024,29 @@ class ListingController extends Controller
      */
     public function uploadPhotos(Request $request, Property $property)
     {
-        $request->validate([
-            'photos' => 'required|array|max:10',
-            'photos.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:10240',
-            'captions' => 'nullable|array',
-            'captions.*' => 'nullable|string|max:255',
-        ]);
+        try {
+            $request->validate([
+                'photos' => 'required|array|max:10',
+                'photos.*' => 'image|mimes:jpg,jpeg,png,gif,webp|max:10240',
+                'captions' => 'nullable|array',
+                'captions.*' => 'nullable|string|max:255',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Property photo upload rejected', [
+                'property_id' => $property->id,
+                'user_id' => auth()->id(),
+                'file_count' => count($request->file('photos') ?? []),
+                'file_names' => collect($request->file('photos') ?? [])
+                    ->map(fn ($f) => $f?->getClientOriginalName())
+                    ->filter()->values()->all(),
+                'errors' => $e->errors(),
+            ]);
+            throw $e;
+        }
 
         $uploaded = 0;
         $cloud = app(\App\Services\Cloud\CloudPhotoService::class);
+        $isFirstPhoto = $property->media()->where('type', 'photo')->count() === 0;
         foreach ($request->file('photos') as $i => $file) {
             if (! $file->isValid()) {
                 continue;
@@ -944,6 +1055,7 @@ class ListingController extends Controller
             $stored = $cloud->store($file, 'properties/'.$property->id.'/'.Str::random(6), auth()->user());
 
             $property->media()->create([
+                'tenant_id' => auth()->user()->tenant_id,
                 'type' => 'photo',
                 'path' => $stored['path'],
                 'external_url' => $stored['external_url'],
@@ -953,9 +1065,16 @@ class ListingController extends Controller
                 'mime_type' => $file->getMimeType(),
                 'size' => $file->getSize(),
                 'sort_order' => $property->media()->max('sort_order') + 1,
+                'is_primary' => $isFirstPhoto && $uploaded === 0,
             ]);
             $uploaded++;
         }
+
+        Log::info('Property photo upload finished', [
+            'property_id' => $property->id,
+            'user_id' => auth()->id(),
+            'uploaded' => $uploaded,
+        ]);
 
         return redirect()->route('inventory.show', $property)
             ->with('success', $uploaded ? __('Photos uploaded.') : __('No valid photo files found.'));
@@ -970,13 +1089,129 @@ class ListingController extends Controller
             abort(404);
         }
 
+        $driveWarnings = [];
+
+        if ($photo->external_url && str_contains($photo->external_url, 'drive.google.com')) {
+            $fileId = PropertyMedia::driveFileId($photo->external_url);
+            if ($fileId) {
+                $connection = auth()->user()->driveConnections()
+                    ->where('provider', 'google')
+                    ->where('scope', 'drive')
+                    ->first();
+
+                if ($connection) {
+                    try {
+                        app(\App\Services\Cloud\CloudProviderFactory::class)
+                            ->make('google', $connection)
+                            ->deleteFile($fileId);
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to delete photo from Google Drive', [
+                            'property_id' => $property->id,
+                            'photo_id' => $photo->id,
+                            'file_id' => $fileId,
+                            'error' => $e->getMessage(),
+                        ]);
+                        $driveWarnings[] = __('Could not remove this photo from Google Drive.');
+                    }
+                }
+            }
+        }
+
         if ($photo->path) {
             Storage::disk('public')->delete($photo->path);
         }
-        $photo->delete();
+
+        DB::transaction(function () use ($property, $photo) {
+            $photo->delete();
+
+            if (! $property->media()->where('type', 'photo')->where('is_primary', true)->exists()) {
+                $next = $property->media()->where('type', 'photo')->orderBy('sort_order')->first();
+                if ($next) {
+                    $next->update(['is_primary' => true]);
+                }
+            }
+        });
+
+        $response = redirect()->route('inventory.show', $property)
+            ->with('success', __('Photo deleted.'));
+
+        if ($driveWarnings) {
+            $response->with('warning', implode(' ', $driveWarnings));
+        }
+
+        return $response;
+    }
+
+    /**
+     * Mark one unit photo as the primary/cover image.
+     */
+    public function setPrimaryPhoto(Request $request, Property $property, PropertyMedia $photo)
+    {
+        if ($photo->property_id !== $property->id || $photo->tenant_id !== auth()->user()->tenant_id) {
+            abort(404);
+        }
+
+        DB::transaction(function () use ($property, $photo) {
+            $property->media()->where('type', 'photo')->update(['is_primary' => false]);
+            $photo->update(['is_primary' => true, 'sort_order' => 1]);
+
+            $others = $property->media()
+                ->where('type', 'photo')
+                ->whereKeyNot($photo->id)
+                ->orderBy('sort_order')
+                ->get();
+
+            foreach ($others as $index => $other) {
+                $other->update(['sort_order' => $index + 2]);
+            }
+        });
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
 
         return redirect()->route('inventory.show', $property)
-            ->with('success', __('Photo deleted.'));
+            ->with('success', __('Main photo updated.'));
+    }
+
+    /**
+     * Persist a new display order for the unit photos.
+     */
+    public function reorderPhotos(Request $request, Property $property)
+    {
+        $request->validate([
+            'ids' => 'nullable|array|max:200',
+            'ids.*' => 'integer|distinct',
+        ]);
+
+        $ids = $request->input('ids', []);
+
+        if ($ids) {
+            $owned = $property->media()->where('type', 'photo')->pluck('id')->all();
+
+            DB::transaction(function () use ($ids, $owned, $property) {
+                $firstId = null;
+                foreach (array_values($ids) as $index => $id) {
+                    if (! in_array((int) $id, $owned, true)) {
+                        continue;
+                    }
+                    $property->media()->whereKey((int) $id)->update(['sort_order' => $index + 1]);
+                    $firstId ??= (int) $id;
+                }
+
+                if ($firstId !== null) {
+                    $property->media()->where('type', 'photo')->update(['is_primary' => false]);
+                    $property->media()->whereKey($firstId)->update(['is_primary' => true]);
+                }
+            });
+        }
+
+        if ($request->wantsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return redirect()->route('inventory.show', $property)
+            ->with('success', __('Photo order updated.'));
     }
 
     protected function exportUnits(Request $request, string $statusColumn)

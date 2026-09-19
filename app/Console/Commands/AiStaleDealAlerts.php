@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 class AiStaleDealAlerts extends Command
 {
     protected $signature = 'ai:stale-deal-alerts';
+
     protected $description = 'Analyze stuck deals and send AI recommendations to agents';
 
     public function handle(): int
@@ -22,7 +23,7 @@ class AiStaleDealAlerts extends Command
         foreach ($tenants as $tenant) {
             try {
                 $ai = new AiService($tenant);
-                if (!$ai->isAvailable()) {
+                if (! $ai->isAvailable()) {
                     continue;
                 }
 
@@ -50,10 +51,10 @@ class AiStaleDealAlerts extends Command
 
                         // Create a notification for the deal agent (or admin if no agent)
                         $recipient = $deal->agent;
-                        if (!$recipient) {
+                        if (! $recipient) {
                             $recipient = User::where('tenant_id', $tenant->id)
                                 ->where('is_active', true)
-                                ->whereHas('role', fn($q) => $q->where('name', 'admin'))
+                                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
                                 ->first();
                         }
 

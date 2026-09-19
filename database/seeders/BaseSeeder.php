@@ -15,6 +15,7 @@ class BaseSeeder extends Seeder
     public function run(): void
     {
         $roles = [
+            'owner' => 'Owner',
             'admin' => 'Admin',
             'acquisition_agent' => 'Acquisition Agent',
             'disposition_agent' => 'Disposition Agent',
@@ -23,6 +24,7 @@ class BaseSeeder extends Seeder
             'listing_agent' => 'Listing Agent',
             'buyers_agent' => 'Buyers Agent',
             'marketing' => 'Marketing',
+            'cold_call_agent' => 'Cold Call Agent',
         ];
 
         foreach ($roles as $name => $displayName) {
@@ -42,6 +44,7 @@ class BaseSeeder extends Seeder
         }
 
         $rolePermissions = [
+            'owner' => $allPermissions->keys()->all(),
             'admin' => $allPermissions->keys()->all(),
             'agent' => [
                 'leads.view', 'leads.create', 'leads.edit', 'leads.delete', 'leads.export', 'leads.bulk_actions',
@@ -78,6 +81,11 @@ class BaseSeeder extends Seeder
                 'calendar.view', 'profile.edit',
             ],
             'marketing' => [
+                'leads.view', 'leads.create', 'leads.edit', 'leads.export',
+                'properties.view', 'properties.create', 'properties.edit',
+                'calendar.view', 'profile.edit',
+            ],
+            'cold_call_agent' => [
                 'leads.view', 'leads.create', 'leads.edit', 'leads.export',
                 'properties.view', 'properties.create', 'properties.edit',
                 'calendar.view', 'profile.edit',

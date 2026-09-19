@@ -153,6 +153,73 @@ class LeadManagementTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_manager_sees_own_and_team_leads_but_not_other_branches(): void
+    {
+        $this->actingAsAdmin();
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+        $teamAgent = $this->createUserWithRole('agent');
+        $teamAgent->update(['reports_to' => $manager->id]);
+        $outsideAgent = $this->createUserWithRole('agent');
+        $outsideAgent->update(['reports_to' => $this->adminUser->id]);
+
+        $managerLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $manager->id, 'first_name' => 'ManagerSee']);
+        $teamLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $teamAgent->id, 'first_name' => 'TeamAgentSee']);
+        $outsideLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $outsideAgent->id, 'first_name' => 'OutsideSee']);
+
+        $this->actingAs($manager);
+
+        $response = $this->get('/leads');
+        $response->assertStatus(200);
+        $response->assertSee('ManagerSee');
+        $response->assertSee('TeamAgentSee');
+        $response->assertDontSee('OutsideSee');
+        $response->assertSee('filter-agent');
+    }
+
+    public function test_manager_can_filter_by_a_team_agent(): void
+    {
+        $this->actingAsAdmin();
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+        $teamAgent = $this->createUserWithRole('agent');
+        $teamAgent->update(['reports_to' => $manager->id]);
+        $outsideAgent = $this->createUserWithRole('agent');
+        $outsideAgent->update(['reports_to' => $this->adminUser->id]);
+
+        $managerLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $manager->id, 'first_name' => 'ManagerOwnLead']);
+        $teamLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $teamAgent->id, 'first_name' => 'TeamFilteredLead']);
+        $outsideLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $outsideAgent->id, 'first_name' => 'OutsideFiltered']);
+
+        $this->actingAs($manager);
+
+        $this->get('/leads?agent_id=' . $teamAgent->id)
+            ->assertOk()
+            ->assertSee('TeamFilteredLead')
+            ->assertDontSee('ManagerOwnLead')
+            ->assertDontSee('OutsideFiltered');
+
+        // An out-of-team agent id cannot widen a manager's scope.
+        $this->get('/leads?agent_id=' . $outsideAgent->id)
+            ->assertOk()
+            ->assertDontSee('OutsideFiltered');
+    }
+
+    public function test_agent_cannot_widen_scope_via_agent_id_filter(): void
+    {
+        $this->createTenantWithAdmin();
+        $agent = $this->actingAsRole('agent');
+        $other = $this->createUserWithRole('agent');
+
+        $myLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $agent->id, 'first_name' => 'OnlyMyLead']);
+        $otherLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $other->id, 'first_name' => 'NotMyLead']);
+
+        $this->get('/leads?agent_id=' . $other->id)
+            ->assertOk()
+            ->assertSee('OnlyMyLead')
+            ->assertDontSee('NotMyLead');
+    }
+
     public function test_lead_creation_requires_first_name(): void
     {
         $this->actingAsAdmin();

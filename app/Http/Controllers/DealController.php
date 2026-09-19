@@ -77,7 +77,7 @@ class DealController extends Controller
         $agents = collect();
         if (auth()->user()->isAdmin()) {
             $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'acquisition_agent', 'disposition_agent', 'listing_agent', 'buyers_agent']))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'acquisition_agent', 'disposition_agent', 'listing_agent', 'buyers_agent']))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }
@@ -161,7 +161,7 @@ class DealController extends Controller
                 $matches = $deal->buyerMatches;
                 if ($matches->count() > 0) {
                     $topScore = $matches->max('score') ?? 0;
-                    $adminRoleId = Role::where('name', 'admin')->value('id');
+                    $adminRoleIds = Role::whereIn('name', ['owner', 'admin'])->pluck('id')->all();
 
                     $isRE = \App\Services\BusinessModeService::isRealEstate($tenant);
                     $notifyRoles = $isRE
@@ -170,7 +170,7 @@ class DealController extends Controller
                     $extraRoleIds = Role::whereIn('name', $notifyRoles)->pluck('id')->all();
 
                     $recipients = User::where('tenant_id', $tenant->id)
-                        ->whereIn('role_id', array_merge([$adminRoleId], $extraRoleIds))
+                        ->whereIn('role_id', array_merge($adminRoleIds, $extraRoleIds))
                         ->where('is_active', true)
                         ->get();
                     if ($recipients->isNotEmpty()) {

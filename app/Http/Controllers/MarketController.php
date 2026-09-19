@@ -433,7 +433,10 @@ class MarketController extends Controller
     protected function assignableAgents()
     {
         return \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', BusinessModeService::getAssignableRoleNames()))
+            ->where(function ($query) {
+                $query->whereHas('role', fn ($q) => $q->whereIn('name', BusinessModeService::getAssignableRoleNames()))
+                    ->orWhereHas('secondaryRoles', fn ($q) => $q->whereIn('name', BusinessModeService::getAssignableRoleNames()));
+            })
             ->orderBy('name')
             ->get(['id', 'name'])
             ->pluck('name', 'id');

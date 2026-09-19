@@ -212,6 +212,34 @@ class Tenant extends Model
         return ($this->business_mode ?? 'wholesale') === 'wholesale';
     }
 
+    /**
+     * Commission formula that ownership agreed with the agents.
+     *
+     * default_split_type: 'fixed' | 'tiered'
+     * default_company_pct / default_agent_pct: fixed company/agent split (40/60).
+     * tiers: ordered list of { from, max, agent_pct } — the agent's share of the
+     *        gross commission for each total-commission range. company = 100 - agent.
+     * default_support_funding: how a support agent's share is funded by default
+     *        (from_agent | from_company | from_both).
+     */
+    public function commissionCalculationSettings(): array
+    {
+        $saved = $this->custom_options['commission_calculation'] ?? [];
+
+        return array_merge([
+            'default_split_type' => 'fixed',
+            'default_company_pct' => '50',
+            'default_agent_pct' => '50',
+            'tiers' => [
+                ['from' => null, 'max' => 100000, 'agent_pct' => '50'],
+                ['from' => 100000.01, 'max' => 200000, 'agent_pct' => '55'],
+                ['from' => 200000.01, 'max' => 300000, 'agent_pct' => '60'],
+                ['from' => 300000.01, 'max' => null, 'agent_pct' => '65'],
+            ],
+            'default_support_funding' => 'from_agent',
+        ], $saved);
+    }
+
     public function isRealEstate(): bool
     {
         return $this->business_mode === 'realestate';

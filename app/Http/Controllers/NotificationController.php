@@ -13,6 +13,7 @@ class NotificationController extends Controller
     {
         $notifications = auth()->user()
             ->notifications()
+            ->latest()
             ->take(10)
             ->get()
             ->map(fn ($n) => [
@@ -46,7 +47,7 @@ class NotificationController extends Controller
             $typeMap = [
                 'leads' => ['App\\Notifications\\LeadAssigned', 'App\\Notifications\\BuyerMatchFound', 'App\\Notifications\\LeadLostForReview', 'App\\Notifications\\LeadReassigned'],
                 'deals' => ['App\\Notifications\\DealStageChanged', 'App\\Notifications\\DueDiligenceWarning'],
-                'tasks' => ['App\\Notifications\\SequenceStepEmail'],
+                'tasks' => ['App\\Notifications\\SequenceStepEmail', 'App\\Notifications\\TaskAssigned', 'App\\Notifications\\TaskActivityNotification'],
                 'team' => ['App\\Notifications\\TeamMemberInvited', 'App\\Notifications\\TeamLeadActivity'],
                 'availability' => ['App\\Notifications\\AvailabilityConflictAlert'],
             ];

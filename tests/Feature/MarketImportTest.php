@@ -258,14 +258,37 @@ Ahmed Ali,2500000,Villa,North-facing villa with garden
         $this->assertSame('JLT', $contact->community);
     }
 
-    public function test_marketing_role_can_use_the_market_module(): void
+    public function test_cold_call_agent_role_can_use_the_cold_calls_module(): void
     {
-        $marketing = $this->actingAsRole('marketing', ['business_mode' => 'realestate']);
+        $coldCall = $this->actingAsRole('cold_call_agent', ['business_mode' => 'realestate']);
         MarketContact::factory()->count(3)->create(['tenant_id' => $this->tenant->id]);
 
         $this->get(route('market.index'))->assertStatus(200);
         $this->get(route('market.create'))->assertStatus(200);
-        $this->assertSame($marketing->tenant_id, $this->tenant->id);
+        $this->assertSame($coldCall->tenant_id, $this->tenant->id);
+    }
+
+    public function test_plain_agent_and_marketing_roles_are_rejected_from_cold_calls(): void
+    {
+        foreach (['agent', 'marketing'] as $role) {
+            $this->actingAsRole($role, ['business_mode' => 'realestate']);
+            $this->get(route('market.index'))->assertStatus(403);
+        }
+    }
+
+    public function test_secondary_cold_call_role_grants_access_to_cold_calls(): void
+    {
+        $user = $this->actingAsRole('listing_agent', ['business_mode' => 'realestate']);
+        $user->secondaryRoles()->attach(\App\Models\Role::where('name', 'cold_call_agent')->firstOrFail()->id);
+
+        $this->get(route('market.index'))->assertStatus(200);
+        $this->get(route('market.create'))->assertStatus(200);
+    }
+
+    public function test_legacy_market_url_returns_404(): void
+    {
+        $this->actingAsRealEstateAdmin();
+        $this->get('/market')->assertStatus(404);
     }
 
     public function test_market_pages_render(): void

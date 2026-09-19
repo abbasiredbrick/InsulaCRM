@@ -129,7 +129,8 @@ class InstallerService
             $tenant->business_mode = $payload['business_mode'] ?? 'wholesale';
             $tenant->save();
 
-            $adminRole = Role::where('name', 'admin')->firstOrFail();
+            $adminRole = Role::where('name', 'owner')->first()
+                ?? Role::where('name', 'admin')->firstOrFail();
             $admin = User::withoutGlobalScopes()->firstOrNew([
                 'email' => $payload['admin_email'],
             ]);

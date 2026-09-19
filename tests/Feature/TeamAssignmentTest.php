@@ -35,18 +35,18 @@ class TeamAssignmentTest extends TestCase
         $this->actingAsAdmin();
 
         $response = $this->post('/leads', [
-            'agent_id'    => $this->adminUser->id,
-            'first_name'  => 'Dana',
-            'last_name'   => 'Whitfield',
+            'agent_id' => $this->adminUser->id,
+            'first_name' => 'Dana',
+            'last_name' => 'Whitfield',
             'lead_source' => 'referral',
-            'status'      => 'new',
+            'status' => 'new',
             'temperature' => 'warm',
         ]);
 
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('leads', [
             'first_name' => 'Dana',
-            'agent_id'   => $this->adminUser->id,
+            'agent_id' => $this->adminUser->id,
         ]);
     }
 
@@ -99,6 +99,28 @@ class TeamAssignmentTest extends TestCase
         $this->assertSame($this->adminUser->id, Deal::find($deal->id)?->agent_id);
     }
 
+    public function test_deleting_a_member_regenerates_reassigned_lead_references(): void
+    {
+        $this->actingAsAdmin();
+        $member = $this->createUserWithRole('agent', ['name' => 'Alice Johnson', 'agent_code' => 'AJ']);
+
+        $lead = $this->createLead([
+            'agent_id' => $member->id,
+            'created_at' => \Illuminate\Support\Carbon::parse('2026-09-15'),
+        ]);
+
+        $this->assertSame('AJ2609001', $lead->reference);
+
+        $this->delete(route('settings.destroyAgent', $member), [
+            'reassign_to' => $this->adminUser->id,
+        ])->assertSessionHasNoErrors();
+
+        $reference = Lead::find($lead->id)?->reference;
+
+        $this->assertNotSame('AJ2609001', $reference);
+        $this->assertSame($this->adminUser->agent_code.'2609001', $reference);
+    }
+
     public function test_deleting_a_member_frees_their_email_for_reuse(): void
     {
         $this->actingAsAdmin();
@@ -109,10 +131,10 @@ class TeamAssignmentTest extends TestCase
         ]);
 
         $response = $this->post(route('settings.inviteAgent'), [
-            'name'     => 'Second Attempt',
-            'email'    => 'reused@example.com',
+            'name' => 'Second Attempt',
+            'email' => 'reused@example.com',
             'password' => 'password123',
-            'role_id'  => \App\Models\Role::where('name', 'agent')->first()->id,
+            'role_id' => \App\Models\Role::where('name', 'agent')->first()->id,
         ]);
 
         $response->assertSessionHasNoErrors();
@@ -153,23 +175,31 @@ class TeamAssignmentTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $this->adminUser->id]);
     }
 
-    public function test_the_last_admin_cannot_be_deleted(): void
+    public function test_an_admin_cannot_delete_another_admin(): void
     {
         $this->actingAsAdmin();
         $secondAdmin = $this->createUserWithRole('admin');
 
-        // Acting as the second admin, the first is now deletable...
-        $this->actingAs($secondAdmin);
-        $this->delete(route('settings.destroyAgent', $this->adminUser), [
-            'reassign_to' => $secondAdmin->id,
-        ]);
-        $this->assertDatabaseMissing('users', ['id' => $this->adminUser->id]);
+        // Admins no longer manage peers — only the Owner does.
+        $this->delete(route('settings.destroyAgent', $secondAdmin), [
+            'reassign_to' => $this->adminUser->id,
+        ])->assertForbidden();
 
-        // ...but nobody can remove the one that remains.
-        $agent = $this->createUserWithRole('agent');
-        $this->actingAs($agent);
-        $this->delete(route('settings.destroyAgent', $secondAdmin), ['reassign_to' => $agent->id]);
         $this->assertDatabaseHas('users', ['id' => $secondAdmin->id]);
+    }
+
+    public function test_the_owner_can_delete_an_admin(): void
+    {
+        $this->createTenantWithAdmin();
+        $owner = $this->createUserWithRole('owner');
+        $admin = $this->adminUser;
+        $this->actingAs($owner);
+
+        $this->delete(route('settings.destroyAgent', $admin), [
+            'reassign_to' => $owner->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('users', ['id' => $admin->id]);
     }
 
     // ── Business mode switch ─────────────────────────────────
@@ -180,7 +210,7 @@ class TeamAssignmentTest extends TestCase
 
         $this->put(route('settings.updateBusinessMode'), [
             'business_mode' => 'realestate',
-            'confirmation'  => 'yes',
+            'confirmation' => 'yes',
         ]);
 
         $this->assertSame('wholesale', $this->tenant->fresh()->business_mode);
@@ -192,7 +222,7 @@ class TeamAssignmentTest extends TestCase
 
         $this->put(route('settings.updateBusinessMode'), [
             'business_mode' => 'realestate',
-            'confirmation'  => 'SWITCH',
+            'confirmation' => 'SWITCH',
         ]);
 
         $this->assertSame('realestate', $this->tenant->fresh()->business_mode);
@@ -206,7 +236,7 @@ class TeamAssignmentTest extends TestCase
 
         $this->put(route('settings.updateBusinessMode'), [
             'business_mode' => 'realestate',
-            'confirmation'  => 'SWITCH',
+            'confirmation' => 'SWITCH',
         ]);
 
         // Data is deliberately left alone - the operator remaps it themselves.
@@ -220,7 +250,7 @@ class TeamAssignmentTest extends TestCase
 
         $this->put(route('settings.updateBusinessMode'), [
             'business_mode' => 'realestate',
-            'confirmation'  => 'SWITCH',
+            'confirmation' => 'SWITCH',
         ]);
 
         $this->assertSame('wholesale', $this->tenant->fresh()->business_mode);

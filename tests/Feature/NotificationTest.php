@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Lead;
 use App\Notifications\LeadAssigned;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class NotificationTest extends TestCase
@@ -84,6 +84,29 @@ class NotificationTest extends TestCase
 
         $response->assertJson(['unread_count' => 1]);
         $this->assertCount(1, $response->json('notifications'));
+    }
+
+    public function test_recent_notifications_are_returned_newest_first(): void
+    {
+        $this->actingAsAdmin();
+
+        $lead = $this->createLead();
+        $base = Carbon::now();
+
+        for ($i = 1; $i <= 6; $i++) {
+            Carbon::setTestNow($base->copy()->addMinutes($i));
+            $this->adminUser->notify(new LeadAssigned($lead, $this->tenant));
+        }
+        Carbon::setTestNow();
+
+        $response = $this->getJson(route('notifications.recent'));
+
+        $response->assertStatus(200);
+        $ids = collect($response->json('notifications'))->pluck('id')->all();
+        $this->assertCount(6, $ids);
+
+        $expected = $this->adminUser->notifications()->latest()->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $this->assertSame($expected, $ids);
     }
 
     public function test_notification_data_has_required_fields(): void

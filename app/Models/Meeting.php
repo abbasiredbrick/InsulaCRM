@@ -27,6 +27,7 @@ class Meeting extends Model
         'duration_minutes',
         'status',
         'notes',
+        'feedback',
         'calendar_provider',
         'calendar_event_id',
         'reminder_minutes',

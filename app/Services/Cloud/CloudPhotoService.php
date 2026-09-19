@@ -29,7 +29,16 @@ class CloudPhotoService
             if ($connection) {
                 try {
                     $provider = $this->factory->make($preference, $connection);
-                    $result = $provider->uploadFile($file->getPathname(), $file->getClientOriginalName(), $file->getMimeType());
+                    $segments = explode('/', trim($directory, '/'));
+                    $subpath = count($segments) >= 2
+                        ? trim($segments[0]).'/'.trim($segments[1])
+                        : (trim($segments[0]) !== '' ? trim($segments[0]) : null);
+                    $result = $provider->uploadFile(
+                        $file->getPathname(),
+                        $file->getClientOriginalName(),
+                        $file->getMimeType(),
+                        $subpath,
+                    );
 
                     return ['path' => null, 'external_url' => $result['external_url'] ?? null];
                 } catch (\Throwable $e) {

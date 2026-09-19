@@ -21,6 +21,9 @@ class PortalIntegration extends Model
         'agent_reference',
         'public_profile_id',
         'default_location_id',
+        'location_catalog',
+        'locations_synced_at',
+        'location_sync_page',
         'webhook_secret',
         'leads_api_token',
         'leads_last_synced_at',
@@ -39,6 +42,9 @@ class PortalIntegration extends Model
             'leads_api_token' => 'encrypted',
             'leads_last_synced_at' => 'datetime',
             'last_synced_at' => 'datetime',
+            'location_catalog' => 'array',
+            'locations_synced_at' => 'datetime',
+            'location_sync_page' => 'integer',
         ];
     }
 

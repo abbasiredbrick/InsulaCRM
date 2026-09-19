@@ -93,6 +93,21 @@ class TeamNotifier
     }
 
     /**
+     * Notify a newly added co-agent that they now share this lead.
+     */
+    public function notifyCoAgentAdded(Lead $lead, User $coAgent): void
+    {
+        $tenant = $lead->tenant;
+        if ($tenant && $coAgent->id !== auth()->id() && $tenant->wantsNotification('lead_reassigned')) {
+            try {
+                $coAgent->notify(new LeadReassigned($lead, null, $lead->agent, __('A colleague added you as a co-agent on this lead.')));
+            } catch (\Throwable $e) {
+                Log::error("TeamNotifier co-agent failed: {$e->getMessage()}");
+            }
+        }
+    }
+
+    /**
      * Every manager (someone with at least one report) above the agent, within
      * the same tenant, excluding the current actor.
      */

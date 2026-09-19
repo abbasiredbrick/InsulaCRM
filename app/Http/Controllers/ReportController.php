@@ -25,8 +25,12 @@ class ReportController extends Controller
         $dealQuery = Deal::whereBetween('created_at', [$from, $to . ' 23:59:59']);
 
         if (auth()->user()->isAgent()) {
-            $leadQuery->where('agent_id', auth()->id());
-            $dealQuery->where('agent_id', auth()->id());
+            $userId = auth()->id();
+            $leadQuery->where(function ($q) use ($userId) {
+                $q->where('agent_id', $userId)
+                    ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $userId)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
+            });
+            $dealQuery->where('agent_id', $userId);
         } elseif ($agentId) {
             $leadQuery->where('agent_id', $agentId);
             $dealQuery->where('agent_id', $agentId);
@@ -339,7 +343,7 @@ class ReportController extends Controller
                 $months[] = $date->format('M Y');
 
                 $lq = Lead::whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
-                if ($user->isAgent()) $lq->where('agent_id', $user->id);
+                if ($user->isAgent()) $lq->where(fn ($q) => $q->where('agent_id', $user->id)->orWhereHas('leadAgents', fn ($lqq) => $lqq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
                 $leadsPerMonth[] = $lq->count();
 
                 $dq = Deal::where('stage', 'closed_won')->whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
@@ -412,7 +416,8 @@ class ReportController extends Controller
         $leadQuery = Lead::query();
         $dealQuery = Deal::query();
         if ($user->isAgent()) {
-            $leadQuery->where('agent_id', $user->id);
+            $leadQuery->where(fn ($q) => $q->where('agent_id', $user->id)
+                ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
             $dealQuery->where('agent_id', $user->id);
         }
 

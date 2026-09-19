@@ -42,8 +42,8 @@
                                 <div class="card-body">
                                     <h6 class="card-title"><i class="bi {{ $icon }}"></i> {{ $name }}</h6>
                                     @if($conn)
-                                        <p class="mb-1 text-success"><i class="bi bi-patch-check"></i> {{ __('Connected as') }} <strong>{{ $conn->account_email }}</strong></p>
-                                        <form method="POST" action="{{ route('cloud.disconnect', ['provider' => 'google']) }}" data-provider="{{ $provider }}" class="d-inline disconnect-form">
+                                        <p class="mb-1 text-success"><i class="bi bi-patch-check"></i> {{ __('Connected as') }} <strong>{{ $conn->provider_account_email ?: ucfirst($provider) }}</strong></p>
+                                        <form method="POST" action="{{ route('cloud.disconnect', ['provider' => $provider]) }}" data-provider="{{ $provider }}" class="d-inline disconnect-form">
                                             @csrf
                                             @method('DELETE')
                                             <input type="hidden" name="scope" value="calendar">
@@ -51,7 +51,7 @@
                                         </form>
                                     @elseif($configured)
                                         <a href="{{ route('cloud.start', ['provider' => $provider, 'scope' => 'calendar']) }}" class="btn btn-sm btn-primary">
-                                            <i class="bi bi-plug"></i> {{ __('Connect calendar') }}
+                                            <i class="bi bi-plug"></i> {{ __('Connect :name Calendar', ['name' => $name]) }}
                                         </a>
                                     @else
                                         <p class="text-muted mb-1">{{ __('Tenant admin must configure') }} {{ $name }} {{ __('credentials in Settings') }}.</p>
@@ -80,7 +80,7 @@
                                 <div class="card-body">
                                     <h6 class="card-title"><i class="bi {{ $icon }}"></i> {{ $name }}</h6>
                                     @if($conn)
-                                        <p class="mb-1 text-success"><i class="bi bi-patch-check"></i> {{ __('Connected as') }} <strong>{{ $conn->account_email }}</strong></p>
+                                        <p class="mb-1 text-success"><i class="bi bi-patch-check"></i> {{ __('Connected as') }} <strong>{{ $conn->provider_account_email ?: ucfirst($provider) }}</strong></p>
                                         <form method="POST" action="{{ route('cloud.disconnect', ['provider' => $provider]) }}" class="d-inline disconnect-form">
                                             @csrf
                                             @method('DELETE')

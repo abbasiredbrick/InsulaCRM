@@ -12,6 +12,15 @@ class LoginTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_login_page_offers_a_password_visibility_toggle(): void
+    {
+        $response = $this->get('/login');
+
+        $response->assertOk();
+        $response->assertSee('id="toggle-password"', false);
+        $response->assertSee('id="login-password"', false);
+    }
+
     public function test_admin_can_login(): void
     {
         $user = $this->createTenantWithAdmin([], [

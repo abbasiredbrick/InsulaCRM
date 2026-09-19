@@ -133,6 +133,8 @@ class Property extends Model
         'marketing_description',
         'virtual_tour_url',
         'bayut_status',
+        'bayut_location_id',
+        'bayut_location_label',
         'bayut_listing_id',
         'bayut_url',
         'bayut_listed_at',
@@ -394,6 +396,40 @@ class Property extends Model
         return $this->isPortalReady();
     }
 
+    public function getIsPortalReadyAttribute(): bool
+    {
+        return $this->isPortalReady();
+    }
+
+    /**
+     * The permit regime for this unit's emirate. Abu Dhabi uses the Madhmoun
+     * permit; Dubai uses the RERA permit. Falls back to the unit's own city.
+     */
+    public function locationPermit(): array
+    {
+        $emirate = (string) ($this->bayut_location_label ?: ($this->city ?: $this->state));
+
+        if (str_contains($emirate, 'Abu Dhabi')) {
+            return ['key' => 'abudhabi', 'label' => __('Madhmoun Permit No')];
+        }
+
+        if (str_contains($emirate, 'Dubai')) {
+            return ['key' => 'dubai', 'label' => __('RERA Permit No')];
+        }
+
+        return ['key' => 'generic', 'label' => __('Permit No')];
+    }
+
+    public function getPermitLabelAttribute(): string
+    {
+        return $this->locationPermit()['label'];
+    }
+
+    public function getPermitRegimeAttribute(): string
+    {
+        return $this->locationPermit()['key'];
+    }
+
     /**
      * Absolute URLs of the unit's photos (uploaded or CDN), for portal feeds.
      */
@@ -401,6 +437,7 @@ class Property extends Model
     {
         return $this->media
             ->where('type', 'photo')
+            ->sortBy(fn ($m) => sprintf('%d-%04d', $m->is_primary ? 0 : 1, $m->sort_order))
             ->map(fn ($m) => $m->url())
             ->filter()
             ->values()

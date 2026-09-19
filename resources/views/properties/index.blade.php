@@ -9,7 +9,7 @@
         <h3 class="card-title">{{ __('All Properties') }}</h3>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('properties.index') }}" class="row g-2">
+        <form method="GET" action="{{ route('properties.index') }}" class="row g-2" data-live-filter>
             <div class="col-md-3">
                 <label for="property-search" class="visually-hidden">{{ __('Search address, city, zip') }}</label>
                 <input type="text" id="property-search" name="search" class="form-control" placeholder="{{ __('Search address, city, zip...') }}" value="{{ request('search') }}">
@@ -53,9 +53,6 @@
                 </select>
             </div>
             @endif
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">{{ __('Filter') }}</button>
-            </div>
             @if(request()->hasAny(['search', 'property_type', 'condition', 'distress', 'listing_status']))
             <div class="col-auto">
                 <a href="{{ route('properties.index') }}" class="btn btn-outline-secondary">{{ __('Clear') }}</a>
@@ -63,6 +60,7 @@
             @endif
         </form>
     </div>
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
@@ -160,6 +158,7 @@
         <div class="ms-auto">
             {{ $properties->withQueryString()->links() }}
         </div>
+    </div>
     </div>
 </div>
 @endsection

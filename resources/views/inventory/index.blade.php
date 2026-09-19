@@ -104,7 +104,7 @@
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('inventory.index') }}" id="inventory-search-form">
+        <form method="GET" action="{{ route('inventory.index') }}" id="inventory-search-form" data-live-filter>
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label class="form-label">{{ __('Search') }}</label>
@@ -129,7 +129,6 @@
                     </select>
                 </div>
                 <div class="col-auto">
-                    <button type="submit" class="btn btn-sm btn-primary">{{ __('Search') }}</button>
                     <a href="{{ route('inventory.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#advancedSearch">
                         {{ __('Advanced') }}
@@ -287,7 +286,7 @@
                             <input type="text" name="developer_name" class="form-control form-control-sm" value="{{ request('developer_name') }}">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">{{ __('RERA permit') }}</label>
+                            <label class="form-label">{{ __('Permit No') }}</label>
                             <input type="text" name="rera_permit_no" class="form-control form-control-sm" value="{{ request('rera_permit_no') }}">
                         </div>
                         <div class="col-md-2">
@@ -320,6 +319,7 @@
         </form>
     </div>
 
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
@@ -398,6 +398,7 @@
         {{ $units->appends(request()->query())->links('vendor.pagination.tabler') }}
     </div>
     @endif
+    </div>
 </div>
 
 @push('scripts')

@@ -57,10 +57,10 @@ class RemindExpiringLeases extends Command
 
             // Fallback: tenant admins when the lease has no agent at all.
             if ($lease->agent_id === null) {
-                $adminRoleId = Role::where('name', 'admin')->value('id');
+                $adminRoleIds = Role::whereIn('name', ['owner', 'admin'])->pluck('id');
                 $recipients = $recipients->merge(
                     User::where('tenant_id', $tenant->id)
-                        ->where('role_id', $adminRoleId)
+                        ->whereIn('role_id', $adminRoleIds)
                         ->where('is_active', true)
                         ->get(),
                 );

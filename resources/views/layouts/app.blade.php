@@ -127,6 +127,25 @@
                         @endif
 
                         @if(($businessMode ?? 'wholesale') === 'realestate')
+                        <li class="nav-item {{ request()->is('my-commissions') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('commissions.mine') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17.2 4.8a3 3 0 0 1 4 4l-8.5 8.5a3 3 0 0 1 -2.1 .9h-2.1a1 1 0 0 0 -1 1v2.3a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1h2a1 1 0 0 0 1 -1v-2.1a3 3 0 0 1 .9 -2.1z" transform="rotate(10 12 12)"/><path d="M15.5 10.5l-6 6"/><path d="M11 7h4"/><path d="M15.5 6.5l2 -2"/><path d="M5.5 13.5l2 -2"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('My Commissions') }}</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {{ request()->is('a2a*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('a2a.index') }}">
+                                <span class="nav-link-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                                </span>
+                                <span class="nav-link-title">{{ __('A2A Contracts') }}</span>
+                            </a>
+                        </li>
+                        @endif
+
+                        @if(($businessMode ?? 'wholesale') === 'realestate')
                         <li class="nav-item {{ request()->is('listings*') ? 'active' : '' }}">
                             <a class="nav-link" href="{{ route('listings.index') }}">
                                 <span class="nav-link-icon">
@@ -188,17 +207,7 @@
                                 </span>
                                 <span class="nav-link-title">{{ __('Leases') }}</span>
                             </a>
-                        </li>
-                        @if(auth()->user()->hasRole('marketing') || auth()->user()->isAdmin() || auth()->user()->isAgent())
-                        <li class="nav-item {{ request()->is('market*') ? 'active' : '' }}">
-                            <a class="nav-link" href="{{ route('market.index') }}">
-                                <span class="nav-link-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 4h4l3 3h6a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"/><path d="M9 8v.01"/><circle cx="12" cy="13" r="1"/><circle cx="16" cy="15" r="1"/><path d="M5 21a4 4 0 0 1 4 -4"/></svg>
-                                </span>
-                                <span class="nav-link-title">{{ __('Market') }}</span>
-                            </a>
-                        </li>
-                        @endif
+</li>
                         @endif
 
                         @unless(auth()->user()->isFieldScout())
@@ -256,9 +265,9 @@
                         </li>
                         @endunless
 
-                        @if(auth()->user()->isAdmin())
+                        @if(auth()->user()->isAdmin() || auth()->user()->isColdCallAgent())
                         {{-- ── MARKETING ───────────────────────────── --}}
-                        @php $marketingActive = request()->is('sequences*') || request()->is('lists*') || request()->is('campaigns*') || request()->is('workflows*') || request()->is('goals*') || request()->is('tags*') || request()->is('document-templates*'); @endphp
+                        @php $marketingActive = request()->is('coldcalls*') || request()->is('sequences*') || request()->is('lists*') || request()->is('campaigns*') || request()->is('workflows*') || request()->is('goals*') || request()->is('tags*') || request()->is('document-templates*'); @endphp
                         <li class="nav-item dropdown {{ $marketingActive ? 'active' : '' }}">
                             <a class="nav-link dropdown-toggle" href="#sidebar-marketing" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ $marketingActive ? 'true' : 'false' }}">
                                 <span class="nav-link-icon">
@@ -268,6 +277,8 @@
                             </a>
                             <div class="dropdown-menu {{ $marketingActive ? 'show' : '' }}">
 
+                                <a class="dropdown-item {{ request()->is('coldcalls*') ? 'active' : '' }}" href="{{ route('market.index') }}">{{ __('Cold Calls') }}</a>
+                                @if(auth()->user()->isAdmin())
                                 <a class="dropdown-item {{ request()->is('sequences*') ? 'active' : '' }}" href="{{ route('sequences.index') }}">{{ __('Sequences') }}</a>
                                 <a class="dropdown-item {{ request()->is('lists*') ? 'active' : '' }}" href="{{ route('lists.index') }}">{{ __('Lists') }}</a>
                                 <a class="dropdown-item {{ request()->is('campaigns*') ? 'active' : '' }}" href="{{ route('campaigns.index') }}">{{ __('Campaigns') }}</a>
@@ -275,6 +286,7 @@
                                 <a class="dropdown-item {{ request()->is('goals*') ? 'active' : '' }}" href="{{ route('goals.index') }}">{{ __('Goals') }}</a>
                                 <a class="dropdown-item {{ request()->is('tags*') ? 'active' : '' }}" href="{{ route('tags.index') }}">{{ __('Tags') }}</a>
                                 <a class="dropdown-item {{ request()->is('document-templates*') ? 'active' : '' }}" href="{{ route('document-templates.index') }}">{{ __('Documents') }}</a>
+                                @endif
                             </div>
                         </li>
 
@@ -466,6 +478,9 @@
                     @if(session('error'))
                     <script>document.addEventListener('DOMContentLoaded',function(){window.showToast(@json(session('error')),'error')})</script>
                     @endif
+                    @if(session('warning'))
+                    <script>document.addEventListener('DOMContentLoaded',function(){window.showToast(@json(session('warning')),'warning')})</script>
+                    @endif
                     @yield('content')
                 </div>
             </div>
@@ -499,8 +514,14 @@
         const list = document.getElementById('notif-list');
         const empty = document.getElementById('notif-empty');
         const markAllBtn = document.getElementById('notif-mark-all');
-        const toggle = document.getElementById('notif-toggle');
+        const toggle = document.getElementById('notification-toggle');
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : String(str);
+            return div.innerHTML;
+        }
 
         const iconMap = {
             'user-plus': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 11h6M19 8v6"/></svg>',
@@ -508,6 +529,8 @@
             'alert-triangle': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M12 9v2m0 4v.01"/><path d="M5 19h14a2 2 0 001.84-2.75l-7.1-12.25a2 2 0 00-3.5 0l-7.1 12.25a2 2 0 001.75 2.75"/></svg>',
             'users': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.85"/></svg>',
             'user-check': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 11l2 2 4-4"/></svg>',
+            'checklist': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M9.615 20H7a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8"/><path d="M14 19l2 2l4-4"/></svg>',
+            'activity': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M3 12h4l3 8l4-16l3 8h4"/></svg>',
             'bell': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 5a2 2 0 014 0 7 7 0 014 6v3a4 4 0 002 3H4a4 4 0 002-3v-3a7 7 0 014-6"/><path d="M9 17v1a3 3 0 006 0v-1"/></svg>'
         };
 
@@ -671,7 +694,8 @@
         var container = document.getElementById('toast-container');
         if (!container) return;
         var toast = document.createElement('div');
-        toast.className = 'alert alert-' + (type === 'error' ? 'danger' : 'success') + ' alert-dismissible shadow-lg';
+        var typeClass = type === 'error' ? 'danger' : (type === 'warning' ? 'warning' : (type === 'info' ? 'info' : 'success'));
+        toast.className = 'alert alert-' + typeClass + ' alert-dismissible shadow-lg';
         toast.setAttribute('role', 'alert');
         toast.style.cssText = 'animation:slideIn .3s ease;margin:0;min-width:280px;';
         toast.innerHTML = message + '<a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>';
@@ -680,7 +704,7 @@
             toast.style.transition = 'opacity .3s ease';
             toast.style.opacity = '0';
             setTimeout(function() { toast.remove(); }, 300);
-        }, 4000);
+        }, type === 'warning' ? 9000 : 4000);
     };
     </script>
     <script>
@@ -789,6 +813,8 @@
     }
     .notif-unread { background: var(--tblr-bg-surface-secondary, #f0f6ff); border-left: 3px solid var(--tblr-primary, #206bc4); }
     </style>
+    <script src="{{ asset('js/searchable-dropdowns.js') . '?v=' . config('app.version') }}"></script>
+    <script src="{{ asset('js/live-filter.js') . '?v=' . config('app.version') }}"></script>
     <script src="{{ asset('js/mobile-app.js') . '?v=' . config('app.version') }}"></script>
     @include('layouts._broadcasting')
 </body>

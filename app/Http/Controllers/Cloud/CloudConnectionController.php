@@ -20,7 +20,10 @@ class CloudConnectionController extends Controller
             abort(422);
         }
 
-        $redirect = $request->query('redirect', route('my-cloud.show'));
+        $redirect = (string) $request->query('redirect', route('my-cloud.show'));
+        if (! str_starts_with($redirect, '/') || str_starts_with($redirect, '//') || str_starts_with($redirect, '/\\')) {
+            $redirect = route('my-cloud.show');
+        }
 
         try {
             $providerInstance = $factory->forStart($provider, auth()->user(), $scope);

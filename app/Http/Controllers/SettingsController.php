@@ -42,7 +42,7 @@ class SettingsController extends Controller
         $teamMembers = User::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
             ->where('id', '!=', auth()->id())
-            ->with('role')
+            ->with(['role', 'secondaryRoles'])
             ->get();
 
         $roles = Role::where(function ($q) use ($tenant) {
@@ -52,6 +52,20 @@ class SettingsController extends Controller
             ? \App\Services\BusinessModeService::REALESTATE_ROLES
             : \App\Services\BusinessModeService::WHOLESALE_ROLES;
         $roles = $roles->filter(fn ($role) => in_array($role->name, $modeRoles));
+
+        // Roles the current actor is allowed to assign: strictly below their
+        // own rank. The Owner role is never assignable here (ownership moves
+        // only through the explicit transfer flow).
+        $assignableRoles = $roles
+            ->filter(fn ($role) => $role->name !== 'owner' && auth()->user()->roleRank() > $role->rank())
+            ->values();
+
+        // Operational roles that may be added on top of a member's primary
+        // role (e.g. Cold Call Agent). Owner/Admin stay primary-only.
+        $secondaryRoleOptions = $roles
+            ->filter(fn ($role) => ! in_array($role->name, ['owner', 'admin'], true))
+            ->values();
+
         $leadSourceCosts = LeadSourceCost::where('tenant_id', $tenant->id)->pluck('monthly_budget', 'lead_source');
         $webhooks = \App\Models\Webhook::where('tenant_id', $tenant->id)->latest()->get();
         $updateManager = app(UpdateManagerService::class);
@@ -72,7 +86,11 @@ class SettingsController extends Controller
 
         $businessModeImpact = $this->businessModeImpact($tenant);
 
-        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady', 'reassignTargets', 'businessModeImpact'));
+        // Commission formula + per-member compensation plans.
+        $commissionSettings = $tenant->commissionCalculationSettings();
+        $compensationPlans = \App\Models\AgentCompensation::get()->keyBy('user_id');
+
+        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'assignableRoles', 'secondaryRoleOptions', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady', 'reassignTargets', 'businessModeImpact', 'commissionSettings', 'compensationPlans'));
     }
 
     public function updateGeneral(GeneralSettingsRequest $request)
@@ -390,21 +408,71 @@ class SettingsController extends Controller
         return response()->json(['logs' => $logs]);
     }
 
+    /**
+     * Roles the acting user may assign: strictly below their own rank,
+     * relevant to the tenant's business mode (or a custom tenant role). The
+     * Owner role is never assignable here — ownership only moves through
+     * transferOwnership().
+     */
+    private function assignableRoleIdsFor(User $actor, Tenant $tenant): array
+    {
+        $modeRoleNames = \App\Services\BusinessModeService::getRoles($tenant);
+
+        return Role::query()
+            ->where(function ($q) use ($tenant) {
+                $q->where('is_system', true)->orWhere('tenant_id', $tenant->id);
+            })
+            ->get()
+            ->filter(function (Role $role) use ($actor, $modeRoleNames, $tenant) {
+                $relevant = $role->is_system
+                    ? in_array($role->name, $modeRoleNames, true)
+                    : $role->tenant_id === $tenant->id;
+
+                return $relevant
+                    && $role->name !== 'owner'
+                    && $actor->roleRank() > $role->rank();
+            })
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Roles that may be granted as additional (secondary) roles on top of a
+     * member's primary role. Owner and Admin are privilege roles that can only
+     * ever be a member's primary role.
+     */
+    private function secondaryRoleIdsFor(Tenant $tenant): array
+    {
+        $modeRoleNames = \App\Services\BusinessModeService::getRoles($tenant);
+
+        return Role::query()
+            ->where(function ($q) use ($tenant) {
+                $q->where('is_system', true)->orWhere('tenant_id', $tenant->id);
+            })
+            ->get()
+            ->filter(function (Role $role) use ($modeRoleNames, $tenant) {
+                $relevant = $role->is_system
+                    ? in_array($role->name, $modeRoleNames, true)
+                    : $role->tenant_id === $tenant->id;
+
+                return $relevant && ! in_array($role->name, ['owner', 'admin'], true);
+            })
+            ->pluck('id')
+            ->all();
+    }
+
     public function inviteAgent(Request $request)
     {
         $tenant = auth()->user()->tenant;
-        $modeRoleNames = \App\Services\BusinessModeService::getRoles($tenant);
-        $allowedRoleIds = Role::where(function ($q) use ($tenant, $modeRoleNames) {
-            $q->where(function ($q2) use ($modeRoleNames) {
-                $q2->where('is_system', true)->whereIn('name', $modeRoleNames);
-            })->orWhere('tenant_id', $tenant->id);
-        })->pluck('id')->toArray();
+        $allowedRoleIds = $this->assignableRoleIdsFor(auth()->user(), $tenant);
 
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'role_id' => ['required', 'exists:roles,id', \Illuminate\Validation\Rule::in($allowedRoleIds)],
+            'additional_roles' => 'nullable|array',
+            'additional_roles.*' => ['integer', \Illuminate\Validation\Rule::in($this->secondaryRoleIdsFor($tenant))],
             'reports_to' => ['nullable', 'integer', function ($attribute, $value, $fail) {
                 if ($value && ! User::where('tenant_id', auth()->user()->tenant_id)->where('id', $value)->exists()) {
                     $fail(__('The manager must be a member of this tenant.'));
@@ -421,6 +489,11 @@ class SettingsController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+        $secondaryRoleIds = collect($request->input('additional_roles', []))
+            ->diff([$request->role_id])
+            ->all();
+        $agent->secondaryRoles()->sync($secondaryRoleIds);
+
         AuditLog::log('agent.invited', $agent);
 
         // Notify the new team member
@@ -431,6 +504,69 @@ class SettingsController extends Controller
         }
 
         return redirect()->route('settings.index', ['tab' => 'team'])->with('success', 'Team member added successfully.');
+    }
+
+    public function updateAgent(Request $request, User $user)
+    {
+        $this->authorize('manageTeamMember', $user);
+
+        $tenant = auth()->user()->tenant;
+        $allowedRoleIds = $this->assignableRoleIdsFor(auth()->user(), $tenant);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role_id' => ['required', 'exists:roles,id', Rule::in($allowedRoleIds)],
+            'additional_roles' => 'nullable|array',
+            'additional_roles.*' => ['integer', Rule::in($this->secondaryRoleIdsFor($tenant))],
+            'reports_to' => ['nullable', 'integer', Rule::notIn([$user->id]), function ($attribute, $value, $fail) {
+                if ($value && ! User::where('tenant_id', auth()->user()->tenant_id)->where('id', $value)->exists()) {
+                    $fail(__('The manager must be a member of this tenant.'));
+                }
+            }],
+        ]);
+
+        $newRole = Role::find($validated['role_id']);
+        if ($user->roleRank() >= 2 && ($newRole?->rank() ?? 1) < 2) {
+            $remainingElevated = User::withoutGlobalScopes()
+                ->where('tenant_id', $user->tenant_id)
+                ->where('id', '!=', $user->id)
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
+                ->count();
+
+            if ($remainingElevated === 0) {
+                return redirect()->route('settings.index', ['tab' => 'team'])
+                    ->with('error', __('You cannot remove the last administrator of this workspace.'));
+            }
+        }
+
+        $oldEmail = $user->email;
+
+        $user->name = $validated['name'];
+        $user->email = $validated['email'];
+        $user->role_id = $validated['role_id'];
+        $user->reports_to = $request->filled('reports_to') ? $validated['reports_to'] : null;
+
+        if ($oldEmail !== $validated['email']) {
+            $user->email_verified_at = null;
+        }
+
+        $user->save();
+
+        $secondaryRoleIds = collect($request->input('additional_roles', []))
+            ->diff([$user->role_id])
+            ->all();
+        $user->secondaryRoles()->sync($secondaryRoleIds);
+
+        AuditLog::log('agent.updated', $user, ['email' => $oldEmail], [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role_id' => $user->role_id,
+            'reports_to' => $user->reports_to,
+        ]);
+
+        return redirect()->route('settings.index', ['tab' => 'team'])
+            ->with('success', __('Team member updated.'));
     }
 
     public function toggleAgent(User $user)
@@ -488,15 +624,15 @@ class SettingsController extends Controller
 
         $tenantId = auth()->user()->tenant_id;
 
-        $remainingAdmins = User::withoutGlobalScopes()
+        $remainingElevated = User::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('id', '!=', $user->id)
-            ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
             ->count();
 
-        if ($user->isAdmin() && $remainingAdmins === 0) {
+        if ($user->roleRank() >= 2 && $remainingElevated === 0) {
             return redirect()->route('settings.index', ['tab' => 'team'])
-                ->with('error', __('You cannot delete the last admin of this workspace.'));
+                ->with('error', __('You cannot delete the last administrator of this workspace.'));
         }
 
         $validated = $request->validate([
@@ -520,7 +656,20 @@ class SettingsController extends Controller
         ];
 
         DB::transaction(function () use ($user, $newOwnerId, $tenantId) {
-            foreach (['leads', 'deals', 'tasks', 'activities', 'showings', 'open_houses'] as $table) {
+            // Leads go through Eloquent (not the bulk table update below) so the
+            // model's updating hook regenerates each reference for the new owner.
+            if (Schema::hasTable('leads') && Schema::hasColumn('leads', 'agent_id')) {
+                Lead::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('agent_id', $user->id)
+                    ->chunkById(200, function ($leads) use ($newOwnerId) {
+                        foreach ($leads as $lead) {
+                            $lead->update(['agent_id' => $newOwnerId]);
+                        }
+                    });
+            }
+
+            foreach (['deals', 'tasks', 'activities', 'showings', 'open_houses'] as $table) {
                 if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'agent_id')) {
                     continue;
                 }
@@ -554,6 +703,61 @@ class SettingsController extends Controller
 
         return redirect()->route('settings.index', ['tab' => 'team'])
             ->with('success', __('Team member deleted. Their records were reassigned and :email can be used again.', ['email' => $deleted['email']]));
+    }
+
+    /**
+     * Hand ownership of the workspace to an existing Admin. Exactly one Owner
+     * exists at a time: promoting the chosen Admin demotes the current Owner
+     * to Admin in the same transaction.
+     */
+    public function transferOwnership(Request $request)
+    {
+        $actor = auth()->user();
+
+        if (! $actor->isOwner()) {
+            abort(403, __('Only the workspace Owner can transfer ownership.'));
+        }
+
+        $validated = $request->validate([
+            'user_id' => [
+                'required',
+                'integer',
+                Rule::notIn([$actor->id]),
+                Rule::exists('users', 'id')->where(fn ($q) => $q->where('tenant_id', $actor->tenant_id)),
+            ],
+        ], [
+            'user_id.not_in' => __('You are already the Owner.'),
+        ]);
+
+        $target = User::withoutGlobalScopes()
+            ->where('tenant_id', $actor->tenant_id)
+            ->findOrFail($validated['user_id']);
+
+        if (! $target->hasRole('admin') || $target->isOwner()) {
+            return redirect()->route('settings.index', ['tab' => 'team'])
+                ->with('error', __('Ownership can only be transferred to an Admin.'));
+        }
+
+        $ownerRoleId = Role::where('name', 'owner')->value('id');
+        $adminRoleId = Role::where('name', 'admin')->value('id');
+
+        if (! $ownerRoleId || ! $adminRoleId) {
+            return redirect()->route('settings.index', ['tab' => 'team'])
+                ->with('error', __('The Owner and Admin roles must exist before ownership can be transferred.'));
+        }
+
+        DB::transaction(function () use ($actor, $target, $ownerRoleId, $adminRoleId) {
+            $target->role_id = $ownerRoleId;
+            $target->save();
+
+            $actor->role_id = $adminRoleId;
+            $actor->save();
+        });
+
+        AuditLog::log('ownership.transferred', $target, ['from' => $actor->id], ['to' => $target->id]);
+
+        return redirect()->route('settings.index', ['tab' => 'team'])
+            ->with('success', __('Ownership transferred to :name. You are now an Admin.', ['name' => $target->name]));
     }
 
     /**
@@ -762,6 +966,121 @@ class SettingsController extends Controller
         }
 
         return back()->with('error', 'Invalid action.');
+    }
+
+    /**
+     * Save the tenant-wide commission formula (default split, tier schedule and
+     * how support agent shares are funded).
+     */
+    public function updateCommissionSettings(Request $request)
+    {
+        $data = $request->validate([
+            'default_split_type' => 'required|in:fixed,tiered',
+            'default_company_pct' => 'nullable|numeric|min:0|max:100',
+            'default_agent_pct' => 'nullable|numeric|min:0|max:100',
+            'tiers' => 'nullable|array',
+            'tiers.*.from' => 'nullable|numeric|min:0',
+            'tiers.*.max' => 'nullable|numeric|min:0',
+            'tiers.*.agent_pct' => 'required|numeric|min:0|max:100',
+            'default_support_funding' => 'required|in:from_agent,from_company,from_both',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $options = $tenant->custom_options ?? [];
+
+        $companyPct = (! $request->filled('default_company_pct')) ? null : (float) $request->default_company_pct;
+        $agentPct = (! $request->filled('default_agent_pct')) ? null : (float) $request->default_agent_pct;
+
+        if ((string) $data['default_split_type'] === 'fixed') {
+            if ($companyPct === null && $agentPct !== null) {
+                $companyPct = max(0, 100 - $agentPct);
+            } elseif ($agentPct === null && $companyPct !== null) {
+                $agentPct = max(0, 100 - $companyPct);
+            } else {
+                $companyPct = $companyPct ?? 50;
+                $agentPct = $agentPct ?? 50;
+            }
+        }
+
+        $tiers = collect($request->input('tiers', []))
+            ->filter(fn ($t) => ($t['agent_pct'] ?? null) !== null && ($t['agent_pct'] ?? '') !== '')
+            ->map(fn ($t) => [
+                'from' => blank($t['from'] ?? null) ? null : (float) $t['from'],
+                'max' => blank($t['max'] ?? null) ? null : (float) $t['max'],
+                'agent_pct' => (float) $t['agent_pct'],
+            ])
+            ->values()
+            ->all();
+
+        $options['commission_calculation'] = [
+            'default_split_type' => $data['default_split_type'],
+            'default_company_pct' => (string) $companyPct,
+            'default_agent_pct' => (string) $agentPct,
+            'tiers' => $tiers,
+            'default_support_funding' => $data['default_support_funding'],
+        ];
+
+        $tenant->update(['custom_options' => $options]);
+
+        AuditLog::log('settings.commission_formula_updated', $tenant, $options['commission_calculation']);
+
+        return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', __('Commission formula saved.'));
+    }
+
+    /**
+     * Save (or create) one member's compensation plan.
+     */
+    public function updateCommissionPlan(Request $request, User $user)
+    {
+        $data = $request->validate([
+            'split_type' => 'required|in:fixed,tiered',
+            'company_pct' => 'nullable|numeric|min:0|max:100',
+            'agent_pct' => 'nullable|numeric|min:0|max:100',
+            'pay_structure' => 'required|in:commission_only,salary_plus_commission,fixed_amount',
+            'base_salary' => 'nullable|numeric|min:0',
+            'fixed_amount_per_close' => 'nullable|numeric|min:0',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+
+        if ((int) $user->tenant_id !== (int) $tenant->id) {
+            abort(403, __('That member does not belong to your organization.'));
+        }
+
+        $companyPct = $data['company_pct'] !== null && $data['company_pct'] !== '' ? (float) $data['company_pct'] : null;
+        $agentPct = $data['agent_pct'] !== null && $data['agent_pct'] !== '' ? (float) $data['agent_pct'] : null;
+
+        if ((string) $data['split_type'] === 'fixed') {
+            if ($companyPct === null && $agentPct !== null) {
+                $companyPct = max(0, 100 - $agentPct);
+            } elseif ($agentPct === null && $companyPct !== null) {
+                $agentPct = max(0, 100 - $companyPct);
+            } else {
+                $companyPct = $companyPct ?? 50;
+                $agentPct = $agentPct ?? 50;
+            }
+        }
+
+        \App\Models\AgentCompensation::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'user_id' => $user->id],
+            [
+                'split_type' => $data['split_type'],
+                'company_pct' => $companyPct,
+                'agent_pct' => $agentPct,
+                'pay_structure' => $data['pay_structure'],
+                'base_salary' => blank($data['base_salary'] ?? null) ? null : $data['base_salary'],
+                'fixed_amount_per_close' => blank($data['fixed_amount_per_close'] ?? null) ? null : $data['fixed_amount_per_close'],
+            ]
+        );
+
+        AuditLog::log('settings.agent_compensation_updated', $user, [
+            'split_type' => $data['split_type'],
+            'company_pct' => $companyPct,
+            'agent_pct' => $agentPct,
+            'pay_structure' => $data['pay_structure'],
+        ]);
+
+        return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', __('Compensation plan saved for :name.', ['name' => $user->name]));
     }
 
     public function updateLeadSourceCosts(Request $request)
@@ -1041,6 +1360,10 @@ class SettingsController extends Controller
         if ($user->tenant_id !== auth()->user()->tenant_id) {
             abort(403);
         }
+
+        // Support staff may only step into accounts below their own rank, so an
+        // Admin can never impersonate the Owner or a peer Admin.
+        abort_unless(auth()->user()->outranks($user), 403);
 
         // Require the admin's current password for security
         $request->validate([
@@ -1477,9 +1800,9 @@ class SettingsController extends Controller
             'permissions.*' => 'exists:permissions,id',
         ]);
 
-        // Cannot modify admin system role permissions
-        if ($role->is_system && $role->name === 'admin') {
-            return redirect()->route('settings.roles')->with('error', __('Cannot modify admin role permissions.'));
+        // Cannot modify the elevated system roles' permissions
+        if ($role->is_system && in_array($role->name, ['owner', 'admin'], true)) {
+            return redirect()->route('settings.roles')->with('error', __('Cannot modify owner or admin role permissions.'));
         }
 
         $role->permissions()->sync($request->permissions ?? []);

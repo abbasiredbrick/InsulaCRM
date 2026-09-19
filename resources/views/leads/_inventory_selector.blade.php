@@ -55,6 +55,7 @@
                 <div class="list-group-item text-muted">{{ __('No inventory yet. Add units under Inventory first.') }}</div>
             @endforelse
         </div>
+        <div id="inv-count" class="small text-secondary mt-2"></div>
     </div>
 </div>
 
@@ -70,6 +71,12 @@
     const hiddenBox = document.getElementById('inv-hidden');
     const selectedBox = document.getElementById('inv-selected');
     const resultsEl = document.getElementById('inv-results');
+    const countEl = document.getElementById('inv-count');
+
+    function renderCount(total) {
+        if (! countEl) { return; }
+        countEl.textContent = total + ' ' + (total === 1 ? '{{ __('unit found') }}' : '{{ __('units found') }}');
+    }
 
     function labelFor(id) {
         const cb = container.querySelector('.inv-check[value="' + id + '"]');
@@ -151,7 +158,7 @@
         });
     }
 
-    function doSearch() {
+    function buildParams() {
         const params = new URLSearchParams();
         const q = document.getElementById('inv-search-q').value.trim();
         const intent = document.getElementById('inv-search-intent').value;
@@ -159,20 +166,47 @@
         if (q) { params.set('q', q); }
         if (intent) { params.set('intent', intent); }
         if (category) { params.set('category', category); }
-
-        const btn = document.getElementById('inv-search-btn');
-        btn.disabled = true;
-        fetch('{{ route('inventory.search') }}' + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
-            .then(r => r.json())
-            .then(renderRows)
-            .catch(() => renderRows([]))
-            .finally(() => { btn.disabled = false; });
+        return params;
     }
 
-    document.getElementById('inv-search-btn').addEventListener('click', doSearch);
+    let searchTimer = null;
+    let searchController = null;
+    let searchSeq = 0;
+
+    function runSearch() {
+        const params = buildParams();
+        const btn = document.getElementById('inv-search-btn');
+        btn.disabled = true;
+
+        const token = ++searchSeq;
+        clearTimeout(searchTimer);
+        if (searchController) { searchController.abort(); }
+        searchController = new AbortController();
+
+        fetch('{{ route('inventory.search') }}' + '?' + params.toString(), {
+            headers: { 'Accept': 'application/json' },
+            signal: searchController.signal
+        })
+            .then(r => r.json())
+            .then(data => { if (token === searchSeq) { renderRows(data.units); renderCount(data.total); } })
+            .catch(err => { if (err && err.name === 'AbortError') return; if (token === searchSeq) { renderRows([]); renderCount(0); } })
+            .finally(() => { if (token === searchSeq) { btn.disabled = false; } });
+    }
+
+    function debounceSearch() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(runSearch, 350);
+    }
+
+    document.getElementById('inv-search-btn').addEventListener('click', runSearch);
+    document.getElementById('inv-search-q').addEventListener('input', debounceSearch);
+    document.getElementById('inv-search-intent').addEventListener('change', debounceSearch);
+    document.getElementById('inv-search-category').addEventListener('change', debounceSearch);
     document.getElementById('inv-search-q').addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
     });
+
+    renderCount(resultsEl.querySelectorAll('.inv-check').length);
 
     syncSelected();
 })();

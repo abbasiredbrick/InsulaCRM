@@ -25,10 +25,29 @@ class LeadController extends Controller
     {
         $this->authorize('viewAny', Lead::class);
 
-        $query = Lead::with('agent')->withCount('lists');
+        $query = Lead::with(['agent', 'property', 'properties'])->withCount('lists');
 
-        if (auth()->user()->isAgent()) {
-            $query->where('agent_id', auth()->id());
+        // Automatic scoping to the logged-in user: admins see every lead,
+        // managers see their own + their team's (plus unassigned), and plain
+        // agents only ever see the leads assigned to them.
+        $user = auth()->user();
+        $viewableAgentIds = null;
+
+        if (! $user->isAdmin()) {
+            if ($user->isManager()) {
+                $viewableAgentIds = array_merge([$user->id], $user->teamUserIds());
+                $query->where(function ($q) use ($viewableAgentIds) {
+                    $q->whereIn('agent_id', $viewableAgentIds)
+                        ->orWhereNull('agent_id')
+                        ->orWhereHas('leadAgents', fn ($lq) => $lq->whereIn('agent_id', $viewableAgentIds)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
+                });
+            } else {
+                $viewableAgentIds = [$user->id];
+                $query->where(function ($q) use ($user) {
+                    $q->where('agent_id', $user->id)
+                        ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
+                });
+            }
         }
 
         if ($request->filled('search')) {
@@ -39,6 +58,15 @@ class LeadController extends Controller
                     ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('reference', 'like', "%{$search}%");
+            });
+        }
+
+        // Unit search: match leads whose linked unit(s) match any unit parameter.
+        if ($request->filled('unit')) {
+            $unit = $request->unit;
+            $query->where(function ($q) use ($unit) {
+                $q->whereHas('property', fn ($pq) => $this->applyPropertySearch($pq, $unit))
+                    ->orWhereHas('properties', fn ($pq) => $this->applyPropertySearch($pq, $unit));
             });
         }
 
@@ -55,17 +83,16 @@ class LeadController extends Controller
         }
 
         if ($request->filled('agent_id')) {
-            $query->where('agent_id', $request->agent_id);
+            $agentId = (int) $request->agent_id;
+            // Non-admins can only filter by an agent they can actually see.
+            if ($viewableAgentIds === null || in_array($agentId, $viewableAgentIds, true)) {
+                $query->where('agent_id', $agentId);
+            }
         }
 
         // Stacked leads filter
         if ($request->filled('stacked') && $request->stacked) {
             $query->has('lists', '>=', 2)->orderByDesc('motivation_score');
-        }
-
-        // DNC filter
-        if ($request->filled('dnc')) {
-            $query->where('do_not_contact', true);
         }
 
         if ($request->filled('contact_type')) {
@@ -84,7 +111,8 @@ class LeadController extends Controller
 
         $leads = $query->latest()->paginate(25);
 
-        $agents = ! auth()->user()->isAgent() ? $this->getAgents() : collect();
+        $showAgentPicker = ! $user->isAgent() || $user->isManager();
+        $agents = $showAgentPicker ? $this->getAgents() : collect();
 
         return view('leads.index', compact('leads', 'agents'));
     }
@@ -215,11 +243,16 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $this->authorize('view', $lead);
-        $lead->load(['agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps', 'showings.property', 'meetings']);
+        $lead->load(['agent', 'agent.commissionPlan', 'activeLeadAgents.agent', 'commissions.agent', 'property', 'properties', 'activities', 'tasks', 'deals', 'lists', 'photos.uploader', 'sequenceEnrollments.sequence.steps', 'showings.property', 'meetings']);
         $sequences = \App\Models\Sequence::where('is_active', true)->get();
         $assignmentHistory = app(AssignmentHistoryService::class)->getHistory($lead);
         $reassignAgents = $this->getAgents($lead);
         $canReassign = auth()->user()->can('reassign', $lead);
+
+        $propertyOptions = \App\Models\Property::orderBy('community')->orderBy('sub_community')->orderBy('unit_no')
+            ->get(\App\Models\Property::optionLabelColumns())
+            ->map(fn (\App\Models\Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
+            ->values();
 
         // Upcoming follow-ups: pending tasks, scheduled viewings and meetings.
         $upcoming = collect();
@@ -227,7 +260,7 @@ class LeadController extends Controller
         $lead->tasks()->where('is_completed', false)->get()->each(function ($task) use ($upcoming) {
             $upcoming->push([
                 'type' => 'task',
-                'at' => $task->due_date ? \Illuminate\Support\Carbon::parse($task->due_date) : null,
+                'at' => $task->dueAt(),
                 'title' => $task->title,
                 'url' => null,
                 'model' => $task,
@@ -260,7 +293,7 @@ class LeadController extends Controller
             ->take(10)
             ->values();
 
-        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory', 'reassignAgents', 'canReassign', 'upcoming'));
+        return view('leads.show', compact('lead', 'sequences', 'assignmentHistory', 'reassignAgents', 'canReassign', 'upcoming', 'propertyOptions'));
     }
 
     /**
@@ -306,6 +339,146 @@ class LeadController extends Controller
         app(\App\Services\TeamNotifier::class)->notifyLeadReassigned($lead, $oldAgent, $target, $reason ?: null);
 
         return redirect()->route('leads.show', $lead)->with('success', __('Lead reassigned to :name.', ['name' => $target->name]));
+    }
+
+    /**
+     * Add a co-agent to the lead. The co-agent may be an internal CRM user or
+     * an external (A2A) collaborator identified by name/temail. When an
+     * internal user is added they immediately gain full access to the lead
+     * (follow-ups, tasks, meetings, activities, viewings and status).
+     */
+    public function addCoAgent(Request $request, Lead $lead)
+    {
+        $this->authorize('shareAgents', $lead);
+
+        $data = $request->validate([
+            'agent_id' => 'nullable|integer|exists:users,id',
+            'external_name' => 'nullable|string|max:190',
+            'external_email' => 'nullable|email|max:190',
+            'external_company' => 'nullable|string|max:190',
+            'commission_pct' => 'nullable|numeric|min:0|max:100',
+            'share_funding' => 'nullable|in:from_agent,from_company,from_both',
+        ]);
+
+        if (empty($data['agent_id']) && blank($data['external_email'])) {
+            return back()->withErrors(['co_agent' => __('Choose a colleague or provide an external email.')])->withInput();
+        }
+
+        $user = auth()->user();
+
+        if (! empty($data['agent_id'])) {
+            $target = User::where('tenant_id', $user->tenant_id)
+                ->where('is_active', true)
+                ->find($data['agent_id']);
+
+            if (! $target) {
+                return back()->withErrors(['co_agent' => __('Selected agent is not active in your organisation.')])->withInput();
+            }
+
+            if ($target->id === $lead->agent_id) {
+                return back()->withErrors(['co_agent' => __('This agent already owns the lead.')])->withInput();
+            }
+
+            if ($lead->hasCoAgent($target)) {
+                return back()->withErrors(['co_agent' => __('This agent already shares the lead.')])->withInput();
+            }
+        }
+
+        $lead->leadAgents()->create([
+            'tenant_id' => $user->tenant_id,
+            'agent_id' => $data['agent_id'] ?? null,
+            'external_name' => $data['external_name'] ?? null,
+            'external_email' => $data['external_email'] ?? null,
+            'external_company' => $data['external_company'] ?? null,
+            'commission_pct' => ! blank($data['commission_pct'] ?? null) ? $data['commission_pct'] : null,
+            'share_funding' => $data['share_funding'] ?? null,
+            'status' => \App\Models\LeadAgent::STATUS_ACTIVE,
+        ]);
+
+        AuditLog::log('lead.co_agent_added', $lead, [
+            'agent_id' => $data['agent_id'] ?? null,
+            'external_email' => $data['external_email'] ?? null,
+            'commission_pct' => $data['commission_pct'] ?? null,
+            'share_funding' => $data['share_funding'] ?? null,
+        ]);
+
+        if (! empty($data['agent_id'])) {
+            app(\App\Services\TeamNotifier::class)->notifyCoAgentAdded($lead, $target);
+        }
+
+        return back()->with('success', __('Co-agent added to the lead.'));
+    }
+
+    /**
+     * Remove a co-agent's access to the lead. The record is kept (soft-removed)
+     * so commission history stays intact.
+     */
+    public function removeCoAgent(Request $request, Lead $lead, \App\Models\LeadAgent $leadAgent)
+    {
+        $this->authorize('shareAgents', $lead);
+
+        if ($leadAgent->lead_id !== $lead->id) {
+            abort(404);
+        }
+
+        $leadAgent->update(['status' => \App\Models\LeadAgent::STATUS_REMOVED]);
+
+        AuditLog::log('lead.co_agent_removed', $lead, ['lead_agent_id' => $leadAgent->id]);
+
+        return back()->with('success', __('Co-agent removed from the lead.'));
+    }
+
+    /**
+     * Set the gross commission basis for the lead (auto-prefilled from closed
+     * deals when available). Editable until a snapshot is taken.
+     */
+    public function updateCommissionAmount(Request $request, Lead $lead)
+    {
+        $this->authorize('shareAgents', $lead);
+
+        $data = $request->validate([
+            'commission_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        if ($lead->hasCommissionSnapshot()) {
+            return back()->with('error', __('A commission snapshot already exists — edit the participant rows directly.'));
+        }
+
+        $lead->update(['commission_amount' => blank($data['commission_amount'] ?? null) ? null : $data['commission_amount']]);
+
+        AuditLog::log('lead.commission_amount_updated', $lead, ['amount' => $lead->commission_amount]);
+
+        return back()->with('success', __('Commission basis updated.'));
+    }
+
+    /**
+     * Run the commission formula and snapshot the split for everyone on the
+     * lead. Paid rows are preserved; only the earned snapshot is rewritten.
+     */
+    public function calculateCommissions(Request $request, Lead $lead)
+    {
+        $this->authorize('shareAgents', $lead);
+
+        try {
+            $result = app(\App\Services\CommissionCalculationService::class)->calculate($lead);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        AuditLog::log('lead.commissions_snapshotted', $lead, [
+            'gross' => $result['gross'],
+            'rows' => count($result['rows']),
+        ]);
+
+        $parts = collect($result['rows'])
+            ->filter(fn ($r) => $r['participant_type'] !== \App\Models\LeadCommission::TYPE_COMPANY)
+            ->map(fn ($r) => trim(($r['participant_name'] ?? $lead->agent?->name).': '.\App\Helpers\TenantFormatHelper::currency($r['amount'])))
+            ->implode(' · ');
+
+        $message = __('Commission split calculated on :gross.', ['gross' => \App\Helpers\TenantFormatHelper::currency($result['gross'])]).($parts ? ' '.$parts : '');
+
+        return back()->with('success', $message)
+            ->with('commission_warnings', $result['warnings'] ?: null);
     }
 
     public function edit(Lead $lead)
@@ -680,5 +853,25 @@ class LeadController extends Controller
         }
 
         return $agents;
+    }
+
+    /**
+     * Match a unit by any of its searchable parameters (title, address,
+     * unit no, community, building, developer, category, source ref...).
+     */
+    private function applyPropertySearch($query, string $term): void
+    {
+        $like = "%{$term}%";
+        $query->where(function ($q) use ($like) {
+            $q->where('marketing_title', 'like', $like)
+                ->orWhere('unit_no', 'like', $like)
+                ->orWhere('building_no', 'like', $like)
+                ->orWhere('address', 'like', $like)
+                ->orWhere('community', 'like', $like)
+                ->orWhere('sub_community', 'like', $like)
+                ->orWhere('developer_name', 'like', $like)
+                ->orWhere('source_unit_ref', 'like', $like)
+                ->orWhere('property_category', 'like', $like);
+        });
     }
 }

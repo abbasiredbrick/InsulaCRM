@@ -30,9 +30,9 @@
         @endif
 
         <div class="row g-2 mb-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <label for="lp-search-q" class="visually-hidden">{{ __('Search inventory') }}</label>
-                <input type="text" id="lp-search-q" class="form-control" placeholder="{{ __('Search inventory to link...') }}">
+                <input type="text" id="lp-search-q" class="form-control" placeholder="{{ __('Type to search inventory and link...') }}" autocomplete="off">
             </div>
             <div class="col-md-3">
                 <select id="lp-search-intent" class="form-select" aria-label="{{ __('Intent') }}">
@@ -50,12 +50,10 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2 d-grid">
-                <button type="button" class="btn btn-outline-primary" id="lp-search-btn">{{ __('Search') }}</button>
-            </div>
         </div>
 
         <div id="lp-results" class="list-group" style="max-height:360px; overflow:auto;"></div>
+        <div id="lp-count" class="small text-secondary mt-2"></div>
     </div>
 </div>
 
@@ -66,6 +64,12 @@
     if (! panel) { return; }
 
     const resultsEl = document.getElementById('lp-results');
+    const countEl = document.getElementById('lp-count');
+
+    function renderCount(total) {
+        if (! countEl) { return; }
+        countEl.textContent = total + ' ' + (total === 1 ? '{{ __('unit found') }}' : '{{ __('units found') }}');
+    }
 
     function renderRows(units) {
         resultsEl.innerHTML = '';
@@ -127,19 +131,23 @@
         if (intent) { params.set('intent', intent); }
         if (category) { params.set('category', category); }
 
-        const btn = document.getElementById('lp-search-btn');
-        btn.disabled = true;
         fetch('{{ route('inventory.search') }}' + '?' + params.toString(), { headers: { 'Accept': 'application/json' } })
             .then(r => r.json())
-            .then(renderRows)
-            .catch(() => renderRows([]))
-            .finally(() => { btn.disabled = false; });
+            .then(data => { renderRows(data.units); renderCount(data.total); })
+            .catch(() => { renderRows([]); renderCount(0); });
     }
 
-    document.getElementById('lp-search-btn').addEventListener('click', doSearch);
+    // Live search while typing, debounced like the rest of the app.
+    let searchTimer = null;
+    document.getElementById('lp-search-q').addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(doSearch, 350);
+    });
     document.getElementById('lp-search-q').addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
     });
+    document.getElementById('lp-search-intent').addEventListener('change', doSearch);
+    document.getElementById('lp-search-category').addEventListener('change', doSearch);
 })();
 </script>
 @endpush

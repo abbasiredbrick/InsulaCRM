@@ -177,4 +177,61 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
             ->assertOk()
             ->assertDontSee('href="/properties"');
     }
+
+    public function test_leads_index_unit_search_matches_leads_via_linked_units(): void
+    {
+        $this->createUnit([
+            'lead_id'         => $this->createLinkedLead('Rashid', 'Ali')->id,
+            'marketing_title' => 'Sky Gardens Tower A',
+            'community'       => 'Business Bay',
+        ]);
+
+        $linkedLead = $this->createLinkedLead('Mona', 'Said');
+        $property = \App\Models\Property::where('marketing_title', 'Sky Gardens Tower A')->firstOrFail();
+        $property->leads()->attach($linkedLead->id, ['relation_type' => 'buyer']);
+
+        $this->createLinkedLead('Other', 'Person');
+
+        $this->get(route('leads.index', ['unit' => 'Sky Gardens']))
+            ->assertOk()
+            ->assertSee('Rashid Ali')
+            ->assertSee('Mona Said')
+            ->assertDontSee('Other Person');
+    }
+
+    public function test_leads_index_unit_search_matches_primary_property_by_community(): void
+    {
+        $primaryLead = $this->createLinkedLead('Hana', 'Yousuf');
+        $this->createUnit([
+            'lead_id'         => $primaryLead->id,
+            'marketing_title' => 'Marina Heights 2',
+            'community'       => 'Dubai Marina',
+        ]);
+
+        $this->createUnit([
+            'marketing_title' => 'Marina Heights 3',
+            'community'       => 'Jumeirah Village Circle',
+        ]);
+
+        $this->get(route('leads.index', ['unit' => 'Dubai Marina']))
+            ->assertOk()
+            ->assertSee('Hana Yousuf')
+            ->assertDontSee('Marina Heights 3');
+    }
+
+    public function test_leads_index_shows_linked_unit_column(): void
+    {
+        $unit = $this->createUnit([
+            'lead_id'         => $this->createLinkedLead()->id,
+            'marketing_title' => 'Palm Tower A',
+            'community'       => 'Jumeirah Lake Towers',
+        ]);
+        $lead = $this->createLinkedLead('Sara', 'Nader');
+        $unit->leads()->attach($lead->id);
+
+        $this->get(route('leads.index'))
+            ->assertOk()
+            ->assertSee('Palm Tower A')
+            ->assertSee('Sara Nader');
+    }
 }

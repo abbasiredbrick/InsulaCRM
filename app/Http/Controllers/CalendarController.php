@@ -39,6 +39,7 @@ class CalendarController extends Controller
             'id' => 'task-'.$task->id,
             'title' => $task->title,
             'date' => $task->due_date->format('Y-m-d'),
+            'time' => blank($task->due_time) ? null : \Carbon\Carbon::parse($task->due_time)->format('g:i A'),
             'type' => 'task',
             'color' => $task->is_completed ? 'green' : ($task->is_overdue ? 'red' : 'blue'),
             'completed' => $task->is_completed,

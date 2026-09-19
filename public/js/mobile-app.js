@@ -91,18 +91,26 @@
 
             // Inline GET filter forms: remember what was applied, and on back
             // re-apply it if the returned page came in without any filters.
+            // Pages that opted into live filtering own their state via the URL
+            // (live-filter.js updates it with history.replaceState), so they
+            // are left alone here. Also capture typed-but-unsubmitted text so
+            // it survives a Back navigation too.
             var tracked = [];
             var forms = document.querySelectorAll('main form[method="GET"]');
             for (var i = 0; i < forms.length; i++) {
                 var form = forms[i];
                 if (form.classList.contains('mobile-search-form')) continue;
-                if (!form.querySelector('input[name="search"]')) continue;
+                if (form.hasAttribute('data-live-filter')) continue;
 
                 var key = 'liststate|' + pathOf(form.action);
                 var debounce = null;
                 var save = function() { ssSet(key, drainForm(form)); };
                 form.addEventListener('submit', save);
                 form.addEventListener('change', function() {
+                    clearTimeout(debounce);
+                    debounce = setTimeout(save, 400);
+                });
+                form.addEventListener('input', function() {
                     clearTimeout(debounce);
                     debounce = setTimeout(save, 400);
                 });

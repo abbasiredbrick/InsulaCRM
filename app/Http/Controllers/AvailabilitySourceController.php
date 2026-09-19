@@ -323,6 +323,14 @@ class AvailabilitySourceController extends Controller
             $result['skipped']
         );
 
+        if (! empty($result['mapping_rebuilt'])) {
+            $summary .= __(' Column mapping was auto-detected from the file\'s column headers — verify it on the Edit screen if anything looks off.');
+        }
+
+        if (! empty($result['reconciliation_skipped'])) {
+            $summary .= __(' Reconciliation for units missing from the sheet was skipped — the file looked partial, so nothing was bulk-marked leased. Re-check the column mapping and re-import.');
+        }
+
         if (($result['conflicts'] ?? 0) > 0) {
             $summary .= sprintf(
                 ' %d listed unit(s) flagged for a decision (%s).',
@@ -478,7 +486,7 @@ class AvailabilitySourceController extends Controller
             return back()->withErrors(['url' => $message])->withInput();
         }
 
-        $out = $this->runRows($source, $table['rows'], 'url', $source->url, $run);
+        $out = $this->runRows($source, $table['rows'], 'url', $source->url, $run, false);
 
         if (! $out['ok']) {
             return back()->withErrors(['url' => $out['error']]);
@@ -492,7 +500,7 @@ class AvailabilitySourceController extends Controller
      *
      * @return array{ok: bool, error?: string, result?: array<string, mixed>}
      */
-    protected function runRows(AvailabilitySource $source, array $rows, string $format, string $filename, ?AvailabilityImportRun $run = null): array
+    protected function runRows(AvailabilitySource $source, array $rows, string $format, string $filename, ?AvailabilityImportRun $run = null, bool $guardReconciliation = true): array
     {
         $run ??= AvailabilityImportRun::create([
             'tenant_id' => auth()->user()->tenant_id,
@@ -504,7 +512,7 @@ class AvailabilitySourceController extends Controller
         ]);
 
         try {
-            $result = $this->ingest->ingest($source, $rows, auth()->user()->tenant_id, auth()->id(), $run->id);
+            $result = $this->ingest->ingest($source, $rows, auth()->user()->tenant_id, auth()->id(), $run->id, $guardReconciliation);
         } catch (\Throwable $e) {
             $run->update([
                 'status' => 'failed',
@@ -537,6 +545,14 @@ class AvailabilitySourceController extends Controller
             $result['missing'],
             $result['skipped']
         );
+
+        if (! empty($result['mapping_rebuilt'])) {
+            $summary .= __(' Column mapping was auto-detected from the file\'s column headers — verify it on the Edit screen if anything looks off.');
+        }
+
+        if (! empty($result['reconciliation_skipped'])) {
+            $summary .= __(' Reconciliation for units missing from the sheet was skipped — the file looked partial, so nothing was bulk-marked leased. Re-check the column mapping and re-import.');
+        }
 
         if (($result['conflicts'] ?? 0) > 0) {
             $summary .= sprintf(

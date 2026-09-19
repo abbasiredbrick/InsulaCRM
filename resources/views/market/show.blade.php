@@ -1,7 +1,7 @@
 @extends('layouts.app')
+@section('title', $contact->full_name . ' — ' . __('Cold Call Contact'))
 
-@section('title', $contact->full_name . ' — ' . __('Market Contact'))
-@section('page-title', __('Market Contact'))
+@section('page-title', __('Cold Call Contact'))
 
 @section('content')
 @php

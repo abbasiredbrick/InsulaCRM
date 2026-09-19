@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Mail;
 class SendAiPipelineDigest extends Command
 {
     protected $signature = 'ai:pipeline-digest';
+
     protected $description = 'Send AI-generated pipeline digest to tenant admins';
 
     public function handle(): int
@@ -22,7 +23,7 @@ class SendAiPipelineDigest extends Command
         foreach ($tenants as $tenant) {
             try {
                 $ai = new AiService($tenant);
-                if (!$ai->isAvailable()) {
+                if (! $ai->isAvailable()) {
                     continue;
                 }
 
@@ -37,7 +38,7 @@ class SendAiPipelineDigest extends Command
                     'hot_leads' => \App\Models\Lead::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('temperature', 'hot')->count(),
                     'active_deals' => \App\Models\Deal::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotIn('stage', ['closed_won', 'closed_lost', 'dead'])->count(),
                     'deals_closed_this_month' => \App\Models\Deal::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('stage', 'closed_won')->where('updated_at', '>=', $monthAgo)->count(),
-                    'total_pipeline_value' => '$' . number_format(\App\Models\Deal::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotIn('stage', ['closed_won', 'closed_lost', 'dead'])->sum('contract_price'), 2),
+                    'total_pipeline_value' => '$'.number_format(\App\Models\Deal::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNotIn('stage', ['closed_won', 'closed_lost', 'dead'])->sum('contract_price'), 2),
                     'pending_tasks' => \App\Models\Task::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('is_completed', false)->count(),
                     'overdue_tasks' => \App\Models\Task::withoutGlobalScopes()->where('tenant_id', $tenant->id)->where('is_completed', false)->where('due_date', '<', $now)->count(),
                 ];
@@ -54,14 +55,14 @@ class SendAiPipelineDigest extends Command
                 // Send to admin users
                 $admins = User::where('tenant_id', $tenant->id)
                     ->where('is_active', true)
-                    ->whereHas('role', fn($q) => $q->where('name', 'admin'))
+                    ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
                     ->get();
 
                 foreach ($admins as $admin) {
                     try {
                         Mail::raw($digest, function ($msg) use ($admin, $tenant) {
                             $msg->to($admin->email)
-                                ->subject("[{$tenant->name}] AI Pipeline Digest — " . now()->format('M d, Y'));
+                                ->subject("[{$tenant->name}] AI Pipeline Digest — ".now()->format('M d, Y'));
                         });
                     } catch (\Throwable $e) {
                         Log::warning('Failed to send digest email', ['user_id' => $admin->id, 'error' => $e->getMessage()]);

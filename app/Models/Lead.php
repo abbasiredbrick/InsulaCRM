@@ -68,6 +68,7 @@ class Lead extends Model
         'stage_changed_at',
         'expected_move_in_date',
         'motivation_score',
+        'commission_amount',
         'ai_motivation_score',
         'do_not_contact',
         'timezone',
@@ -81,6 +82,7 @@ class Lead extends Model
             'do_not_contact' => 'boolean',
             'motivation_score' => 'integer',
             'ai_motivation_score' => 'integer',
+            'commission_amount' => 'decimal:2',
             'custom_fields' => 'array',
             'stage_changed_at' => 'datetime',
             'expected_move_in_date' => 'date',
@@ -111,12 +113,37 @@ class Lead extends Model
             if ($lead->isDirty('stage') && $lead->stage && ! $lead->stage_changed_at) {
                 $lead->stage_changed_at = now();
             }
+
+            // A reassignment changes the owning agent, so the lead reference
+            // (agent code + per-agent sequence) is recomputed for the new agent.
+            if ($lead->isDirty('agent_id') && $lead->agent_id !== null) {
+                $lead->reference = app(\App\Services\LeadReferenceService::class)->regenerate($lead);
+            }
         });
     }
 
     public function getFullNameAttribute(): string
     {
         return "{$this->first_name} {$this->last_name}";
+    }
+
+    /**
+     * Concise picker label for searchable client dropdowns. Portal leads
+     * often arrive without a name, so the label falls back to phone / email
+     * — otherwise those clients can never be found by typing.
+     */
+    public function pickerLabel(): string
+    {
+        $name = trim("{$this->first_name} {$this->last_name}");
+
+        if ($name) {
+            return $name;
+        }
+
+        return trim(implode(' · ', array_filter([
+            $this->phone,
+            $this->email,
+        ]))) ?: __('Unnamed client');
     }
 
     /**
@@ -217,6 +244,75 @@ class Lead extends Model
     public function agent()
     {
         return $this->belongsTo(User::class, 'agent_id');
+    }
+
+    /**
+     * Additional agents / external collaborators sharing this lead's record
+     * and its commission. Only live (non-removed) participants are returned.
+     */
+    public function leadAgents()
+    {
+        return $this->hasMany(LeadAgent::class);
+    }
+
+    public function activeLeadAgents()
+    {
+        return $this->hasMany(LeadAgent::class)->where('status', LeadAgent::STATUS_ACTIVE);
+    }
+
+    /**
+     * CRM users sharing the lead as co-agents (external collaborators are not
+     * users, so they are excluded here).
+     */
+    public function coAgents()
+    {
+        return $this->activeLeadAgents()->whereNotNull('agent_id');
+    }
+
+    public function hasCoAgent(User $user): bool
+    {
+        return $this->coAgents()->where('agent_id', $user->id)->exists();
+    }
+
+    public function commissions()
+    {
+        return $this->hasMany(LeadCommission::class);
+    }
+
+    /**
+     * Total commission earned across deals that reached closed_won. Used as the
+     * auto-prefill basis for the lead's commission amount.
+     */
+    public function closedDealsCommissionTotal(): ?float
+    {
+        $total = $this->deals()
+            ->where('stage', 'closed_won')
+            ->whereNotNull('total_commission')
+            ->sum('total_commission');
+
+        return $total > 0 ? (float) $total : null;
+    }
+
+    /**
+     * Gross commission basis for this lead: the explicitly entered amount, or
+     * the sum of closed deals' total_commission, or null.
+     */
+    public function commissionBasis(): ?float
+    {
+        if ($this->commission_amount !== null) {
+            return (float) $this->commission_amount;
+        }
+
+        return $this->closedDealsCommissionTotal() ?? 0;
+    }
+
+    /**
+     * True if an earned commission snapshot already exists (effectively locking
+     * the split at close time).
+     */
+    public function hasCommissionSnapshot(): bool
+    {
+        return $this->commissions()->where('status', LeadCommission::STATUS_EARNED)->exists();
     }
 
     public function tenant()

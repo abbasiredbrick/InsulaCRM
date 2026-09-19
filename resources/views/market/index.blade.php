@@ -1,7 +1,7 @@
 @extends('layouts.app')
+@section('title', __('Cold Calls'))
 
-@section('title', __('Market / Cold Calls'))
-@section('page-title', __('Market / Cold Calls'))
+@section('page-title', __('Cold Calls'))
 
 @section('content')
 @php
@@ -64,7 +64,7 @@
 
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">{{ __('Market Contacts') }}</h3>
+        <h3 class="card-title">{{ __('Cold Call Contacts') }}</h3>
         <div class="card-actions">
             <a href="{{ route('market.create') }}" class="btn btn-primary">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -74,7 +74,7 @@
     </div>
 
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('market.index') }}" class="row g-2 align-items-end">
+        <form method="GET" action="{{ route('market.index') }}" class="row g-2 align-items-end" data-live-filter>
             <div class="col-md-3">
                 <label class="form-label">{{ __('Search') }}</label>
                 <input type="text" name="search" value="{{ request('search') }}" class="form-control form-control-sm" placeholder="{{ __('Name, phone, email, community…') }}">
@@ -106,12 +106,10 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-outline-primary w-100">{{ __('Filter') }}</button>
-            </div>
         </form>
     </div>
 
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>
@@ -169,7 +167,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">{{ __('No market contacts yet.') }} <a href="{{ route('market.create') }}">{{ __('Import a list') }}</a>.</td>
+                    <td colspan="7" class="text-center text-muted py-4">{{ __('No cold call contacts yet.') }} <a href="{{ route('market.create') }}">{{ __('Import a list') }}</a>.</td>
                 </tr>
             @endforelse
             </tbody>
@@ -178,9 +176,10 @@
 
     @if($contacts->hasPages())
         <div class="card-footer d-flex justify-content-center">
-            {{ $contacts->links() }}
+            {{ $contacts->withQueryString()->links() }}
         </div>
     @endif
+    </div>
 </div>
 
 @endsection

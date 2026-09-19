@@ -28,6 +28,28 @@ class ShowingManagementTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_create_showing_form_preselects_lead_from_lead_page(): void
+    {
+        $this->reAdmin();
+        $lead = $this->createLead(['first_name' => 'Grace', 'last_name' => 'Hopper']);
+
+        $response = $this->get('/showings/create?lead_id='.$lead->id);
+        $response->assertStatus(200);
+
+        $html = str_replace('&quot;', '"', $response->getContent());
+        $this->assertStringContainsString('value="'.$lead->id.'" selected', $html, 'The chosen client must be preselected on the create form.');
+        $this->assertStringContainsString('Grace Hopper', $html, 'The preselected client label must be rendered.');
+    }
+
+    public function test_create_showing_form_shows_unnamed_portal_lead_by_phone(): void
+    {
+        $this->reAdmin();
+        $this->createLead(['first_name' => '', 'last_name' => '', 'phone' => '+375257000001']);
+
+        $html = str_replace('&quot;', '"', $this->get('/showings/create')->getContent());
+        $this->assertStringContainsString('+375257000001', $html, 'Unnamed portal leads must be searchable by phone number.');
+    }
+
     public function test_admin_can_create_showing(): void
     {
         $this->reAdmin()->withCalendar();

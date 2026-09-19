@@ -60,13 +60,10 @@
         </form>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('buyers.index') }}" class="row g-2">
+        <form method="GET" action="{{ route('buyers.index') }}" class="row g-2" data-live-filter>
             <div class="col-md-4">
                 <label for="buyer-search" class="visually-hidden">{{ __('Search name, company, email') }}</label>
                 <input type="text" id="buyer-search" name="search" class="form-control" placeholder="{{ __('Search name, company, email...') }}" value="{{ request('search') }}">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-outline-primary w-100">{{ __('Search') }}</button>
             </div>
             @if(request('search'))
             <div class="col-md-1">
@@ -76,6 +73,7 @@
         </form>
     </div>
     <x-saved-views-bar entity-type="buyers" />
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>
@@ -172,6 +170,7 @@
         <div class="ms-auto">
             {{ $buyers->withQueryString()->links() }}
         </div>
+    </div>
     </div>
 </div>
 @push('scripts')

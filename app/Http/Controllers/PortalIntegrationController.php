@@ -128,6 +128,55 @@ class PortalIntegrationController extends Controller
         return back()->with('error', $result['message'] ?? __('Connection failed.'));
     }
 
+    public function searchLocations(Request $request)
+    {
+        $integration = PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
+        if ($integration === null) {
+            return response()->json(['results' => [], 'catalog' => false]);
+        }
+
+        $service = new BayutPortalService($integration);
+        $term = $request->query('q', '');
+        $results = $service->searchLocations($term);
+
+        return response()->json(['results' => $results, 'catalog' => true]);
+    }
+
+    public function syncLocations(Request $request, string $portal)
+    {
+        abort_unless($portal === 'bayut', 404);
+
+        $integration = PortalIntegration::where('tenant_id', auth()->user()->tenant_id)
+            ->where('portal', 'bayut')
+            ->where('is_active', true)
+            ->first();
+
+        if ($integration === null) {
+            return back()->with('error', __('Save the Bayut integration first.'));
+        }
+
+        $result = (new BayutPortalService($integration))->syncLocations();
+
+        $integration->refresh();
+        $integration->update([
+            'last_error' => $result['ok'] ? null : ($result['message'] ?? null),
+        ]);
+
+        AuditLog::log('settings.portal_integration_bayut_locations_synced', $integration, [
+            'count' => count($result['locations'] ?? []),
+        ]);
+
+        if ($result['ok']) {
+            return back()->with('success', $result['message']);
+        }
+
+        return back()->with('error', $result['message'] ?? __('Location sync failed.'));
+    }
+
     public function syncLeads(Request $request, string $portal)
     {
         abort_unless(in_array($portal, ['propertyfinder', 'bayut'], true), 404);

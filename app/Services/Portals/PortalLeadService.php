@@ -204,7 +204,7 @@ class PortalLeadService
 
         $tenant->users()
             ->where('is_active', true)
-            ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
             ->get()
             ->each(function (User $admin) use ($notification, $lead) {
                 try {

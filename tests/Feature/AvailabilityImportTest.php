@@ -121,6 +121,270 @@ class AvailabilityImportTest extends TestCase
         $this->assertNull($townhouse->handover_date);
     }
 
+    // ── The real AMS "Properties-<date>.csv" layout ─────────────────────────
+    //
+    // AMS emails a comma CSV with a UTF-8 BOM, an Excel-style header row,
+    // trailing empty columns, and grouped blocks where only the first unit row
+    // carries the building/location.
+
+    protected function amsGroupedBlocks(): array
+    {
+        return [
+            ['Bey View Tower', 'Abu Dhabi Mall', '', '1301', '4 BR + Maids room', '352 Sq Mtr / 3744 Sq Foot', '240,000', '12,000', '20,000', 'Vacant', '2 Parkings', 'Keys - Security', 'Beach Rotana Membership', '2 Adults + 2 Child below 17 Yrs'],
+            [], // blank separator row between blocks
+            ['The Bridges', 'Tower 2', '', '903', '1 BR', '', '74,000', '3,700', '15,000', 'Vacant', '1 Parkings', 'Keys at Canal Residence', '', ''],
+            [],
+            ['Canal Residence', 'Reem Island', '', 'P-105', '3 BR + Maids Town House', '2768 Square Feet', '300,000', '15,000', '1,000', 'Vacant', '2 Parkings', 'Concierge', 'Gym/Swimming Pool', ''],
+            ['', '', '', '1714', '1 BR - 871.34 Square Foot', 'Closed Kitchen', '115,000', '5,750', '1,000', 'Vacant', '1 Parkings', 'Concierge', 'Gym/Swimming Pool', ''],
+            ['', '', '', '1209', '1 BR - 864.57 Square Foot', 'Closed Kitchen', '115,000', '5,750', '1,000', 'Up-coming', '1 Parkings', '31.10.2026', 'Gym/Swimming Pool', ''],
+            [],
+            ['Taj Residence', 'Behind ADCB Head Off', '', '304', '3 BR + Maids Room', 'With Balcony / 120 Sq Mtr', '100,000', '5,000', '1,000', 'Vacant', '', 'Keys - Security', '', ''],
+        ];
+    }
+
+    protected function amsCsv(?array $blocks = null): string
+    {
+        $header = ['Property Name', 'Location', "Location (please\nclick)", 'Unit No.', 'No. of Bedrooms', 'Unit Features', 'Rent', 'Deposit', 'Admin Fee', 'Status', 'Parking', 'Key Location', 'Facilities', 'Remarks'];
+        $encode = fn (array $cells): string => implode(',', array_map(fn ($cell) => (function ($cell) {
+            $cell = (string) $cell;
+            if (str_contains($cell, ',') || str_contains($cell, '"') || str_contains($cell, "\n")) {
+                return '"'.str_replace('"', '""', $cell).'"';
+            }
+
+            return $cell;
+        })($cell), $cells));
+        $lines = [$encode($header).','];
+        foreach (($blocks ?? $this->amsGroupedBlocks()) as $block) {
+            if ($block === []) {
+                $lines[] = '';
+            } else {
+                $lines[] = $encode($block).',,';
+            }
+        }
+
+        return "\xEF\xBB\xBF".implode("\n", $lines)."\n";
+    }
+
+    protected function parseAmsCsv(?array $blocks = null): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'ams_csv_');
+        file_put_contents($path, $this->amsCsv($blocks));
+
+        try {
+            return (new AvailabilityIngestService)->parseFile($path, 'csv', [
+                'delimiter' => 'comma',
+                'has_header' => true,
+            ]);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    protected function headerMappedAmsSource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'AMS Properties',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'comma', 'has_header' => true],
+            'column_map' => [
+                'Property Name' => 'building',
+                'Location' => 'community',
+                'Unit No.' => 'unit_no',
+                'No. of Bedrooms' => 'bedrooms',
+                'Unit Features' => 'features',
+                'Rent' => 'rent',
+                'Deposit' => 'deposit',
+                'Admin Fee' => 'admin_fee',
+                'Status' => 'status',
+                'Parking' => 'parking',
+                'Key Location' => 'key_date',
+                'Facilities' => 'amenities',
+                'Remarks' => 'remarks',
+            ],
+        ]);
+    }
+
+    public function test_ams_header_csv_parses_to_clean_column_names(): void
+    {
+        $table = $this->parseAmsCsv();
+
+        $this->assertSame(6, count($table['rows']));
+        $this->assertSame('Property Name', $table['header'][0]);
+        $this->assertSame('Location (please click)', $table['header'][2]);
+        $this->assertSame('Unit No.', $table['header'][3]);
+        $this->assertSame('col14', $table['header'][14]);
+
+        $this->assertSame('Bey View Tower', $table['rows'][0]['Property Name']);
+        $this->assertSame('1301', $table['rows'][0]['Unit No.']);
+        $this->assertSame('The Bridges', $table['rows'][1]['Property Name']);
+        $this->assertSame('Canal Residence', $table['rows'][2]['Property Name']);
+    }
+
+    public function test_ams_csv_ingest_creates_units_with_correct_buildings_and_no_leases(): void
+    {
+        $source = $this->headerMappedAmsSource();
+        $service = new AvailabilityIngestService;
+        $result = $service->ingest($source, $this->parseAmsCsv()['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(6, $result['created']);
+        $this->assertSame(0, $result['updated']);
+        $this->assertSame(0, $result['missing']);
+        $this->assertFalse($result['reconciliation_skipped']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get();
+        $this->assertCount(6, $units);
+        $this->assertSame(0, $units->where('availability', 'leased')->count());
+        $this->assertSame(0, $units->where('sub_community', 'Other')->count());
+
+        $byRef = $units->keyBy('source_unit_ref');
+        $this->assertSame('Bey View Tower', $byRef['1301']->sub_community);
+        $this->assertSame('The Bridges', $byRef['903']->sub_community);
+        $this->assertSame('Tower 2', $byRef['903']->community);
+        $this->assertSame('Canal Residence', $byRef['P-105']->sub_community);
+        $this->assertSame('Canal Residence', $byRef['1714']->sub_community);
+        $this->assertSame('Reem Island', $byRef['1209']->community);
+        $this->assertSame('Taj Residence', $byRef['304']->sub_community);
+        $this->assertSame('ready_to_list', $byRef['1209']->availability);
+
+        $this->assertSame('2026-10-31', $byRef['1209']->handover_date?->toDateString());
+    }
+
+    public function test_ams_csv_bedroom_counts_ignore_area_and_maid_figures(): void
+    {
+        // The "No. of Bedrooms" cell carries trailing area/parking digits
+        // ("3 BR + Maid - (309 SQM)", "1 BR - 871.34 Square Foot"). These must
+        // never be concatenated into the bedroom count (3309 / 187134 bug).
+        $source = $this->headerMappedAmsSource();
+        $service = new AvailabilityIngestService;
+
+        $rows = $this->parseAmsCsv([
+            ['Al Hattan Residence', 'AL Raha', '', '803', '3 BR + Maid - (309 SQM)', '', '150,000', '7,500', '1,000', 'Vacant', '2 Parkings', '', '', ''],
+            ['Canal Residence', 'Reem Island', '', '1714', '1 BR - 871.34 Square Foot', '', '115,000', '5,750', '1,000', 'Vacant', '1 Parkings', '', '', ''],
+            ['Canal Residence', 'Reem Island', '', '1007', '2 BR + Maid / 2022 Square Ft', '', '130,000', '6,500', '1,000', 'Vacant', '1 Parkings', '', '', ''],
+            ['Al Hattan Residence', 'AL Raha', '', 'Retail 3', '165 Square Meters', '', '250,000', '12,500', '1,000', 'Vacant', '', '', '', ''],
+            ['Al Hattan Residence', 'AL Raha', '', '105', '1 BR (131 SQM)', '', '62,000', '3,100', '1,000', 'Vacant', '', '', '', ''],
+        ])['rows'];
+
+        $service->ingest($source, $rows, $this->tenant->id, $this->adminUser->id);
+
+        $byRef = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get()->keyBy('source_unit_ref');
+
+        $this->assertSame(3, $byRef['803']->bedrooms);
+        $this->assertSame(1, $byRef['1714']->bedrooms);
+        $this->assertSame(2, $byRef['1007']->bedrooms);
+        $this->assertNull($byRef['Retail 3']->bedrooms);
+        $this->assertSame(1, $byRef['105']->bedrooms);
+
+        $this->assertSame('3BR Apartment for Rent in Al Hattan Residence', $byRef['803']->marketing_title);
+        $this->assertSame('1BR Apartment for Rent in Canal Residence', $byRef['1714']->marketing_title);
+    }
+
+    public function test_ams_partial_reimport_never_bulk_marks_units_leased(): void
+    {
+        $source = $this->headerMappedAmsSource();
+        $service = new AvailabilityIngestService;
+        $service->ingest($source, $this->parseAmsCsv()['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $partial = $this->parseAmsCsv([
+            ['Bey View Tower', 'Abu Dhabi Mall', '', '1301', '4 BR + Maids room', '352 Sq Mtr / 3744 Sq Foot', '240,000', '12,000', '20,000', 'Vacant', '2 Parkings', 'Keys - Security', '', ''],
+        ]);
+        $result = $service->ingest($source, $partial['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertTrue($result['reconciliation_skipped']);
+        $this->assertSame(0, $result['missing']);
+
+        $leased = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->where('availability', 'leased')->count();
+        $this->assertSame(0, $leased);
+    }
+
+    public function test_legacy_col_mapping_source_gets_rebuilt_from_header_csv(): void
+    {
+        // Sources created for the old paste-text format store a positional
+        // "colN" map + "has_header: false". Uploading a proper header CSV
+        // through one used to misalign every column. It must now detect the
+        // header, rebuild the mapping, and import units under the right names.
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'AMS Properties',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'comma', 'has_header' => false, 'inherit_columns' => ['col0']],
+            'column_map' => [
+                'col0' => 'building',
+                'col1' => 'unit_no',
+                'col2' => 'features',
+                'col3' => 'rent',
+                'col4' => 'deposit',
+                'col5' => 'admin_fee',
+                'col6' => 'status',
+                'col7' => 'parking',
+                'col8' => 'key_date',
+                'col9' => 'amenities',
+            ],
+            'status_map' => ['vacant' => 'ready_to_list', 'up-coming' => 'ready_to_list'],
+        ]);
+
+        $path = tempnam(sys_get_temp_dir(), 'ams_legacy_');
+        file_put_contents($path, $this->amsCsv());
+
+        try {
+            $table = (new AvailabilityIngestService)->parseFile($path, 'csv', ['delimiter' => 'comma', 'has_header' => false]);
+        } finally {
+            @unlink($path);
+        }
+
+        // The header must be promoted even though the stored options say no.
+        $this->assertSame('Property Name', $table['header'][0]);
+        $this->assertSame('Unit No.', $table['header'][3]);
+
+        $result = (new AvailabilityIngestService)->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertTrue($result['mapping_rebuilt']);
+        $this->assertSame(6, $result['created']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get();
+        $byRef = $units->keyBy('source_unit_ref');
+        $this->assertSame('Bey View Tower', $byRef['1301']->sub_community);
+        $this->assertSame('The Bridges', $byRef['903']->sub_community);
+        $this->assertSame('Tower 2', $byRef['903']->community);
+        $this->assertSame('Canal Residence', $byRef['P-105']->sub_community);
+        $this->assertSame('Taj Residence', $byRef['304']->sub_community);
+        $this->assertSame('ready_to_list', $byRef['1209']->availability);
+        $this->assertSame(0, $units->where('sub_community', 'Other')->count());
+        $this->assertSame(0, $units->where('sub_community', 'AMS Properties')->count());
+    }
+
+    public function test_building_only_header_row_carries_down_to_following_units(): void
+    {
+        // AMS fills 'Property Name' on the first row of a merged block. When
+        // that first row has no unit number (a building header row), the name
+        // must still carry down to the actual unit rows.
+        $blocks = [
+            ['Al Hattan Residence', 'Al Raha - Dana Area', '', '', '', '', '150,000', '15,000', '1,000', 'Vacant', '', 'Keys - Security', '', ''],
+            ['', '', '', '803', '3 BR + Maid - (309 SQM)', 'Duplex with Terrace', '200,000', '10,000', '3,000', 'Vacant', '', 'Keys', '', ''],
+            ['', '', '', '105', '1 BR (131 SQM)', 'Closed kitchen With Terrace', '95,000', '4,750', '2,000', 'Vacant', '', 'Keys', '', ''],
+        ];
+
+        $source = $this->headerMappedAmsSource();
+        $result = (new AvailabilityIngestService)->ingest($source, $this->parseAmsCsv($blocks)['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(2, $result['created']);
+        $this->assertSame(1, $result['skipped']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get();
+        $byRef = $units->keyBy('source_unit_ref');
+        $this->assertSame('Al Hattan Residence', $byRef['803']->sub_community);
+        $this->assertSame('Al Hattan Residence', $byRef['105']->sub_community);
+        $this->assertSame('Al Raha - Dana Area', $byRef['803']->community);
+        $this->assertSame('ready_to_list', $byRef['105']->availability);
+        $this->assertSame(0, $units->where('sub_community', 'Other')->count());
+    }
+
     public function test_re_import_updates_instead_of_duplicating(): void
     {
         $source = $this->createAmsSource();

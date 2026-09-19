@@ -105,11 +105,44 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
+    /**
+     * Additional operational roles layered on top of the primary role_id. The
+     * primary role drives rank, identity and the UI; secondary roles grant
+     * extra capabilities (e.g. a Listing Agent who also cold calls).
+     */
+    public function secondaryRoles()
+    {
+        return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Name of the primary role plus every additional role.
+     */
+    public function roleNames(): array
+    {
+        $names = $this->role ? [$this->role->name] : [];
+
+        foreach ($this->secondaryRoles as $role) {
+            $names[] = $role->name;
+        }
+
+        return array_values(array_unique(array_filter($names)));
+    }
+
     // ── Team management ────────────────────────────────────────
 
     public function manager()
     {
         return $this->belongsTo(User::class, 'reports_to');
+    }
+
+    /**
+     * This member's agreed compensation plan (split + pay structure).
+     */
+    public function commissionPlan()
+    {
+        return $this->hasOne(AgentCompensation::class);
     }
 
     public function directReports()
@@ -199,7 +232,45 @@ class User extends Authenticatable
 
     public function hasRole(string $roleName): bool
     {
-        return $this->role->name === $roleName;
+        if (! $this->role) {
+            return $this->secondaryRoles()->where('name', $roleName)->exists();
+        }
+
+        $primary = $this->role->name;
+
+        if ($primary === $roleName) {
+            return true;
+        }
+
+        // The Owner is a strict superset of the Admin, so every existing
+        // hasRole('admin') gate (route middleware included) admits them too.
+        if ($roleName === 'admin' && $primary === 'owner') {
+            return true;
+        }
+
+        // Owner and Admin are privilege roles that can only ever be the primary
+        // role, so a secondary assignment of either is meaningless.
+        if ($roleName === 'owner' || $roleName === 'admin') {
+            return false;
+        }
+
+        return $this->secondaryRoles()->where('name', $roleName)->exists();
+    }
+
+    /**
+     * Authority rank of this user's role (Owner 3, Admin 2, others 1).
+     */
+    public function roleRank(): int
+    {
+        return $this->role?->rank() ?? 0;
+    }
+
+    /**
+     * Whether this user sits strictly above the given user in the hierarchy.
+     */
+    public function outranks(?User $other): bool
+    {
+        return $other !== null && $this->roleRank() > $other->roleRank();
     }
 
     /**
@@ -228,23 +299,43 @@ class User extends Authenticatable
      */
     public function hasPermission(string $key): bool
     {
-        // Admin system role always has all permissions
-        if ($this->role && $this->role->is_system && $this->role->name === 'admin') {
+        // Owner and Admin system roles always have all permissions.
+        if ($this->role && $this->role->is_system && in_array($this->role->name, ['owner', 'admin'], true)) {
             return true;
         }
 
-        return $this->role && $this->role->hasPermission($key);
+        // The primary role's own permissions…
+        if ($this->role && $this->role->hasPermission($key)) {
+            return true;
+        }
+
+        // …plus anything granted by an additional role.
+        return $this->secondaryRoles->contains(fn (Role $role) => $role->hasPermission($key));
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->hasRole('owner');
     }
 
     public function isAdmin(): bool
     {
+        // hasRole('admin') is owner-inclusive: the Owner holds full rights.
         return $this->hasRole('admin');
     }
 
     public function isAgent(): bool
     {
-        return $this->hasRole('agent') || $this->isAcquisitionAgent()
+        // Cold Call Agents are agents too; the role may be a primary or an
+        // additional assignment.
+        return $this->hasRole('agent') || $this->isColdCallAgent()
+            || $this->isAcquisitionAgent()
             || $this->isListingAgent() || $this->isBuyersAgent();
+    }
+
+    public function isColdCallAgent(): bool
+    {
+        return $this->hasRole('cold_call_agent');
     }
 
     public function isAcquisitionAgent(): bool

@@ -166,9 +166,18 @@
                             <input type="text" name="title_deed_no" class="form-control" value="{{ old('title_deed_no', $property->title_deed_no) }}">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">{{ __('RERA Permit No') }}</label>
+                            <label class="form-label">{{ $property->permit_label }}</label>
                             <input type="text" name="rera_permit_no" class="form-control @error('rera_permit_no') is-invalid @enderror" value="{{ old('rera_permit_no', $property->rera_permit_no) }}" placeholder="{{ __('Required by portals') }}">
                             @error('rera_permit_no') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-hint small">
+                                @if($property->permit_regime === 'abudhabi')
+                                    {{ __('Abu Dhabi listings use the Madhmoun permit (TAMM).') }}
+                                @elseif($property->permit_regime === 'dubai')
+                                    {{ __('Dubai listings use the RERA permit (Trakheesi).') }}
+                                @else
+                                    {{ __('Dubai listings use the RERA permit; Abu Dhabi uses the Madhmoun permit.') }}
+                                @endif
+                            </div>
                         </div>
                     </div>
                     <div class="row mt-3">

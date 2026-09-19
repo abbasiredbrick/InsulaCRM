@@ -140,7 +140,7 @@
                         const strikethrough = ev.completed ? ' cal-event-line-through' : '';
                         html += '<div class="cal-event cal-event-' + ev.color + strikethrough + '" style="' + cursor + '"' + link + ' title="' + escapeAttr(ev.title) + '">';
                         html += '<span class="cal-event-dot"></span>';
-                        html += '<span style="overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(ev.title) + '</span>';
+                        html += '<span style="overflow:hidden;text-overflow:ellipsis;">' + (ev.time ? '<small class="text-secondary me-1">' + escapeHtml(ev.time) + '</small>' : '') + escapeHtml(ev.title) + '</span>';
                         html += '</div>';
                     });
                     if (extra > 0) {

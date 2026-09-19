@@ -40,6 +40,11 @@
                         <li class="nav-item">
                             <a href="#tab-lead-costs" class="nav-link" data-bs-toggle="tab">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Source Budgeting') : __('Lead Source Costs') }}</a>
                         </li>
+                        @if(($businessMode ?? 'wholesale') === 'realestate')
+                        <li class="nav-item">
+                            <a href="#tab-commissions" class="nav-link" data-bs-toggle="tab">{{ __('Commissions') }}</a>
+                        </li>
+                        @endif
                         <li class="nav-item">
                             <a href="#tab-custom-fields" class="nav-link" data-bs-toggle="tab">{{ __('Custom Fields') }}</a>
                         </li>
@@ -282,6 +287,48 @@
 
             <!-- Team Tab -->
             <div class="tab-pane" id="tab-team">
+                <div class="alert alert-info d-flex align-items-start gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon mt-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div>
+                        <div class="fw-bold">{{ __('Role hierarchy') }}</div>
+                        <div class="small">{{ __('Owner → Admin → Agent / Listing Agent / Cold Call Agent') }}</div>
+                        @if(auth()->user()->isOwner())
+                            <div class="small mt-1">{{ __('As Owner you can create and manage Admins and every role below. Ownership itself is transferred, not shared.') }}</div>
+                        @else
+                            <div class="small mt-1">{{ __('As Admin you can manage every role below Admin. Admins and the Owner are managed by the Owner only.') }}</div>
+                        @endif
+                    </div>
+                </div>
+
+                @if(auth()->user()->isOwner())
+                    @php $adminTargets = $teamMembers->filter(fn ($m) => $m->hasRole('admin') && ! $m->isOwner()); @endphp
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h4 class="card-title">{{ __('Transfer Ownership') }}</h4>
+                            <p class="text-secondary mb-2">{{ __('Make one of your Admins the new Owner. You will become an Admin. There is always exactly one Owner.') }}</p>
+                            @if($adminTargets->isEmpty())
+                                <p class="text-muted mb-0">{{ __('There are no Admins to hand ownership to. Create or promote an Admin first.') }}</p>
+                            @else
+                                <form action="{{ route('settings.transferOwnership') }}" method="POST" class="row g-2 align-items-end"
+                                      onsubmit="return confirm('{{ __('Transfer ownership? You will be demoted to Admin.') }}')">
+                                    @csrf
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ __('New Owner') }}</label>
+                                        <select name="user_id" class="form-select" required>
+                                            @foreach($adminTargets as $adminTarget)
+                                                <option value="{{ $adminTarget->id }}">{{ $adminTarget->name }} ({{ $adminTarget->email }})</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="submit" class="btn btn-warning w-100">{{ __('Transfer ownership') }}</button>
+                                    </div>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 <h4 class="mb-3">{{ __('Add Team Member') }}</h4>
                 <form action="{{ route('settings.inviteAgent') }}" method="POST" class="row g-2 mb-4">
                     @csrf
@@ -296,7 +343,7 @@
                     </div>
                     <div class="col-md-2">
                         <select name="role_id" class="form-select" required>
-                            @foreach($roles as $role)
+                            @foreach($assignableRoles as $role)
                                 <option value="{{ $role->id }}">{{ __(ucwords(str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
@@ -306,6 +353,14 @@
                             <option value="">{{ __('No manager') }}</option>
                             @foreach($teamMembers as $member)
                                 <option value="{{ $member->id }}">{{ $member->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">{{ __('Additional roles (optional)') }}</label>
+                        <select name="additional_roles[]" class="form-select" multiple>
+                            @foreach($secondaryRoleOptions as $role)
+                                <option value="{{ $role->id }}">{{ __(ucwords(str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -333,7 +388,14 @@
                                 <td>{{ $agent->name }}</td>
                                 <td><code>{{ $agent->agent_code ?? __('—') }}</code></td>
                                 <td>{{ $agent->email }}</td>
-                                <td><span class="badge bg-blue-lt">{{ __(ucwords(str_replace('_', ' ', $agent->role->name ?? '-'))) }}</span></td>
+                                <td>
+                                    <div>
+                                        <span class="badge bg-blue-lt">{{ __(ucwords(str_replace('_', ' ', $agent->role->name ?? '-'))) }}</span>
+                                        @foreach($agent->secondaryRoles as $role)
+                                            <span class="badge bg-azure-lt mt-1 d-block">{{ __(ucwords(str_replace('_', ' ', $role->name))) }}</span>
+                                        @endforeach
+                                    </div>
+                                </td>
                                 <td>
                                     <span class="badge {{ $agent->is_active ? 'bg-green-lt' : 'bg-red-lt' }}">
                                         {{ $agent->is_active ? __('Active') : __('Inactive') }}
@@ -347,6 +409,68 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @can('manageTeamMember', $agent)
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editMemberModal{{ $agent->id }}">
+                                        {{ __('Edit') }}
+                                    </button>
+                                    <div class="modal fade" id="editMemberModal{{ $agent->id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="POST" action="{{ route('settings.updateAgent', $agent) }}">
+                                                @csrf
+                                                @method('PUT')
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">{{ __('Edit :name', ['name' => $agent->name]) }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label required">{{ __('Full name') }}</label>
+                                                            <input type="text" name="name" class="form-control" value="{{ $agent->name }}" required>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label required">{{ __('Email') }}</label>
+                                                            <input type="email" name="email" class="form-control" value="{{ $agent->email }}" required>
+                                                            <small class="form-hint">{{ __('This is the email they use to sign in.') }}</small>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label required">{{ __('Role') }}</label>
+                                                            <select name="role_id" class="form-select" required>
+                                                                @foreach($assignableRoles as $role)
+                                                                    <option value="{{ $role->id }}" @selected((int) $agent->role_id === (int) $role->id)>{{ __(ucwords(str_replace('_', ' ', $role->name))) }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <small class="form-hint">{{ __('The primary role determines their rank and default area.') }}</small>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">{{ __('Additional roles') }}</label>
+                                                            <select name="additional_roles[]" class="form-select" multiple>
+                                                                @foreach($secondaryRoleOptions as $role)
+                                                                    <option value="{{ $role->id }}" @selected($agent->secondaryRoles->contains('id', $role->id))>{{ __(ucwords(str_replace('_', ' ', $role->name))) }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            <small class="form-hint">{{ __('Lets them act in other areas, e.g. Cold Call Agent.') }}</small>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label">{{ __('Manager') }}</label>
+                                                            <select name="reports_to" class="form-select">
+                                                                <option value="">{{ __('No manager') }}</option>
+                                                                @foreach($teamMembers as $member)
+                                                                    @if($member->id !== $agent->id)
+                                                                        <option value="{{ $member->id }}" @selected((int) $agent->reports_to === (int) $member->id)>{{ $member->name }}</option>
+                                                                    @endif
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                                                        <button type="submit" class="btn btn-primary">{{ __('Save changes') }}</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
                                     <form method="POST" action="{{ route('settings.toggleAgent', $agent) }}" class="d-inline">
                                         @csrf
                                         @method('PATCH')
@@ -457,6 +581,9 @@
                                             </form>
                                         </div>
                                     </div>
+                                    @else
+                                        <span class="text-muted small">{{ __('No actions available') }}</span>
+                                    @endcan
                                 </td>
                             </tr>
                             @endforeach
@@ -653,6 +780,191 @@
                     <button type="submit" class="btn btn-primary">{{ $businessMode === 'realestate' ? __('Save Source Budgets') : __('Save Lead Source Costs') }}</button>
                 </form>
             </div>
+            <!-- Commissions Tab (real estate mode) -->
+            @if(($businessMode ?? 'wholesale') === 'realestate')
+            <div class="tab-pane" id="tab-commissions">
+                <p class="text-secondary mb-3">{{ __('Agents earn an agreed share of the commission on closed leads. Configure the default formula here, then give every member their own plan below.') }}</p>
+
+                <form action="{{ route('settings.updateCommissionSettings') }}" method="POST" class="mb-4">
+                    @csrf
+                    <h4 class="mb-2">{{ __('Commission Formula') }}</h4>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Default split type') }}</label>
+                            <select name="default_split_type" class="form-select" id="split-type-select">
+                                <option value="fixed" {{ ($commissionSettings['default_split_type'] ?? 'fixed') === 'fixed' ? 'selected' : '' }}>{{ __('Fixed company / agent split') }}</option>
+                                <option value="tiered" {{ ($commissionSettings['default_split_type'] ?? 'fixed') === 'tiered' ? 'selected' : '' }}>{{ __('Tiered by total commission') }}</option>
+                            </select>
+                            <small class="form-hint">{{ __('Tiered uses the ranges below, keyed on the total commission amount of the lead.') }}</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Company %') }}</label>
+                            <input type="number" name="default_company_pct" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionSettings['default_company_pct'] ?? '50' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">{{ __('Agent %') }}</label>
+                            <input type="number" name="default_agent_pct" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionSettings['default_agent_pct'] ?? '50' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="tiers-block" style="{{ ($commissionSettings['default_split_type'] ?? 'fixed') === 'tiered' ? '' : 'display:none;' }}">
+                        <label class="form-label">{{ __('Tier schedule — agent share of total commission') }}</label>
+                        <div class="table-responsive">
+                            <table class="table table-vcenter">
+                                <thead>
+                                    <tr><th>{{ __('From (total commission)') }}</th><th>{{ __('Up to (total commission)') }}</th><th>{{ __('Agent share %') }}</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach(($commissionSettings['tiers'] ?? []) as $idx => $tier)
+                                    <tr>
+                                        <td>
+                                            <input type="number" name="tiers[{{ $idx }}][from]" class="form-control form-control-sm" step="0.01" min="0" value="{{ $tier['from'] ?? '' }}" placeholder="—">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="tiers[{{ $idx }}][max]" class="form-control form-control-sm" step="0.01" min="0" value="{{ $tier['max'] ?? '' }}" placeholder="—">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="tiers[{{ $idx }}][agent_pct]" class="form-control form-control-sm" step="0.01" min="0" max="100" value="{{ $tier['agent_pct'] ?? '' }}" required>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <small class="form-hint">{{ __('Out-of-range totals fall back to the last tier. Company share is always 100% − agent share.') }}</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">{{ __('Default funding for support / co-agents') }}</label>
+                        <select name="default_support_funding" class="form-select">
+                            <option value="from_agent" {{ ($commissionSettings['default_support_funding'] ?? 'from_agent') === 'from_agent' ? 'selected' : '' }}>{{ __('Fully paid from the main agent') }}</option>
+                            <option value="from_company" {{ ($commissionSettings['default_support_funding'] ?? 'from_agent') === 'from_company' ? 'selected' : '' }}>{{ __('Fully paid from the company') }}</option>
+                            <option value="from_both" {{ ($commissionSettings['default_support_funding'] ?? 'from_agent') === 'from_both' ? 'selected' : '' }}>{{ __('Half from company, half from main agent') }}</option>
+                        </select>
+                        <small class="form-hint">{{ __('Example: 50/50 split with a support agent on 20% funded half/half → company 40% / main 40% / support 20%.') }}</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">{{ __('Save Formula') }}</button>
+                </form>
+
+                <hr class="my-4">
+
+                <h4 class="mb-3">{{ __('Per-Agent Plans') }}</h4>
+                <p class="text-secondary mb-3">{{ __('Give each member an override. Agents without a plan use the formula above (commission only).') }}</p>
+                <div class="table-responsive">
+                    <table class="table table-vcenter">
+                        <thead>
+                            <tr>
+                                <th>{{ __('Member') }}</th>
+                                <th>{{ __('Split') }}</th>
+                                <th>{{ __('Pay structure') }}</th>
+                                <th>{{ __('Base salary') }}</th>
+                                <th>{{ __('Fixed amount / close') }}</th>
+                                <th>{{ __('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($agents as $member)
+                            @php $plan = $compensationPlans[$member->id] ?? null; @endphp
+                            <tr>
+                                <td>{{ $member->name }} <small class="text-secondary d-block">{{ $member->role->display_name ?? '' }}</small></td>
+                                <td>
+                                    @if($plan)
+                                        @if($plan->split_type === 'tiered')
+                                            <span class="badge bg-purple-lt">{{ __('Tiered') }}</span>
+                                        @elseif($plan->isFixedAmount())
+                                            <span class="badge bg-orange-lt">{{ __('Fixed amount') }}</span>
+                                        @else
+                                            {{ rtrim(rtrim((string) $plan->company_pct, '0'), '.').' / '.rtrim(rtrim((string) $plan->agent_pct, '0'), '.') }}
+                                        @endif
+                                    @else
+                                        <span class="text-secondary">{{ __('Default formula') }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($plan)
+                                        @php $pay = $plan->pay_structure; @endphp
+                                        <span class="badge {{ $pay === 'commission_only' ? 'bg-green-lt' : ($pay === 'salary_plus_commission' ? 'bg-azure-lt' : 'bg-orange-lt') }}">
+                                            {{ __('commission_only') === $pay ? __('Commission only') : ($pay === 'salary_plus_commission' ? __('Salary + commission') : __('Fixed amount')) }}
+                                        </span>
+                                    @else
+                                        <span class="badge bg-green-lt">{{ __('Commission only') }}</span>
+                                    @endif
+                                </td>
+                                <td>{{ $plan?->base_salary ? \App\Helpers\TenantFormatHelper::currency($plan->base_salary) : '—' }}</td>
+                                <td>{{ $plan?->fixed_amount_per_close ? \App\Helpers\TenantFormatHelper::currency($plan->fixed_amount_per_close) : '—' }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#compensationModal{{ $member->id }}">
+                                        {{ $plan ? __('Edit plan') : __('Set plan') }}
+                                    </button>
+                                    <div class="modal fade" id="compensationModal{{ $member->id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="POST" action="{{ route('settings.updateCommissionPlan', $member) }}">
+                                                @csrf
+                                                @method('PUT')
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">{{ __('Compensation — :name', ['name' => $member->name]) }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label required">{{ __('Pay structure') }}</label>
+                                                            <select name="pay_structure" class="form-select">
+                                                                <option value="commission_only" @selected(($plan?->pay_structure ?? 'commission_only') === 'commission_only')>{{ __('Commission only') }}</option>
+                                                                <option value="salary_plus_commission" @selected(($plan?->pay_structure ?? '') === 'salary_plus_commission')>{{ __('Salary + commission') }}</option>
+                                                                <option value="fixed_amount" @selected(($plan?->pay_structure ?? '') === 'fixed_amount')>{{ __('Fixed amount per closed lead (listing / cold call)') }}</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="row g-2 mb-3">
+                                                            <div class="col-6">
+                                                                <label class="form-label required">{{ __('Split type') }}</label>
+                                                                <select name="split_type" class="form-select">
+                                                                    <option value="fixed" @selected(($plan?->split_type ?? 'fixed') === 'fixed')>{{ __('Fixed company / agent') }}</option>
+                                                                    <option value="tiered" @selected(($plan?->split_type ?? '') === 'tiered')>{{ __('Tiered (use formula ranges)') }}</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div class="row g-2 mb-3">
+                                                            <div class="col-6">
+                                                                <label class="form-label">{{ __('Company %') }}</label>
+                                                                <input type="number" name="company_pct" class="form-control" min="0" max="100" step="0.01" value="{{ $plan?->company_pct ?? '' }}" placeholder="{{ ($commissionSettings['default_company_pct'] ?? 50).'%' }}">
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="form-label">{{ __('Agent %') }}</label>
+                                                                <input type="number" name="agent_pct" class="form-control" min="0" max="100" step="0.01" value="{{ $plan?->agent_pct ?? '' }}" placeholder="{{ ($commissionSettings['default_agent_pct'] ?? 50).'%' }}">
+                                                            </div>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-6">
+                                                                <label class="form-label">{{ __('Base salary / month') }}</label>
+                                                                <input type="number" name="base_salary" class="form-control" step="0.01" min="0" value="{{ $plan?->base_salary ?? '' }}" placeholder="0.00">
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="form-label">{{ __('Fixed amount / close') }}</label>
+                                                                <input type="number" name="fixed_amount_per_close" class="form-control" step="0.01" min="0" value="{{ $plan?->fixed_amount_per_close ?? '' }}" placeholder="0.00">
+                                                            </div>
+                                                        </div>
+                                                        @if($plan)
+                                                        <small class="form-hint d-block mt-2">{{ __('Leaving a fixed split blank inherits the formula default.') }}</small>
+                                                        @endif
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                                                        <button type="submit" class="btn btn-primary">{{ __('Save plan') }}</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
             <!-- Custom Fields Tab -->
             <div class="tab-pane" id="tab-custom-fields">
                 <!-- Custom Field Definitions -->
@@ -3475,6 +3787,23 @@ if (testBtn) {
     }
 }
 </style>
+@endpush
+
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var splitSelect = document.getElementById('split-type-select');
+    var tiersBlock = document.getElementById('tiers-block');
+    if (splitSelect && tiersBlock) {
+        var syncTiers = function() {
+            tiersBlock.style.display = splitSelect.value === 'tiered' ? '' : 'none';
+        };
+        splitSelect.addEventListener('change', syncTiers);
+        syncTiers();
+    }
+});
+</script>
 @endpush
 
 

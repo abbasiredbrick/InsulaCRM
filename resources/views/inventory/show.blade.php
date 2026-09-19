@@ -33,6 +33,16 @@
     </div>
 </div>
 
+@if($errors->any())
+<div class="alert alert-danger" id="photo-upload-errors">
+    <ul class="mb-0">
+        @foreach($errors->all() as $error)
+            <li>{{ $error }}</li>
+        @endforeach
+    </ul>
+</div>
+@endif
+
 {{-- Photo gallery / upload --}}
 @include('inventory._photos')
 
@@ -111,7 +121,7 @@
                     <dt class="col-sm-3">{{ __('Title Deed No') }}</dt>
                     <dd class="col-sm-9">{{ $property->title_deed_no ?: '—' }}</dd>
 
-                    <dt class="col-sm-3">{{ __('RERA Permit No') }}</dt>
+                    <dt class="col-sm-3">{{ $property->permit_label }}</dt>
                     <dd class="col-sm-9">{{ $property->rera_permit_no ?: '—' }}</dd>
 
                     <dt class="col-sm-3">{{ __('Assigned agent') }}</dt>
@@ -191,10 +201,20 @@
                                     @php $urlField = $portal['key'] . '_url'; @endphp
                                     @if($property->{$urlField}) • <a href="{{ $property->{$urlField} }}" target="_blank" rel="noopener">{{ __('view listing') }}</a>@endif
                                 @endif
+                                @if($portal['key'] === 'bayut' && $property->bayut_location_label)
+                                    • {{ $property->bayut_location_label }}
+                                @endif
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             @include('inventory._portal-toggle', ['unit' => $property, 'portal' => $portal])
+                            @if($portal['key'] === 'bayut' && $property->bayut_status !== 'live')
+                            <form method="POST" action="{{ route('inventory.push', [$property, 'bayut']) }}" class="d-inline" onsubmit="return confirm('{{ __('Push this unit to Bayut now?') }}')">
+                                @csrf
+                                <input type="hidden" name="confirmed" value="1">
+                                <button type="submit" class="btn btn-sm btn-danger btn-pill {{ $property->is_portal_ready ? '' : 'disabled' }}" {{ $property->is_portal_ready ? '' : 'disabled' }}>{{ __('Push Bayut') }}</button>
+                            </form>
+                            @endif
                             <a href="{{ route('inventory.show', $property) }}#portal-{{ $portal['key'] }}" class="btn btn-sm btn-outline-primary btn-pill">{{ __('Record') }}</a>
                         </div>
                     </div>
@@ -220,6 +240,33 @@
                             </div>
                             <div class="col-12"><button type="submit" class="btn btn-sm btn-primary w-100">{{ __('Save status') }}</button></div>
                         </form>
+                        @if($portal['key'] === 'bayut' && ($property->market_class ?? 'ready') === 'off_plan' && in_array($property->intent, ['rent', 'both'], true))
+                        <div class="small text-warning mt-2">{{ __('Bayut only allows off-plan developments to be listed for Sale, not Rent. Set intent to Sale or mark the unit Ready once completed.') }}</div>
+                        @endif
+                        @if($portal['key'] === 'bayut')
+                        <form method="POST" action="{{ route('inventory.portal-location', $property) }}" class="row g-2 mt-2 border-top pt-2">
+                            @csrf
+                            <div class="col-12">
+                                <label class="form-label small">{{ __('Bayut location (push API)') }} — @if(($property->market_class ?? 'ready') === 'off_plan'){{ __('off-plan: sale only') }}@else{{ __('rent & sale') }}@endif</label>
+                                <x-searchable-select
+                                    name="location_id"
+                                    label-name="location_label"
+                                    :options="$bayut_location_options"
+                                    :selected="(string) $property->bayut_location_id"
+                                    :remote="$bayut_location_search_url"
+                                    :placeholder="__('Choose / search a Bayut location…')"
+                                    :search-placeholder="__('Type building, community or emirate… e.g. Taj')"
+                                />
+                            </div>
+                            <div class="col-12 d-flex align-items-center gap-2">
+                                <button type="submit" class="btn btn-sm btn-outline-primary w-100">{{ __('Save Bayut location') }}</button>
+                                <a href="{{ route('portal-integrations.index') }}" class="btn btn-sm btn-outline-secondary text-nowrap">{{ __('Settings') }}</a>
+                            </div>
+                            <div class="col-12">
+                                <span class="small text-muted">{{ __('This searches Bayut\'s full location catalog live (21,000+ locations). No pre-sync needed.') }}</span>
+                            </div>
+                        </form>
+                        @endif
                     </div>
                 </div>
                 @endforeach
@@ -227,4 +274,19 @@
         </div>
     </div>
 </div>
+<script>
+(function () {
+    const search = document.getElementById('bayut-location-search');
+    const select = document.getElementById('bayut-location-select');
+    if (!search || !select) return;
+    const options = Array.prototype.slice.call(select.options);
+    search.addEventListener('input', function () {
+        const q = search.value.trim().toLowerCase();
+        options.forEach(function (opt, i) {
+            if (q === '') { opt.style.display = ''; return; }
+            opt.style.display = (opt.textContent.toLowerCase().indexOf(q) !== -1) ? '' : 'none';
+        });
+    });
+})();
+</script>
 @endsection

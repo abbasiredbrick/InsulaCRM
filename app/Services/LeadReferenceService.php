@@ -35,6 +35,16 @@ class LeadReferenceService
     }
 
     /**
+     * Recompute a lead's reference after it moves to a different agent. The
+     * month segment still reflects when the lead was created, but the agent
+     * code and per-agent sequence follow the new owner.
+     */
+    public function regenerate(Lead $lead): string
+    {
+        return $this->generate($lead);
+    }
+
+    /**
      * A sample reference for the settings preview.
      */
     public function preview(?int $tenantId = null): string

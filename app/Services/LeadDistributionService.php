@@ -91,7 +91,7 @@ class LeadDistributionService
     {
         $agents = $tenant->users()
             ->where('is_active', true)
-            ->whereHas('role', fn($q) => $q->whereIn('name', ['admin', 'agent', 'acquisition_agent']))
+            ->whereHas('role', fn($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'acquisition_agent']))
             ->get();
 
         if ($agents->isEmpty()) {

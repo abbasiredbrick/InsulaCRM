@@ -183,6 +183,23 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Showings (real estate agent mode) ────────────────────────
     Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::resource('showings', ShowingController::class);
+
+        // A2A commission-sharing contracts with external agents
+        Route::get('/a2a', [\App\Http\Controllers\A2aContractController::class, 'index'])->name('a2a.index');
+        Route::get('/a2a/create', [\App\Http\Controllers\A2aContractController::class, 'create'])->name('a2a.create');
+        Route::post('/a2a', [\App\Http\Controllers\A2aContractController::class, 'store'])->name('a2a.store');
+        Route::get('/a2a/{contract}', [\App\Http\Controllers\A2aContractController::class, 'show'])->name('a2a.show');
+        Route::get('/a2a/{contract}/print', [\App\Http\Controllers\A2aContractController::class, 'printContract'])->name('a2a.print');
+        Route::patch('/a2a/{contract}/mark-sent', [\App\Http\Controllers\A2aContractController::class, 'markSent'])->name('a2a.markSent');
+        Route::post('/a2a/{contract}/upload-signed', [\App\Http\Controllers\A2aContractController::class, 'uploadSigned'])->name('a2a.uploadSigned');
+        Route::get('/a2a/{contract}/download', [\App\Http\Controllers\A2aContractController::class, 'downloadSigned'])->name('a2a.downloadSigned');
+        Route::patch('/a2a/{contract}/void', [\App\Http\Controllers\A2aContractController::class, 'void'])->name('a2a.void');
+        Route::post('/a2a/{contract}/attach', [\App\Http\Controllers\A2aContractController::class, 'attachToLead'])->name('a2a.attach');
+
+        // Feedback on viewings/tasks/meetings logged into the lead activity
+        Route::post('/followups/viewings/{showing}/feedback', [\App\Http\Controllers\FollowupController::class, 'viewingFeedback'])->name('followups.viewing.feedback');
+        Route::post('/followups/tasks/{task}/feedback', [\App\Http\Controllers\FollowupController::class, 'taskFeedback'])->name('followups.task.feedback');
+        Route::post('/followups/meetings/{meeting}/feedback', [\App\Http\Controllers\FollowupController::class, 'meetingFeedback'])->name('followups.meeting.feedback');
     });
 
     // ── Open Houses (real estate agent mode) ──────────────────────
@@ -201,17 +218,19 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/leases/{lease}/start-new-search', [LeaseController::class, 'startNewSearch'])->name('leases.startNewSearch');
     });
 
-    // ── Market / Cold Calls (real estate agent mode) ────────────
-    Route::middleware(['role:admin,agent,marketing', 'mode:realestate'])->group(function () {
-        Route::get('/market', [MarketController::class, 'index'])->name('market.index');
-        Route::get('/market/import', [MarketController::class, 'create'])->name('market.create');
-        Route::post('/market/import', [MarketController::class, 'import'])->name('market.import');
-        Route::get('/market/{marketContact}', [MarketController::class, 'show'])->name('market.show');
-        Route::patch('/market/{marketContact}', [MarketController::class, 'update'])->name('market.update');
-        Route::post('/market/{marketContact}/status', [MarketController::class, 'updateStatus'])->name('market.status');
-        Route::post('/market/{marketContact}/convert-property', [MarketController::class, 'convertToProperty'])->name('market.convert-property');
-        Route::post('/market/{marketContact}/convert-lead', [MarketController::class, 'convertToLead'])->name('market.convert-lead');
-        Route::delete('/market/{marketContact}', [MarketController::class, 'destroy'])->name('market.destroy');
+    // ── Cold Calls (marketing / cold calling) ────────────────
+    // Access is restricted to members holding the Cold Call Agent role (as
+    // their primary or an additional role) plus Admins and the Owner.
+    Route::middleware(['role:cold_call_agent,admin'])->group(function () {
+        Route::get('/coldcalls', [MarketController::class, 'index'])->name('market.index');
+        Route::get('/coldcalls/import', [MarketController::class, 'create'])->name('market.create');
+        Route::post('/coldcalls/import', [MarketController::class, 'import'])->name('market.import');
+        Route::get('/coldcalls/{marketContact}', [MarketController::class, 'show'])->name('market.show');
+        Route::patch('/coldcalls/{marketContact}', [MarketController::class, 'update'])->name('market.update');
+        Route::post('/coldcalls/{marketContact}/status', [MarketController::class, 'updateStatus'])->name('market.status');
+        Route::post('/coldcalls/{marketContact}/convert-property', [MarketController::class, 'convertToProperty'])->name('market.convert-property');
+        Route::post('/coldcalls/{marketContact}/convert-lead', [MarketController::class, 'convertToLead'])->name('market.convert-lead');
+        Route::delete('/coldcalls/{marketContact}', [MarketController::class, 'destroy'])->name('market.destroy');
     });
 
     // ── Listings (real estate agent mode) ───────────────────────────
@@ -239,8 +258,12 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::delete('/inventory/{property}', [ListingController::class, 'destroy'])->name('inventory.destroy');
         Route::post('/inventory/{property}/photos', [ListingController::class, 'uploadPhotos'])->name('inventory.photos.upload');
         Route::delete('/inventory/{property}/photos/{photo}', [ListingController::class, 'deletePhoto'])->name('inventory.photos.delete');
+        Route::post('/inventory/{property}/photos/reorder', [ListingController::class, 'reorderPhotos'])->name('inventory.photos.reorder');
+        Route::post('/inventory/{property}/photos/{photo}/primary', [ListingController::class, 'setPrimaryPhoto'])->name('inventory.photos.primary');
         Route::post('/inventory/{property}/portal-status', [ListingController::class, 'updatePortalStatus'])->name('inventory.portal-status');
         Route::post('/inventory/{property}/portal-toggle', [ListingController::class, 'togglePortalStatus'])->name('inventory.portal-toggle');
+        Route::post('/inventory/{property}/portal-location', [ListingController::class, 'updatePortalLocation'])->name('inventory.portal-location');
+        Route::get('/inventory/bayut/locations/search', [PortalIntegrationController::class, 'searchLocations'])->name('inventory.bayut-locations-search');
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
             ->name('inventory.push');
@@ -359,6 +382,9 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Leads: admin, agent, acquisition_agent, listing_agent, buyers_agent ──────────
     Route::middleware('role:admin,agent,acquisition_agent,listing_agent,buyers_agent')->group(function () {
         Route::get('/leads/export', [LeadController::class, 'export'])->name('leads.export');
+
+        Route::get('/my-commissions', [\App\Http\Controllers\CommissionController::class, 'mine'])->name('commissions.mine');
+        Route::patch('/commissions/{commission}/status', [\App\Http\Controllers\CommissionController::class, 'updateStatus'])->name('commissions.status');
         Route::get('/leads/kanban', [LeadKanbanController::class, 'index'])->name('leads.kanban');
         Route::post('/leads/bulk-action', [LeadController::class, 'bulkAction'])->name('leads.bulkAction');
         Route::resource('leads', LeadController::class);
@@ -371,12 +397,18 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         // Activities on leads
         Route::post('/leads/{lead}/activities', [ActivityController::class, 'store'])->name('leads.activities.store');
         Route::post('/leads/{lead}/reassign', [LeadController::class, 'reassign'])->name('leads.reassign');
+        Route::post('/leads/{lead}/co-agents', [LeadController::class, 'addCoAgent'])->name('leads.coAgents.store');
+        Route::delete('/leads/{lead}/co-agents/{leadAgent}', [LeadController::class, 'removeCoAgent'])->name('leads.coAgents.destroy');
+        Route::post('/leads/{lead}/commission-amount', [LeadController::class, 'updateCommissionAmount'])->name('leads.commissionAmount');
+        Route::post('/leads/{lead}/commission-calculate', [LeadController::class, 'calculateCommissions'])->name('leads.commissionCalculate');
         Route::post('/leads/{lead}/send-email', [ActivityController::class, 'sendEmail'])->name('leads.sendEmail');
         Route::put('/activities/{activity}', [ActivityController::class, 'update'])->name('activities.update');
         Route::delete('/activities/{activity}', [ActivityController::class, 'destroy'])->name('activities.destroy');
 
         // Tasks on leads
         Route::post('/leads/{lead}/tasks', [TaskController::class, 'store'])->name('leads.tasks.store');
+        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+        Route::post('/tasks/{task}/activity', [TaskController::class, 'logActivity'])->name('tasks.activity');
         Route::patch('/tasks/{task}/toggle', [TaskController::class, 'toggleComplete'])->name('tasks.toggle');
         Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
 
@@ -384,6 +416,12 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/leads/{lead}/meetings', [\App\Http\Controllers\MeetingController::class, 'store'])->name('leads.meetings.store');
         Route::patch('/meetings/{meeting}', [\App\Http\Controllers\MeetingController::class, 'update'])->name('meetings.update');
         Route::delete('/meetings/{meeting}', [\App\Http\Controllers\MeetingController::class, 'destroy'])->name('meetings.destroy');
+
+        // Inline viewing creation from the lead page (real estate mode)
+        Route::middleware('mode:realestate')->group(function () {
+            Route::post('/leads/{lead}/showings', [\App\Http\Controllers\ShowingController::class, 'storeForLead'])->name('leads.showings.store');
+            Route::get('/leads/{lead}/followups', [\App\Http\Controllers\FollowupController::class, 'index'])->name('leads.followups.index');
+        });
 
         // Property for a lead (create/update from lead detail)
         Route::post('/leads/{lead}/property', [PropertyController::class, 'store'])->name('leads.property.store');
@@ -551,15 +589,19 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.updateGeneral');
         Route::post('/settings/invite-agent', [SettingsController::class, 'inviteAgent'])->name('settings.inviteAgent');
+        Route::put('/settings/agents/{user}', [SettingsController::class, 'updateAgent'])->name('settings.updateAgent');
         Route::patch('/settings/agents/{user}/toggle', [SettingsController::class, 'toggleAgent'])->name('settings.toggleAgent');
         Route::put('/settings/agents/{user}/reset-password', [SettingsController::class, 'resetPasswordAgent'])->name('settings.resetPasswordAgent');
         Route::delete('/settings/agents/{user}/reset-2fa', [SettingsController::class, 'reset2fa'])->name('settings.reset2fa');
         Route::delete('/settings/agents/{user}', [SettingsController::class, 'destroyAgent'])->name('settings.destroyAgent');
+        Route::post('/settings/transfer-ownership', [SettingsController::class, 'transferOwnership'])->name('settings.transferOwnership');
         Route::put('/settings/business-mode', [SettingsController::class, 'updateBusinessMode'])->name('settings.updateBusinessMode');
         Route::put('/settings/distribution', [SettingsController::class, 'updateDistribution'])->name('settings.updateDistribution');
         Route::put('/settings/lead-references', [SettingsController::class, 'updateLeadReferenceSettings'])->name('settings.updateLeadReferenceSettings');
         Route::put('/settings/portal-leads', [SettingsController::class, 'updatePortalLeadSettings'])->name('settings.updatePortalLeadSettings');
         Route::put('/settings/portal-credits', [SettingsController::class, 'updatePortalCreditsSettings'])->name('settings.updatePortalCreditsSettings');
+        Route::post('/settings/commission', [SettingsController::class, 'updateCommissionSettings'])->name('settings.updateCommissionSettings');
+        Route::put('/settings/agents/{user}/compensation', [SettingsController::class, 'updateCommissionPlan'])->name('settings.updateCommissionPlan');
 
         // DNC Management
         Route::get('/settings/dnc', [DncController::class, 'index'])->name('dnc.index');
@@ -635,6 +677,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/portal-integrations/{portal}/toggle', [PortalIntegrationController::class, 'toggle'])->name('portal-integrations.toggle');
         Route::post('/settings/portal-integrations/{portal}/test', [PortalIntegrationController::class, 'test'])->name('portal-integrations.test');
         Route::post('/settings/portal-integrations/{portal}/sync-leads', [PortalIntegrationController::class, 'syncLeads'])->name('portal-integrations.sync-leads');
+        Route::post('/settings/portal-integrations/{portal}/sync-locations', [PortalIntegrationController::class, 'syncLocations'])->name('portal-integrations.sync-locations');
+        Route::get('/settings/portal-integrations/bayut/search-locations', [PortalIntegrationController::class, 'searchLocations'])->name('portal-integrations.search-locations');
 
         // Document Templates (admin manages templates)
         Route::get('/document-templates', [DocumentTemplateController::class, 'index'])->name('document-templates.index');

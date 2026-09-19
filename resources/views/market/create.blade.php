@@ -1,7 +1,7 @@
 @extends('layouts.app')
+@section('title', __('Import Cold Call List'))
 
-@section('title', __('Import Market List'))
-@section('page-title', __('Import Market List'))
+@section('page-title', __('Import Cold Call List'))
 
 @section('content')
 
@@ -99,7 +99,7 @@
 
                 <div class="alert alert-info mt-3 mb-0">
                     <strong>{{ __('What happens next?') }}</strong>
-                    {{ __('The list appears under Market. After a successful cold call you convert a landlord row to inventory (unit under the calling agent, owner saved) or an investor row to a sales lead — details stay editable.') }}
+                    {{ __('The list appears under Cold Calls. After a successful cold call you convert a landlord row to inventory (unit under the calling agent, owner saved) or an investor row to a sales lead — details stay editable.') }}
                 </div>
             </div>
         </div>

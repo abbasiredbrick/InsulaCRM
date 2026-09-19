@@ -22,11 +22,19 @@ class PropertyMedia extends Model
         'mime_type',
         'size',
         'sort_order',
+        'is_primary',
     ];
 
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'is_primary' => 'boolean',
+        ];
     }
 
     public function property()
@@ -45,11 +53,37 @@ class PropertyMedia extends Model
     public function url(): ?string
     {
         if ($this->external_url) {
+            $driveId = static::driveFileId($this->external_url);
+
+            if ($driveId) {
+                return 'https://drive.google.com/thumbnail?id='.rawurlencode($driveId).'&sz=w1600';
+            }
+
             return $this->external_url;
         }
 
         if ($this->path) {
             return \Illuminate\Support\Facades\Storage::disk('public')->url($this->path);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract the readable Google Drive file id from a Drive URL.
+     */
+    public static function driveFileId(string $url): ?string
+    {
+        if (! str_contains($url, 'drive.google.com')) {
+            return null;
+        }
+
+        if (preg_match('~/(?:file/d/([^/?#]+)|open\?id=([^&#]+)|uc\?.*?id=([^&#]+))~', $url, $m)) {
+            return $m[1] ?: $m[2] ?: $m[3];
+        }
+
+        if (preg_match('~[?&]id=([^&]+)~', $url, $m)) {
+            return $m[1];
         }
 
         return null;

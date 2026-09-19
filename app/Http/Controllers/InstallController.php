@@ -33,7 +33,9 @@ class InstallController extends Controller
      */
     public function requirements(Request $request)
     {
-        if ($this->isInstalled()) return redirect('/login');
+        if ($this->isInstalled()) {
+            return redirect('/login');
+        }
 
         $this->ensureEnvFileExists();
 
@@ -97,6 +99,7 @@ class InstallController extends Controller
             if (stripos($serverPath, 'wamp') !== false || is_dir('C:\\wamp64')) {
                 return 'wamp';
             }
+
             return 'windows';
         }
 
@@ -122,7 +125,9 @@ class InstallController extends Controller
      */
     public function database()
     {
-        if ($this->isInstalled()) return redirect('/login');
+        if ($this->isInstalled()) {
+            return redirect('/login');
+        }
         $this->ensureEnvFileExists();
 
         return view('install.database', [
@@ -135,7 +140,9 @@ class InstallController extends Controller
      */
     public function saveDatabase(Request $request)
     {
-        if ($this->isInstalled()) return redirect('/login');
+        if ($this->isInstalled()) {
+            return redirect('/login');
+        }
 
         $this->ensureEnvFileExists();
 
@@ -183,7 +190,7 @@ class InstallController extends Controller
                 $pdo->exec("CREATE DATABASE `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             } catch (\Exception $e) {
                 return back()->withInput()->withErrors([
-                    'db_database' => 'Connected to MariaDB, but this account cannot create the database "' . $dbName . '". Create the database in your hosting panel first, then continue with its existing database user.',
+                    'db_database' => 'Connected to MariaDB, but this account cannot create the database "'.$dbName.'". Create the database in your hosting panel first, then continue with its existing database user.',
                 ]);
             }
         }
@@ -218,22 +225,22 @@ class InstallController extends Controller
 
                 foreach ($userHosts as $userHost) {
                     // Drop user if it already exists (from a previous failed install attempt)
-                    $pdo->exec("DROP USER IF EXISTS " . $pdo->quote($newUser) . "@" . $pdo->quote($userHost));
+                    $pdo->exec('DROP USER IF EXISTS '.$pdo->quote($newUser).'@'.$pdo->quote($userHost));
 
                     // Create the user
                     $pdo->exec(
-                        "CREATE USER " . $pdo->quote($newUser) . "@" . $pdo->quote($userHost) .
-                        " IDENTIFIED BY " . $pdo->quote($newPass)
+                        'CREATE USER '.$pdo->quote($newUser).'@'.$pdo->quote($userHost).
+                        ' IDENTIFIED BY '.$pdo->quote($newPass)
                     );
 
                     // Grant only the privileges needed for Laravel on this database
                     $pdo->exec(
-                        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES " .
-                        "ON `{$dbName}`.* TO " . $pdo->quote($newUser) . "@" . $pdo->quote($userHost)
+                        'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES '.
+                        "ON `{$dbName}`.* TO ".$pdo->quote($newUser).'@'.$pdo->quote($userHost)
                     );
                 }
 
-                $pdo->exec("FLUSH PRIVILEGES");
+                $pdo->exec('FLUSH PRIVILEGES');
 
                 // Verify the new user can connect
                 $testPdo = new \PDO(
@@ -249,6 +256,7 @@ class InstallController extends Controller
                 $secureUserCreated = true;
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::error('Secure DB user creation failed', ['error' => $e->getMessage()]);
+
                 return back()->withInput()->withErrors([
                     'secure_username' => 'Connected successfully, but this MariaDB account could not create or grant the dedicated database user. Use an existing database user instead, or supply MariaDB administrator credentials with CREATE USER and GRANT privileges.',
                 ]);
@@ -261,9 +269,9 @@ class InstallController extends Controller
 
         // Helper: replace env value, handling commented-out lines (# DB_HOST=...)
         $setEnv = function (string $key, string $value) use (&$envContent) {
-            $pattern = '/^#?\s*' . preg_quote($key, '/') . '=.*/m';
+            $pattern = '/^#?\s*'.preg_quote($key, '/').'=.*/m';
             if (preg_match($pattern, $envContent)) {
-                $envContent = preg_replace($pattern, $key . '=' . $value, $envContent);
+                $envContent = preg_replace($pattern, $key.'='.$value, $envContent);
             } else {
                 $envContent .= "\n{$key}={$value}";
             }
@@ -272,9 +280,9 @@ class InstallController extends Controller
         $setEnv('DB_CONNECTION', 'mysql');
         $setEnv('DB_HOST', $dbHost);
         $setEnv('DB_PORT', $dbPort);
-        $setEnv('DB_DATABASE', '"' . addcslashes($dbName, '"\\') . '"');
-        $setEnv('DB_USERNAME', '"' . addcslashes($finalUsername, '"\\') . '"');
-        $setEnv('DB_PASSWORD', '"' . addcslashes($finalPassword, '"\\') . '"');
+        $setEnv('DB_DATABASE', '"'.addcslashes($dbName, '"\\').'"');
+        $setEnv('DB_USERNAME', '"'.addcslashes($finalUsername, '"\\').'"');
+        $setEnv('DB_PASSWORD', '"'.addcslashes($finalPassword, '"\\').'"');
 
         File::put($envPath, $envContent);
 
@@ -297,7 +305,9 @@ class InstallController extends Controller
      */
     public function setup()
     {
-        if ($this->isInstalled()) return redirect('/login');
+        if ($this->isInstalled()) {
+            return redirect('/login');
+        }
         $this->ensureEnvFileExists();
 
         return view('install.setup', [
@@ -312,7 +322,9 @@ class InstallController extends Controller
      */
     public function install(Request $request)
     {
-        if ($this->isInstalled()) return redirect('/login');
+        if ($this->isInstalled()) {
+            return redirect('/login');
+        }
 
         $this->ensureEnvFileExists();
 
@@ -332,13 +344,13 @@ class InstallController extends Controller
             // Update app name and URL in .env
             $envPath = base_path('.env');
             $envContent = File::get($envPath);
-            $envContent = preg_replace('/APP_NAME=.*/', 'APP_NAME="' . $request->app_name . '"', $envContent);
-            $envContent = preg_replace('/APP_URL=.*/', 'APP_URL=' . $appUrl, $envContent);
+            $envContent = preg_replace('/APP_NAME=.*/', 'APP_NAME="'.$request->app_name.'"', $envContent);
+            $envContent = preg_replace('/APP_URL=.*/', 'APP_URL='.$appUrl, $envContent);
             File::put($envPath, $envContent);
 
             // Create plugins directory if it doesn't exist
             $pluginsPath = base_path('plugins');
-            if (!File::isDirectory($pluginsPath)) {
+            if (! File::isDirectory($pluginsPath)) {
                 File::makeDirectory($pluginsPath, 0755, true);
             }
 
@@ -348,7 +360,9 @@ class InstallController extends Controller
             $envPath = base_path('.env');
             $envValues = [];
             foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-                if (str_starts_with(trim($line), '#')) continue;
+                if (str_starts_with(trim($line), '#')) {
+                    continue;
+                }
                 if (str_contains($line, '=')) {
                     [$key, $value] = explode('=', $line, 2);
                     $envValues[trim($key)] = trim($value, '"\'');
@@ -389,7 +403,7 @@ class InstallController extends Controller
             if ($businessMode === 'realestate') {
                 $reRoles = [
                     'listing_agent' => 'Listing Agent',
-                    'buyers_agent'  => 'Buyers Agent',
+                    'buyers_agent' => 'Buyers Agent',
                 ];
                 foreach ($reRoles as $name => $displayName) {
                     \App\Models\Role::firstOrCreate(
@@ -414,7 +428,8 @@ class InstallController extends Controller
                 ]);
                 $tenant->save();
 
-                $adminRole = \App\Models\Role::where('name', 'admin')->first();
+                $adminRole = \App\Models\Role::where('name', 'owner')->first()
+                    ?? \App\Models\Role::where('name', 'admin')->first();
                 $admin = \App\Models\User::withoutGlobalScopes()->firstOrNew([
                     'email' => $request->admin_email,
                 ]);
@@ -441,7 +456,7 @@ class InstallController extends Controller
                     $demoDataWarning = 'Partial demo data from an earlier install attempt was detected, so sample data was not seeded again.';
                 } else {
                     try {
-                        $seeder = new \Database\Seeders\DemoDataSeeder();
+                        $seeder = new \Database\Seeders\DemoDataSeeder;
                         $seeder->run($tenant->id);
                         $demoDataLoaded = true;
                     } catch (\Throwable $e) {
@@ -454,7 +469,7 @@ class InstallController extends Controller
             }
 
             $storageLinkMissing = false;
-            if (!file_exists(public_path('storage'))) {
+            if (! file_exists(public_path('storage'))) {
                 try {
                     // This can fail on some hosting setups and bind-mounted containers.
                     Artisan::call('storage:link');
@@ -467,7 +482,7 @@ class InstallController extends Controller
             }
 
             // Verify the symlink was created (may still fail on some hosting)
-            if (!file_exists(public_path('storage'))) {
+            if (! file_exists(public_path('storage'))) {
                 $storageLinkMissing = true;
                 \Illuminate\Support\Facades\Log::warning('Storage symlink could not be created. File uploads may not display correctly. You can create it manually: php artisan storage:link');
             }
@@ -478,7 +493,7 @@ class InstallController extends Controller
             $this->setEnvValue('QUEUE_CONNECTION', 'database');
 
             // Write installed.lock
-            File::put(storage_path('installed.lock'), 'Installed on ' . now()->toDateTimeString());
+            File::put(storage_path('installed.lock'), 'Installed on '.now()->toDateTimeString());
 
             Artisan::call('config:clear');
 
@@ -492,6 +507,7 @@ class InstallController extends Controller
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Installation failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
             return back()->withErrors(['install' => 'Installation failed. Please check the application log at storage/logs/ for details.']);
         }
     }
@@ -562,7 +578,7 @@ class InstallController extends Controller
             }
 
             if (DB::table('tenants')->exists() && DB::table('users')->exists()) {
-                File::put($markerPath, 'Recovered install marker on ' . now()->toDateTimeString());
+                File::put($markerPath, 'Recovered install marker on '.now()->toDateTimeString());
 
                 return true;
             }
@@ -593,10 +609,10 @@ class InstallController extends Controller
     {
         $envPath = base_path('.env');
         $content = File::get($envPath);
-        $pattern = '/^#?\s*' . preg_quote($key, '/') . '=.*/m';
+        $pattern = '/^#?\s*'.preg_quote($key, '/').'=.*/m';
 
         if (preg_match($pattern, $content)) {
-            $content = preg_replace($pattern, $key . '=' . $value, $content);
+            $content = preg_replace($pattern, $key.'='.$value, $content);
         } else {
             $content .= "\n{$key}={$value}";
         }
@@ -690,11 +706,10 @@ class InstallController extends Controller
         string $examplePath,
         array $metadata = [],
         array $webIdentity = [],
-    ): string
-    {
+    ): string {
         return match ($check) {
             'env_exists' => match ($environment) {
-                'xampp' => 'Create the file by copying ' . $examplePath . ' to ' . $envPath . '. In Windows Explorer you can duplicate .env.example and rename the copy to .env.',
+                'xampp' => 'Create the file by copying '.$examplePath.' to '.$envPath.'. In Windows Explorer you can duplicate .env.example and rename the copy to .env.',
                 'xampp-linux' => 'Run: ls -la to confirm .env.example exists, then run cp .env.example .env. If the sample file is missing, re-upload the package or create .env manually from the installation guide sample.',
                 'wamp', 'windows' => 'Create .env by copying .env.example in your project folder, then refresh this page.',
                 'docker' => 'Create .env before starting the container, or copy .env.example to .env inside the application root and restart the container.',
@@ -709,12 +724,12 @@ class InstallController extends Controller
             'pdo_mysql' => match ($environment) {
                 'xampp' => 'Open C:\xampp\php\php.ini, enable extension=pdo_mysql, then restart Apache from the XAMPP control panel.',
                 'wamp' => 'Enable php_pdo_mysql from the WAMP tray menu, then restart all services.',
-                'debian' => 'Run: sudo apt install -y php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '-mysql && sudo systemctl restart apache2 php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '-fpm',
+                'debian' => 'Run: sudo apt install -y php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-mysql && sudo systemctl restart apache2 php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-fpm',
                 'rhel' => 'Run: sudo dnf install -y php-mysqlnd && sudo systemctl restart httpd php-fpm',
                 'docker' => 'Add pdo_mysql to your PHP image, rebuild the container, and restart it.',
-                default => 'Install the pdo_mysql extension for your PHP ' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . ' runtime, then restart PHP/Apache.',
+                default => 'Install the pdo_mysql extension for your PHP '.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.' runtime, then restart PHP/Apache.',
             },
-                'demo_data' => 'Demo data is optional. You can continue without it, or install fakerphp/faker in the environment if you want sample content.',
+            'demo_data' => 'Demo data is optional. You can continue without it, or install fakerphp/faker in the environment if you want sample content.',
             default => '',
         };
     }
@@ -877,7 +892,7 @@ class InstallController extends Controller
             $baseUrl = substr($baseUrl, 0, -7);
         }
 
-        return rtrim($request->getSchemeAndHttpHost() . $baseUrl, '/');
+        return rtrim($request->getSchemeAndHttpHost().$baseUrl, '/');
     }
 
     /**

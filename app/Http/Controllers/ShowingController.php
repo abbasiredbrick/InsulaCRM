@@ -51,7 +51,7 @@ class ShowingController extends Controller
         $agents = collect();
         if (auth()->user()->isAdmin()) {
             $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
                 ->orderBy('name')
                 ->get(['id', 'name']);
         }
@@ -67,11 +67,11 @@ class ShowingController extends Controller
             ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
-        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
-            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => trim($l->first_name.' '.$l->last_name)])
+        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'phone', 'email'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => $l->pickerLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -119,6 +119,43 @@ class ShowingController extends Controller
         return redirect()->route('showings.show', $showing)->with('success', __('Viewing scheduled successfully.'));
     }
 
+    /**
+     * Create a showing inline from the lead detail page (avoids the full
+     * showing form) - mirrors store() but pins the lead to the route lead.
+     */
+    public function storeForLead(ShowingRequest $request, Lead $lead, \App\Services\Cloud\CloudCalendarService $calendar)
+    {
+        $this->authorize('update', $lead);
+
+        $data = $request->validated();
+        $data['tenant_id'] = auth()->user()->tenant_id;
+        $data['agent_id'] = $data['agent_id'] ?? auth()->id();
+        $data['lead_id'] = $lead->id;
+
+        $showing = Showing::create($data);
+
+        app(LeadViewingService::class)->advanceToStage($lead, 'viewing_scheduled');
+
+        Activity::create([
+            'tenant_id' => auth()->user()->tenant_id,
+            'lead_id' => $lead->id,
+            'deal_id' => $showing->deal_id,
+            'agent_id' => auth()->id(),
+            'type' => 'meeting',
+            'subject' => __('Viewing scheduled'),
+            'body' => __('Showing at :address on :date at :time', [
+                'address' => $showing->property->address ?? '',
+                'date' => $showing->showing_date->format('M j, Y'),
+                'time' => $showing->showing_time,
+            ]),
+            'logged_at' => now(),
+        ]);
+
+        $calendar->sync($showing, auth()->user());
+
+        return back()->with('success', __('Viewing scheduled successfully.'));
+    }
+
     public function show(Showing $showing)
     {
         $this->authorize('view', $showing);
@@ -135,11 +172,11 @@ class ShowingController extends Controller
             ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
-        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
-            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => trim($l->first_name.' '.$l->last_name)])
+        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'phone', 'email'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => $l->pickerLabel()])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-            ->whereHas('role', fn ($q) => $q->whereIn('name', ['admin', 'agent', 'listing_agent', 'buyers_agent']))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
             ->orderBy('name')
             ->get(['id', 'name']);
 

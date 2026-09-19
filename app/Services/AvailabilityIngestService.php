@@ -287,12 +287,27 @@ class AvailabilityIngestService
      *
      * @return array<string, mixed>
      */
-    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null, ?int $runId = null): array
+    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null, ?int $runId = null, bool $guardReconciliation = true): array
     {
         $columnMap = $source->column_map ?: [];
         $parseOptions = $source->parse_options ?: [];
         $statusMap = $this->normalizedStatusMap($source->status_map ?: []);
         $city = $source->default_city ?: 'Abu Dhabi';
+
+        // If the saved column map shares NO columns with the parsed rows, the file
+        // must be laid out differently (e.g. a legacy positional "colN" map fed a
+        // proper header CSV). Rebuild the map automatically from the header names.
+        $mappingRebuilt = false;
+        if ($rows !== []) {
+            $rowKeys = array_keys($rows[0]);
+            if (array_intersect(array_keys($columnMap), $rowKeys) === []) {
+                $detected = $this->detectHeaderMap($rowKeys);
+                if ($detected !== []) {
+                    $columnMap = $detected;
+                    $mappingRebuilt = true;
+                }
+            }
+        }
 
         $created = 0;
         $updated = 0;
@@ -301,10 +316,27 @@ class AvailabilityIngestService
         $conflicts = 0;
         $seenRefs = [];
         $skippedExamples = [];
+        $lastBuilding = '';
+        $lastCommunity = '';
+
+        // Snapshot the source's current units so we can tell whether this run
+        // actually matched them (broken mappings silently create "Other"
+        // duplicates and leave the real units untouched).
+        $beforeKeys = [];
+        Property::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('availability_source_id', $source->id)
+            ->select('id', 'sub_community', 'source_unit_ref')
+            ->chunkById(500, function ($rows) use (&$beforeKeys) {
+                foreach ($rows as $property) {
+                    $beforeKeys[($property->sub_community ?? '').'|'.($property->source_unit_ref ?? '')] = true;
+                }
+            });
 
         DB::transaction(function () use (
             $rows, $columnMap, $parseOptions, $statusMap, $city, $source, $tenantId, $runId,
-            &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples
+            &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples,
+            &$lastBuilding, &$lastCommunity
         ) {
             foreach ($rows as $row) {
                 $total++;
@@ -346,6 +378,23 @@ class AvailabilityIngestService
                 if ($unitNo !== '' && preg_match('/\b(unit\s*no|no\.?\s*of\s*b|number|s\.?\s*no|sr\.?\s*no)\b/i', $unitNo) && ! preg_match('/[0-9]/', $unitNo)) {
                     $unitNo = '';
                 }
+
+                // Block-style sheets (AMS etc.) only print the building/area on the
+                // first row of a group — even on a building-only header row with no
+                // unit number — so capture the carry BEFORE the row is skipped.
+                $building = trim((string) ($data['building'] ?? $data['sub_community'] ?? ''));
+                if ($building === '') {
+                    $building = $lastBuilding;
+                } else {
+                    $lastBuilding = $building;
+                }
+                $community = trim((string) ($data['community'] ?? ''));
+                if ($community === '') {
+                    $community = $lastCommunity;
+                } else {
+                    $lastCommunity = $community;
+                }
+
                 $looksLikeUnit = $unitNo !== '' && (
                     preg_match('/[0-9]/', $unitNo)
                     || preg_match('/^(villa|plot|office|retail|shop|showroom|unit|penthouse)/i', $unitNo)
@@ -361,7 +410,6 @@ class AvailabilityIngestService
 
                     continue;
                 }
-                $building = trim((string) ($data['building'] ?? $data['sub_community'] ?? ''));
                 if ($building === '') {
                     $building = $source->default_building ?: '';
                 }
@@ -484,7 +532,7 @@ class AvailabilityIngestService
                     'zip_code' => '',
                     'market_class' => 'ready',
                     'property_category' => $category,
-                    'community' => $data['community'] ?? null,
+                    'community' => $community ?: null,
                     'sub_community' => $building,
                     'city' => $city,
                     'unit_no' => $unitNo,
@@ -567,43 +615,57 @@ class AvailabilityIngestService
         });
 
         $missing = 0;
+        $reconciliationSkipped = false;
         if ($created > 0 || $updated > 0 || $total > 0) {
             $linked = Property::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('availability_source_id', $source->id)
                 ->get();
 
-            foreach ($linked as $property) {
-                $key = ($property->sub_community ?? '').'|'.($property->source_unit_ref ?? '');
-                if (isset($seenRefs[$key]) || $property->availability_synced_at === null) {
-                    continue;
-                }
+            // Safety net: when a run matched only a small fraction of the
+            // source's pre-existing units, a broken mapping/parse is far more
+            // likely than a mass lease — never bulk-mark the rest as leased on
+            // a run like that. URL-published lists legitimately shrink, so the
+            // guard is disabled there.
+            $beforeCount = count($beforeKeys);
+            $matchedBefore = count(array_intersect_key($beforeKeys, $seenRefs));
+            if ($guardReconciliation && $beforeCount > 0 && $matchedBefore < max(1, (int) ceil($beforeCount * 0.3))) {
+                $reconciliationSkipped = true;
+            }
 
-                // Listed units that dropped off the sheet keep their portal
-                // listing until someone decides what to do with them — the
-                // re-listing permit is expensive to regenerate.
-                if ($property->availability === 'listed') {
-                    $this->flagConflict($property, $source, 'missing_from_sheet', $runId);
-                    $conflicts++;
+            if (! $reconciliationSkipped) {
+                foreach ($linked as $property) {
+                    $key = ($property->sub_community ?? '').'|'.($property->source_unit_ref ?? '');
+                    if (isset($seenRefs[$key]) || $property->availability_synced_at === null) {
+                        continue;
+                    }
 
-                    continue;
-                }
+                    // Listed units that dropped off the sheet keep their portal
+                    // listing until someone decides what to do with them — the
+                    // re-listing permit is expensive to regenerate.
+                    if ($property->availability === 'listed') {
+                        $this->flagConflict($property, $source, 'missing_from_sheet', $runId);
+                        $conflicts++;
 
-                // Otherwise mirror what the PM shared: not on the sheet → apply
-                // the source's "missing" status (leased by default, unlisted for
-                // URL-published lists whose "hide" just means not published).
-                $missingStatus = $source->missing_status ?: 'leased';
-                if (! in_array($missingStatus, ['listed', 'ready_to_list', 'reserved', 'leased', 'sold', 'unlisted', 'draft'], true)) {
-                    $missingStatus = 'leased';
+                        continue;
+                    }
+
+                    // Otherwise mirror what the PM shared: not on the sheet → apply
+                    // the source's "missing" status (leased by default, unlisted for
+                    // URL-published lists whose "hide" just means not published).
+                    $missingStatus = $source->missing_status ?: 'leased';
+                    if (! in_array($missingStatus, ['listed', 'ready_to_list', 'reserved', 'leased', 'sold', 'unlisted', 'draft'], true)) {
+                        $missingStatus = 'leased';
+                    }
+                    $append = $missingStatus === 'leased'
+                        ? 'Leased per '.$source->name.' availability update on '.now()->format('d.m.Y').'.'
+                        : 'Marked '.$missingStatus.' per '.$source->name.' availability update on '.now()->format('d.m.Y').'.';
+                    $property->update([
+                        'availability' => $missingStatus,
+                        'notes' => trim(($property->notes ?? '').' '.$append),
+                    ]);
+                    $missing++;
                 }
-                $append = $missingStatus === 'leased'
-                    ? 'Leased per '.$source->name.' availability update on '.now()->format('d.m.Y').'.'
-                    : 'Marked '.$missingStatus.' per '.$source->name.' availability update on '.now()->format('d.m.Y').'.';
-                $property->update([
-                    'availability' => $missingStatus,
-                    'notes' => trim(($property->notes ?? '').' '.$append),
-                ]);
-                $missing++;
             }
         }
 
@@ -617,6 +679,8 @@ class AvailabilityIngestService
             'conflicts' => $conflicts,
             'skipped' => $skipped,
             'skipped_examples' => $skippedExamples,
+            'reconciliation_skipped' => $reconciliationSkipped,
+            'mapping_rebuilt' => $mappingRebuilt,
         ];
     }
 
@@ -689,7 +753,7 @@ class AvailabilityIngestService
         }
 
         $admins = User::where('tenant_id', $property->tenant_id)
-            ->whereHas('role', fn ($q) => $q->where('name', 'admin'))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
             ->get();
 
         $recipients = $recipients->merge($admins)->unique('id')->filter(
@@ -717,7 +781,8 @@ class AvailabilityIngestService
             'rent_price', 'rent', 'deposit', 'deposit_amount', 'admin_fee', 'tawtheeq', 'tawtheeq_fee',
             'service_charge', 'list_price' => $this->moneyNumeric($value),
             'parking' => $this->parkingCount($value),
-            'bedrooms', 'bathrooms' => $this->intOrNull($value),
+            'bedrooms' => $this->bedroomCount($value),
+            'bathrooms' => $this->bathroomCount($value),
             'square_footage' => $this->areaNumeric($value),
             'handover_date', 'key_date' => $value,
             'source_status', 'status' => $value,
@@ -774,6 +839,48 @@ class AvailabilityIngestService
             }
         }
         if (preg_match('/^(\d+)/', $value, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse a bedroom count from a "No. of Bedrooms" style cell, which often
+     * carries extra digits that are NOT part of the count, e.g.
+     * "3 BR + Maid - (309 SQM)", "1 BR - 871.34 Square Foot",
+     * "2 BR + Laundry/1665.95 Sq. Ft.". Only the number bound to a
+     * BR/BD/BHK/Bedroom keyword (or a bare integer / studio) is returned, so
+     * trailing area figures are never concatenated into the count.
+     */
+    protected function bedroomCount(string $value): ?int
+    {
+        $value = trim($value);
+
+        if (preg_match('/\b(\d{1,2})\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)\b/i', $value, $m)) {
+            return (int) $m[1];
+        }
+
+        if (preg_match('/\bstudio\b/i', $value)) {
+            return 0;
+        }
+
+        if (preg_match('/^\s*(\d{1,2})\s*$/', $value, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
+    }
+
+    protected function bathroomCount(string $value): ?int
+    {
+        $value = trim($value);
+
+        if (preg_match('/\b(\d{1,2})\s*(?:BA|BATH(?:ROOM)?S?)\b/i', $value, $m)) {
+            return (int) $m[1];
+        }
+
+        if (preg_match('/^\s*(\d{1,2})\s*$/', $value, $m)) {
             return (int) $m[1];
         }
 
@@ -1013,18 +1120,150 @@ class AvailabilityIngestService
         };
     }
 
+    /**
+     * Drop a leading UTF-8 BOM (Excel "save as CSV" files open with one) so
+     * header/cell matching is not offset by an invisible character.
+     */
+    protected function stripBom(string $value): string
+    {
+        return preg_replace('/^\xEF\xBB\xBF/', '', $value) ?: $value;
+    }
+
+    /**
+     * Normalize a column header so it is easy to map and match: strip the BOM,
+     * trim surrounding whitespace and collapse any inner runs (Excel cells keep
+     * embedded newlines, e.g. "Location (please\nclick)").
+     */
+    protected function normalizeHeaderName(string $value): string
+    {
+        return preg_replace('/\s+/', ' ', trim($this->stripBom($value))) ?: '';
+    }
+
+    /**
+     * Known header-name synonyms (lowercased, whitespace collapsed) so a file
+     * with a real header row can be mapped automatically. Sources created for
+     * the old paste-text format store a positional "colN" map — when a proper
+     * CSV/XLSX is uploaded through them, columns would otherwise misalign.
+     *
+     * @return array<string, string>
+     */
+    protected function knownFieldColumns(): array
+    {
+        return [
+            'property name' => 'building',
+            'building' => 'building',
+            'project' => 'building',
+            'tower' => 'building',
+            'sub community' => 'building',
+            'location' => 'community',
+            'community' => 'community',
+            'area' => 'community',
+            'district' => 'community',
+            'unit' => 'unit_no',
+            'unit no' => 'unit_no',
+            'unit no.' => 'unit_no',
+            'unit number' => 'unit_no',
+            'room no' => 'unit_no',
+            'no. of bedrooms' => 'bedrooms',
+            'number of bedrooms' => 'bedrooms',
+            'bedrooms' => 'bedrooms',
+            'beds' => 'bedrooms',
+            'unit features' => 'features',
+            'features' => 'features',
+            'property type' => 'features',
+            'type' => 'features',
+            'rent' => 'rent',
+            'rent (aed)' => 'rent',
+            'rent price' => 'rent',
+            'asking rent' => 'rent',
+            'annual rent' => 'rent',
+            'deposit' => 'deposit',
+            'security deposit' => 'deposit',
+            'admin fee' => 'admin_fee',
+            'admin charges' => 'admin_fee',
+            'status' => 'status',
+            'availability' => 'status',
+            'parking' => 'parking',
+            'parking spaces' => 'parking',
+            'parkings' => 'parking',
+            'key location' => 'key_date',
+            'key date' => 'key_date',
+            'vacancy date' => 'key_date',
+            'vacant from' => 'key_date',
+            'available from' => 'key_date',
+            'facilities' => 'amenities',
+            'amenities' => 'amenities',
+            'remarks' => 'remarks',
+            'notes' => 'remarks',
+            'city' => 'city',
+        ];
+    }
+
+    /**
+     * Build a column map from a parsed header row using the known synonyms.
+     *
+     * @param  array<int, string>  $header
+     * @return array<string, string>
+     */
+    protected function detectHeaderMap(array $header): array
+    {
+        $known = $this->knownFieldColumns();
+        $map = [];
+        foreach ($header as $name) {
+            $key = strtolower((string) $name);
+            if ($key !== '' && isset($known[$key])) {
+                $map[$name] = $known[$key];
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Decide whether the first grid row is a header row rather than data (used
+     * when a source's saved parse_options say "no header" but the uploaded
+     * file actually starts with named columns, e.g. an Excel-exported CSV).
+     *
+     * @param  array<int, mixed>  $cells
+     */
+    protected function looksLikeHeaderRow(array $cells): bool
+    {
+        $known = $this->knownFieldColumns();
+        $hits = 0;
+        foreach (array_slice($cells, 0, 20) as $cell) {
+            $name = $this->normalizeHeaderName((string) $cell);
+            if ($name !== '' && isset($known[strtolower($name)])) {
+                $hits++;
+            }
+        }
+
+        return $hits >= 2;
+    }
+
     protected function gridToRows(array $grid, array $parseOptions): array
     {
         $hasHeader = (bool) ($parseOptions['has_header'] ?? false);
         $inherit = (array) ($parseOptions['inherit_columns'] ?? []);
+
+        // Sources created for the old paste-text format store "has_header: false".
+        // If the file actually starts with recognizable named columns, promote it
+        // to a header row so columns line up instead of shifting data around.
+        if (! $hasHeader && $grid !== [] && $this->looksLikeHeaderRow($grid[0])) {
+            $hasHeader = true;
+        }
+
         $max = 0;
         foreach ($grid as $row) {
             $max = max($max, count($row));
         }
 
         if ($hasHeader) {
-            $header = array_slice(array_shift($grid) ?? [], 0, $max);
-            $header = array_values(array_slice(array_pad($header, $max, ''), 0, $max));
+            $headerRow = array_slice((array) (array_shift($grid) ?? []), 0, $max);
+            $header = [];
+            for ($i = 0; $i < $max; $i++) {
+                $name = $this->normalizeHeaderName((string) ($headerRow[$i] ?? ''));
+                $header[] = $name !== '' ? $name : 'col'.$i;
+            }
         } else {
             $header = [];
             for ($i = 0; $i < $max; $i++) {

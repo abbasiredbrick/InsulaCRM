@@ -10,23 +10,31 @@
     </div>
     <div class="card-body collapse show" id="section-photos">
         @if($property->media->where('type', 'photo')->isNotEmpty())
-        <div class="row g-2 mb-3" id="photo-gallery">
+        <div class="row g-2 mb-2" id="photo-gallery" data-reorder-url="{{ route('inventory.photos.reorder', $property) }}">
             @foreach($property->media->where('type', 'photo')->sortBy('sort_order') as $photo)
-            <div class="col-6 col-sm-4 col-md-3">
+            <div class="col-6 col-sm-4 col-md-3 drag-photo" draggable="true" data-photo-id="{{ $photo->id }}">
                 <div class="position-relative" style="border-radius:6px;overflow:hidden;">
                     <a href="{{ $photo->url() }}" target="_blank" class="d-block photo-thumb" data-caption="{{ $photo->caption }}" data-original="{{ $photo->original_name }}">
                         <img src="{{ $photo->url() }}" alt="{{ $photo->caption ?? $photo->original_name }}"
                              class="w-100" style="height:140px;object-fit:cover;cursor:pointer;border-radius:6px;">
                     </a>
                     <form action="{{ route('inventory.photos.delete', [$property, $photo]) }}" method="POST"
-                          class="position-absolute" style="top:4px;right:4px;"
-                          onsubmit="return confirm('{{ __('Delete this photo?') }}')">
+                          class="position-absolute" style="top:4px;right:4px;">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-sm btn-icon" style="background:rgba(0,0,0,0.5);border:none;padding:2px 5px;" title="{{ __('Delete') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="#fff" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                     </form>
+                    <button type="button" class="btn btn-sm btn-icon position-absolute set-main-photo {{ $photo->is_primary ? 'active' : '' }}"
+                            style="top:4px;left:4px;background:rgba(0,0,0,0.5);border:none;padding:2px 7px;line-height:1;"
+                            data-photo-id="{{ $photo->id }}" data-primary-url="{{ route('inventory.photos.primary', [$property, $photo]) }}"
+                            title="{{ $photo->is_primary ? __('Main photo') : __('Set as main photo') }}">
+                        <span style="font-size:15px;color:{{ $photo->is_primary ? '#ffd400' : '#fff' }};opacity:{{ $photo->is_primary ? '1' : '0.75' }};">★</span>
+                    </button>
+                    @if($photo->is_primary)
+                    <span class="position-absolute" style="top:32px;left:4px;background:rgba(0,0,0,0.6);color:#ffd400;font-size:10px;padding:1px 6px;border-radius:3px;">{{ __('Main') }}</span>
+                    @endif
                     @if($photo->caption)
                     <div class="position-absolute w-100 px-2 py-1" style="bottom:0;left:0;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         {{ $photo->caption }}
@@ -41,6 +49,7 @@
             </div>
             @endforeach
         </div>
+        <small class="text-secondary d-block mb-3">{{ __('The first photo is the main photo. Drag another photo to the first position to make it the main photo, or tap the star. Drag photos to reorder.') }}</small>
         @endif
 
         <!-- Upload Form -->
@@ -52,10 +61,11 @@
                     <div class="text-secondary" style="font-size:13px;">
                         {{ __('Drop photos here or') }} <strong class="text-primary">{{ __('click to browse') }}</strong>
                     </div>
-                    <small class="text-secondary">{{ __('JPG, PNG, GIF, WebP. Max 10MB each, up to 10 at a time.') }}</small>
+                    <small class="text-secondary">{{ __('JPG, PNG, GIF or WebP. Max 10MB each, up to 10 at a time. iPhone HEIC photos are not supported — set Camera → Formats to “Most Compatible”.') }}</small>
                     <input type="file" name="photos[]" id="photo-file-input" multiple accept="image/jpeg,image/png,image/gif,image/webp" class="d-none">
                 </div>
             </div>
+            <div id="photo-skip-warning" class="alert alert-warning py-1 px-2" style="display:none;font-size:12px;"></div>
             <div id="photo-preview-area" class="row g-2 mb-2" style="display:none;"></div>
             <div id="photo-upload-actions" style="display:none;" class="d-flex justify-content-between align-items-center">
                 <span class="text-secondary" id="photo-count-label">{{ __('0 selected') }}</span>
@@ -94,6 +104,51 @@ document.addEventListener('DOMContentLoaded', function() {
     var countLabel = document.getElementById('photo-count-label');
     var clearBtn = document.getElementById('photo-clear-btn');
     var form = document.getElementById('photo-upload-form');
+    var skipWarning = document.getElementById('photo-skip-warning');
+
+    var MAX_FILES = 10;
+    var MAX_BYTES = 10 * 1024 * 1024;
+    var ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    function filterFiles(files) {
+        var valid = [];
+        var skipped = [];
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            if (ALLOWED_TYPES.indexOf(f.type) === -1) {
+                skipped.push(f.name + ' (unsupported format)');
+            } else if (f.size > MAX_BYTES) {
+                skipped.push(f.name + ' (over 10MB)');
+            } else if (valid.length >= MAX_FILES) {
+                skipped.push(f.name + ' (max ' + MAX_FILES + ' photos)');
+            } else {
+                valid.push(f);
+            }
+        }
+        return { valid: valid, skipped: skipped };
+    }
+
+    function showSkipWarning(skipped) {
+        if (!skipWarning) return;
+        if (skipped.length) {
+            skipWarning.textContent = '{{ __('Skipped:') }} ' + skipped.join(', ');
+            skipWarning.style.display = 'block';
+        } else {
+            skipWarning.style.display = 'none';
+        }
+    }
+
+    function applyValidFiles(files) {
+        var result = filterFiles(files);
+        showSkipWarning(result.skipped);
+
+        if (result.valid.length && typeof DataTransfer !== 'undefined') {
+            var dt = new DataTransfer();
+            result.valid.forEach(function(f) { dt.items.add(f); });
+            fileInput.files = dt.files;
+        }
+        showPreviews();
+    }
 
     // Click to browse
     dropZone.addEventListener('click', function() { fileInput.click(); });
@@ -109,11 +164,12 @@ document.addEventListener('DOMContentLoaded', function() {
     dropZone.addEventListener('drop', function(e) {
         e.preventDefault();
         dropZone.style.background = '';
-        fileInput.files = e.dataTransfer.files;
-        showPreviews();
+        applyValidFiles(e.dataTransfer.files);
     });
 
-    fileInput.addEventListener('change', showPreviews);
+    fileInput.addEventListener('change', function() {
+        applyValidFiles(fileInput.files);
+    });
 
     function showPreviews() {
         previewArea.innerHTML = '';
@@ -150,6 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
         previewArea.innerHTML = '';
         previewArea.style.display = 'none';
         actions.style.display = 'none';
+        showSkipWarning([]);
     });
 
     // Lightbox
@@ -162,6 +219,93 @@ document.addEventListener('DOMContentLoaded', function() {
                 var caption = this.dataset.caption || this.dataset.original || '';
                 document.getElementById('lightbox-caption').textContent = caption;
                 new bootstrap.Modal(lightboxModal).show();
+            });
+        });
+    }
+
+    // Saved-photo gallery: drag to reorder + star to set main
+    var gallery = document.getElementById('photo-gallery');
+    if (gallery) {
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        var dragEl = null;
+
+        function getDragAfter(container, y) {
+            var els = [].slice.call(container.querySelectorAll('.drag-photo:not(.dragging)'));
+            var closest = { offset: -Infinity, el: null };
+            els.forEach(function(el) {
+                var box = el.getBoundingClientRect();
+                var offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    closest = { offset: offset, el: el };
+                }
+            });
+            return closest.el;
+        }
+
+        function saveOrder() {
+            var ids = [].slice.call(gallery.querySelectorAll('.drag-photo')).map(function(el) {
+                return el.dataset.photoId;
+            });
+            return fetch(gallery.dataset.reorderUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ ids: ids })
+            });
+        }
+
+        gallery.addEventListener('dragstart', function(e) {
+            dragEl = e.target.closest('.drag-photo');
+            if (dragEl) {
+                dragEl.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            }
+        });
+
+        gallery.addEventListener('dragenter', function(e) { e.preventDefault(); });
+
+        gallery.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (!dragEl) return;
+            var after = getDragAfter(gallery, e.clientY);
+            if (after == null) {
+                gallery.appendChild(dragEl);
+            } else {
+                gallery.insertBefore(dragEl, after);
+            }
+        });
+
+        gallery.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (dragEl) dragEl.classList.remove('dragging');
+            saveOrder().then(function(r) {
+                if (r.ok) window.location.reload();
+            });
+        });
+
+        gallery.addEventListener('dragend', function(e) {
+            if (dragEl) dragEl.classList.remove('dragging');
+            saveOrder();
+            dragEl = null;
+        });
+
+        gallery.addEventListener('click', function(e) {
+            var btn = e.target.closest('.set-main-photo');
+            if (!btn) return;
+            e.preventDefault();
+            fetch(btn.dataset.primaryUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            }).then(function(r) {
+                if (r.ok) window.location.reload();
             });
         });
     }

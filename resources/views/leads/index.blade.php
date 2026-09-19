@@ -59,10 +59,14 @@
         </form>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('leads.index') }}" class="row g-2">
+        <form method="GET" action="{{ route('leads.index') }}" class="row g-2" data-live-filter>
             <div class="col-md-3">
                 <label for="filter-search" class="visually-hidden">{{ __('Search') }}</label>
                 <input type="text" name="search" id="filter-search" class="form-control" placeholder="{{ __('Search name, phone, email...') }}" value="{{ request('search') }}">
+            </div>
+            <div class="col-md-3">
+                <label for="filter-unit" class="visually-hidden">{{ __('Unit') }}</label>
+                <input type="text" name="unit" id="filter-unit" class="form-control" placeholder="{{ __('Search by unit (title, address, community...)') }}" value="{{ request('unit') }}">
             </div>
             <div class="col-md-2">
                 <label for="filter-source" class="visually-hidden">{{ __('Lead Source') }}</label>
@@ -82,16 +86,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
-                <label for="filter-temperature" class="visually-hidden">{{ __('Temperature') }}</label>
-                <select name="temperature" id="filter-temperature" class="form-select">
-                    <option value="">{{ __('All Temperatures') }}</option>
-                    @foreach(['hot' => __('Hot'), 'warm' => __('Warm'), 'cold' => __('Cold')] as $val => $label)
-                        <option value="{{ $val }}" {{ request('temperature') == $val ? 'selected' : '' }}>{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
-            @if(!auth()->user()->isAgent())
+            @if(!auth()->user()->isAgent() || auth()->user()->isManager())
             <div class="col-md-2">
                 <label for="filter-agent" class="visually-hidden">{{ __('Agent') }}</label>
                 <select name="agent_id" id="filter-agent" class="form-select">
@@ -107,13 +102,9 @@
                     @if(($businessMode ?? 'wholesale') === 'wholesale')
                     <a href="{{ route('leads.index', ['stacked' => 1]) }}" class="btn btn-sm {{ request('stacked') ? 'btn-purple' : 'btn-outline-purple' }}">{{ __('Stacked') }}</a>
                     @endif
-                    <a href="{{ route('leads.index', ['dnc' => 1]) }}" class="btn btn-sm {{ request('dnc') ? 'btn-danger' : 'btn-outline-danger' }}">{{ __('DNC') }}</a>
                 </div>
             </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">{{ __('Filter') }}</button>
-            </div>
-            @if(request()->hasAny(['search', 'source', 'status', 'temperature', 'agent_id', 'stacked', 'dnc']))
+            @if(request()->hasAny(['search', 'unit', 'source', 'status', 'agent_id', 'stacked']))
             <div class="col-md-1">
                 <a href="{{ route('leads.index') }}" class="btn btn-outline-secondary w-100">{{ __('Clear') }}</a>
             </div>
@@ -122,7 +113,7 @@
         <div class="mt-2 d-flex align-items-center gap-2 flex-wrap" id="saved-views-bar">
             <span class="text-secondary small">{{ __('Saved Views:') }}</span>
             <div id="saved-views-list" class="d-flex gap-1 flex-wrap"></div>
-            @if(request()->hasAny(['search', 'source', 'status', 'temperature', 'agent_id', 'stacked', 'dnc']))
+            @if(request()->hasAny(['search', 'unit', 'source', 'status', 'agent_id', 'stacked']))
             <button type="button" class="btn btn-sm btn-outline-primary" id="save-view-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2"/><circle cx="12" cy="14" r="2"/><polyline points="14 4 14 8 8 8"/></svg>
                 {{ __('Save View') }}
@@ -144,12 +135,14 @@
             return request()->fullUrlWithQuery(['sort' => $col, 'direction' => $dir]);
         };
     @endphp
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>
                 <tr>
                     <th class="w-1"><input type="checkbox" id="select-all" class="form-check-input" aria-label="{{ __('Select all leads') }}"></th>
                     <th><a href="{{ $sortUrl('first_name') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Name') }}{!! $sortArrow('first_name') !!}</a></th>
+                    <th>{{ __('Unit') }}</th>
                     <th>{{ __('Phone') }}</th>
                     <th><a href="{{ $sortUrl('status') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Status') }}{!! $sortArrow('status') !!}</a></th>
                     <th><a href="{{ $sortUrl('reference') }}" class="text-reset text-decoration-none d-inline-flex align-items-center">{{ __('Ref') }}{!! $sortArrow('reference') !!}</a></th>
@@ -175,6 +168,25 @@
                         @if(($businessMode ?? 'wholesale') === 'wholesale' && ($lead->lists_count ?? 0) >= 3)
                             <span class="badge bg-purple-lt ms-1">{{ __('Stacked') }}</span>
                         @endif
+                    </td>
+                    <td>
+                        @php
+                            $leadUnits = $lead->properties ?? collect([]);
+                            if ($lead->property) {
+                                $leadUnits = $leadUnits->push($lead->property);
+                            }
+                            $leadUnits = $leadUnits->unique('id');
+                        @endphp
+                        @forelse($leadUnits as $lfUnit)
+                            <div class="text-nowrap">
+                                <a href="{{ route('inventory.show', $lfUnit) }}" class="text-reset text-decoration-none" title="{{ $lfUnit->optionLabel() }}">{{ $lfUnit->display_name }}</a>
+                                @if(($lfUnit->pivot->relation_type ?? '') !== '')
+                                    <span class="badge bg-secondary-lt ms-1">{{ ucwords(str_replace('_', ' ', $lfUnit->pivot->relation_type)) }}</span>
+                                @endif
+                            </div>
+                        @empty
+                            <span class="text-muted">—</span>
+                        @endforelse
                     </td>
                     <td class="text-secondary">@if($lead->phone)<a href="tel:{{ $lead->phone }}" class="text-reset text-decoration-none">{{ $lead->phone }}</a>@else - @endif</td>
                     <td>
@@ -244,8 +256,8 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="11" class="text-center py-4">
-                        @if(request()->hasAny(['search', 'source', 'status', 'temperature', 'agent_id', 'stacked', 'dnc']))
+                    <td colspan="12" class="text-center py-4">
+                        @if(request()->hasAny(['search', 'unit', 'source', 'status', 'agent_id', 'stacked']))
                             <div class="text-secondary mb-2">{{ __('No leads match your current filters.') }}</div>
                             <a href="{{ route('leads.index') }}" class="btn btn-sm btn-outline-secondary">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg>
@@ -274,6 +286,7 @@
         <div class="ms-auto">
             {{ $leads->withQueryString()->links() }}
         </div>
+    </div>
     </div>
 </div>
 
@@ -307,17 +320,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            getCheckboxes().forEach(cb => cb.checked = this.checked);
-            updateBulkBar();
-        });
-    }
-
+    // Delegated so it keeps working after live-filter swaps the rows in.
     document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('lead-checkbox')) {
+        if (e.target && e.target.id === 'select-all') {
+            getCheckboxes().forEach(cb => cb.checked = e.target.checked);
             updateBulkBar();
-            if (!e.target.checked && selectAll) selectAll.checked = false;
+            return;
+        }
+        if (e.target && e.target.classList && e.target.classList.contains('lead-checkbox')) {
+            updateBulkBar();
+            if (!e.target.checked) {
+                var all = document.getElementById('select-all');
+                if (all) all.checked = false;
+            }
         }
     });
 });
@@ -338,12 +353,14 @@ function showToast(message, type) {
     el.addEventListener('hidden.bs.toast', function() { el.remove(); });
 }
 
-document.querySelectorAll('.status-select').forEach(function(select) {
-    select.addEventListener('change', function() {
-        var leadId = this.dataset.leadId;
-        var status = this.value;
-        var selectEl = this;
-        fetch('{{ url("/leads") }}/' + leadId + '/status', {
+// Delegated so it keeps working after live-filter swaps the rows in.
+document.addEventListener('change', function(e) {
+    var select = e.target;
+    if (!select || !select.classList || !select.classList.contains('status-select')) return;
+    var leadId = select.dataset.leadId;
+    var status = select.value;
+    var selectEl = select;
+    fetch('{{ url("/leads") }}/' + leadId + '/status', {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -360,7 +377,6 @@ document.querySelectorAll('.status-select').forEach(function(select) {
         }).catch(function() {
             showToast('{{ __("Network error. Please try again.") }}', 'error');
         });
-    });
 });
 
 // Saved views (localStorage)
@@ -420,16 +436,19 @@ document.querySelectorAll('.status-select').forEach(function(select) {
 // Table density toggle
 (function() {
     var STORAGE_KEY = 'keystone_table_density';
-    var table = document.querySelector('.table.card-table');
-    if (!table) return;
 
-    var savedDensity = localStorage.getItem(STORAGE_KEY) || 'comfortable';
+    function getTable() {
+        return document.querySelector('.table.card-table');
+    }
 
     function applyDensity(density) {
-        if (density === 'compact') {
-            table.classList.add('table-sm');
-        } else {
-            table.classList.remove('table-sm');
+        var table = getTable();
+        if (table) {
+            if (density === 'compact') {
+                table.classList.add('table-sm');
+            } else {
+                table.classList.remove('table-sm');
+            }
         }
         // Update button active states
         document.querySelectorAll('.density-toggle').forEach(function(btn) {
@@ -439,13 +458,18 @@ document.querySelectorAll('.status-select').forEach(function(select) {
     }
 
     // Apply saved preference
-    applyDensity(savedDensity);
+    applyDensity(localStorage.getItem(STORAGE_KEY) || 'comfortable');
 
     // Handle clicks
     document.querySelectorAll('.density-toggle').forEach(function(btn) {
         btn.addEventListener('click', function() {
             applyDensity(this.dataset.density);
         });
+    });
+
+    // Re-apply after live-filter replaces the table in place.
+    document.addEventListener('insulacrm:live-updated', function() {
+        applyDensity(localStorage.getItem(STORAGE_KEY) || 'comfortable');
     });
 })();
 </script>

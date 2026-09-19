@@ -29,7 +29,21 @@ class LeadPolicy
 
     public function delete(User $user, Lead $lead): bool
     {
-        return $this->ownsOrCanManage($user, $lead);
+        if (! $user->canManageLeads()) {
+            return false;
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        if ($lead->agent_id === $user->id) {
+            return true;
+        }
+
+        // Managers (anyone with reports) can delete their team's leads, but a
+        // co-agent never can - they only share access, not ownership.
+        return $lead->agent_id !== null && in_array($lead->agent_id, $user->teamUserIds(), true);
     }
 
     public function export(User $user): bool
@@ -66,6 +80,14 @@ class LeadPolicy
             || in_array($lead->agent_id, $user->teamUserIds(), true);
     }
 
+    /**
+     * The owner, admins and managers may add/remove co-agents on a lead.
+     */
+    public function shareAgents(User $user, Lead $lead): bool
+    {
+        return $this->ownsOrCanManage($user, $lead);
+    }
+
     private function ownsOrCanManage(User $user, Lead $lead): bool
     {
         if (! $user->canManageLeads()) {
@@ -77,6 +99,12 @@ class LeadPolicy
         }
 
         if ($lead->agent_id === $user->id) {
+            return true;
+        }
+
+        // A co-agent added via the sharing UI has the same access as the owner:
+        // follow-ups, tasks, meetings, activities, viewings and status.
+        if ($lead->hasCoAgent($user)) {
             return true;
         }
 

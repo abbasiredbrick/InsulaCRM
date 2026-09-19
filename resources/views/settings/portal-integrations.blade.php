@@ -43,6 +43,12 @@
                     @csrf
                     <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Sync leads') }}</button>
                 </form>
+                @if($box['portal'] === 'bayut')
+                <form method="POST" action="{{ route('portal-integrations.sync-locations', $box['portal']) }}" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Sync Bayut locations') }}</button>
+                </form>
+                @endif
                 @endif
                 @endif
             </div>
@@ -129,6 +135,21 @@
         <div class="alert alert-secondary mt-3 mb-0">
             <div class="fw-bold small text-uppercase">{{ __('Leads pull') }}</div>
             <div class="form-hint">{{ __('Last pulled:') }} {{ $integration->leads_last_synced_at->format('d M Y H:i') }}</div>
+        </div>
+        @endif
+
+        @if($box['portal'] === 'bayut')
+        <div class="alert alert-secondary mt-3 mb-0">
+            <div class="fw-bold small text-uppercase">{{ __('Location catalog (push API)') }}</div>
+            <div class="form-hint">
+                @if(!empty($integration?->location_catalog))
+                    {{ __(':count locations synced', ['count' => count($integration->location_catalog)]) }}<br>
+                    {{ __('Last synced:') }} {{ $integration->locations_synced_at?->diffForHumans() ?: '—' }}
+                @else
+                    {{ __('No locations synced yet. Press Sync Bayut locations above to pull the agency area list.') }}
+                @endif
+            </div>
+            <div class="form-hint mt-1">{{ __('Units then place their Bayut listing under the unit → Portal status card, using only these locations.') }}</div>
         </div>
         @endif
 

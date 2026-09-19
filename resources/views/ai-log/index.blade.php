@@ -13,7 +13,7 @@
         <h3 class="card-title">{{ __('AI Generated Outputs') }}</h3>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('ai-log.index') }}" class="row g-2">
+        <form method="GET" action="{{ route('ai-log.index') }}" class="row g-2" data-live-filter>
             <div class="col-md-3">
                 <input type="text" name="search" class="form-control" placeholder="{{ __('Search...') }}" value="{{ request('search') }}">
             </div>
@@ -34,9 +34,6 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">{{ __('Filter') }}</button>
-            </div>
             @if(request()->hasAny(['search', 'type', 'user_id']))
             <div class="col-auto">
                 <a href="{{ route('ai-log.index') }}" class="btn btn-outline-secondary">{{ __('Clear') }}</a>
@@ -44,6 +41,7 @@
             @endif
         </form>
     </div>
+    <div data-live-results>
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>
@@ -125,5 +123,6 @@
         </div>
     </div>
     @endif
+    </div>
 </div>
 @endsection

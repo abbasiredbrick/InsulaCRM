@@ -95,7 +95,7 @@ class BuyerPortalController extends Controller
         // Notify tenant admin(s) about the new buyer registration
         $admins = User::withoutGlobalScopes()
             ->where('tenant_id', $tenant->id)
-            ->whereHas('role', fn ($q) => $q->where('slug', 'admin'))
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin']))
             ->get();
 
         foreach ($admins as $admin) {

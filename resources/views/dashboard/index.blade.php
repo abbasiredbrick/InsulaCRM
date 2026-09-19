@@ -6,6 +6,10 @@
 @endsection
 
 @section('content')
+@if(auth()->user()->isAgent())
+    <x-cloud.connect-calendar-card />
+@endif
+
 <div class="d-flex justify-content-end mb-3">
     <div class="dropdown">
         <button class="btn btn-ghost-secondary btn-sm" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-label="{{ __('Customize Dashboard') }}">

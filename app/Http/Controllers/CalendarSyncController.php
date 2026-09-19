@@ -126,11 +126,15 @@ class CalendarSyncController extends Controller
                 continue;
             }
 
+            $dt = $this->parseEventDateTime($event['dtstart'], $event['dtstart_time']);
+
             Task::create([
                 'tenant_id' => $user->tenant_id,
                 'agent_id' => $user->id,
+                'created_by' => $user->id,
                 'title' => Str::limit($event['summary'], 255),
-                'due_date' => $event['dtstart'],
+                'due_date' => $dt['date'],
+                'due_time' => $dt['time'],
                 'is_completed' => false,
             ]);
 
@@ -214,9 +218,16 @@ class CalendarSyncController extends Controller
         $lines[] = 'X-WR-CALNAME:'.$this->escapeIcalText(config('app.name')).' - '.$this->escapeIcalText($user->name);
 
         foreach ($tasks as $task) {
+            $usesTime = ! blank($task->due_time);
+
             $lines[] = 'BEGIN:VEVENT';
             $lines[] = 'UID:task-'.$task->id.'@keystone';
-            $lines[] = 'DTSTART;VALUE=DATE:'.$task->due_date->format('Ymd');
+            $lines[] = $usesTime
+                ? 'DTSTART:'.\Carbon\Carbon::parse($task->due_date->format('Y-m-d').' '.$task->due_time)->format('Ymd\THis')
+                : 'DTSTART;VALUE=DATE:'.$task->due_date->format('Ymd');
+            if ($usesTime) {
+                $lines[] = 'DTEND:'.\Carbon\Carbon::parse($task->due_date->format('Y-m-d').' '.$task->due_time)->addMinutes(60)->format('Ymd\THis');
+            }
             $lines[] = 'SUMMARY:'.$this->escapeIcalText('Task: '.$task->title);
 
             $description = '';
@@ -277,8 +288,8 @@ class CalendarSyncController extends Controller
             $line = trim($line);
 
             if ($line === 'BEGIN:VEVENT') {
-                $inEvent = true;
-                $currentEvent = ['summary' => null, 'dtstart' => null];
+$inEvent = true;
+            $currentEvent = ['summary' => null, 'dtstart' => null, 'dtstart_time' => null];
 
                 continue;
             }
@@ -318,6 +329,7 @@ class CalendarSyncController extends Controller
                     } elseif (strlen($value) >= 15) {
                         // DateTime: YYYYMMDDTHHmmss or YYYYMMDDTHHmmssZ
                         $clean = rtrim($value, 'Z');
+                        $currentEvent['dtstart_time'] = \Carbon\Carbon::createFromFormat('Ymd\THis', $clean)->format('H:i');
                         $currentEvent['dtstart'] = \Carbon\Carbon::createFromFormat('Ymd\THis', $clean)->toDateString();
                     }
                 } catch (\Throwable $e) {
@@ -328,6 +340,17 @@ class CalendarSyncController extends Controller
         }
 
         return $events;
+    }
+
+    /**
+     * Split a parsed event start into a date string and optional H:i time.
+     */
+    protected function parseEventDateTime(string $date, ?string $time): array
+    {
+        return [
+            'date' => $date,
+            'time' => blank($time) ? null : \Carbon\Carbon::parse($time)->format('H:i'),
+        ];
     }
 
     /**

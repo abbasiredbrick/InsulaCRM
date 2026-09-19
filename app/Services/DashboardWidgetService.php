@@ -44,7 +44,7 @@ class DashboardWidgetService
 
     public static function getEligibleWidgets(User $user): array
     {
-        $roleName = $user->role->name ?? 'agent';
+        $roleName = $user->isOwner() ? 'admin' : ($user->role->name ?? 'agent');
         $eligible = [];
 
         foreach (self::WIDGETS as $key => $widget) {
@@ -64,7 +64,7 @@ class DashboardWidgetService
         }
 
         $tenant = $user->tenant;
-        $roleName = $user->role->name ?? 'agent';
+        $roleName = $user->isOwner() ? 'admin' : ($user->role->name ?? 'agent');
 
         if ($tenant && $tenant->default_dashboard_widgets !== null) {
             $defaults = $tenant->default_dashboard_widgets;

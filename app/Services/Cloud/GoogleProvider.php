@@ -142,9 +142,13 @@ class GoogleProvider extends CloudBaseProvider
         return array_filter($body, fn ($v) => $v !== null);
     }
 
-    public function uploadFile(string $path, string $name, string $mime): array
+    public function uploadFile(string $path, string $name, string $mime, ?string $subpath = null): array
     {
         $folderId = $this->ensurePhotosFolder();
+
+        if ($subpath !== null && $subpath !== '') {
+            $folderId = $this->ensureSubfolder($subpath) ?? $folderId;
+        }
 
         $response = Http::withToken($this->accessToken())
             ->timeout(120)
@@ -221,5 +225,70 @@ class GoogleProvider extends CloudBaseProvider
         $this->connection->save();
 
         return $folderId;
+    }
+
+    public function deleteFile(string $fileId): void
+    {
+        Http::withToken($this->accessToken())
+            ->timeout(30)
+            ->delete(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId))
+            ->throw();
+    }
+
+    /**
+     * Lazily create a nested path of folders (e.g. "properties/{id}") under the
+     * tenant photo folder and cache the created folder ids on the connection.
+     */
+    public function ensureSubfolder(string $subpath): ?string
+    {
+        $rootId = $this->ensurePhotosFolder();
+
+        if (! $rootId) {
+            return null;
+        }
+
+        $meta = $this->connection->metadata ?? [];
+
+        if (isset($meta['photos_subfolders'][$subpath])) {
+            return $meta['photos_subfolders'][$subpath];
+        }
+
+        $parentId = $rootId;
+        $current = '';
+
+        foreach (explode('/', trim($subpath, '/')) as $segment) {
+            if ($segment === '') {
+                continue;
+            }
+
+            $current = $current === '' ? $segment : $current.'/'.$segment;
+
+            if (isset($meta['photos_subfolders'][$current])) {
+                $parentId = $meta['photos_subfolders'][$current];
+                continue;
+            }
+
+            try {
+                $response = Http::withToken($this->accessToken())
+                    ->timeout(30)
+                    ->post(static::DRIVE_FILES_URL, [
+                        'name' => $segment,
+                        'mimeType' => 'application/vnd.google-apps.folder',
+                        'parents' => [$parentId],
+                    ])
+                    ->throw();
+
+                $id = $response->json('id');
+                $meta['photos_subfolders'][$current] = $id;
+                $parentId = $id;
+            } catch (\Throwable $e) {
+                return $meta['photos_subfolders'][$subpath] ?? null;
+            }
+        }
+
+        $this->connection->metadata = $meta;
+        $this->connection->save();
+
+        return $meta['photos_subfolders'][$subpath] ?? null;
     }
 }

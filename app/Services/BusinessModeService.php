@@ -135,13 +135,15 @@ class BusinessModeService
     // ── Wholesale roles ──
 
     public const WHOLESALE_ROLES = [
-        'admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent',
+        'owner', 'admin', 'acquisition_agent', 'disposition_agent', 'field_scout', 'agent',
+        'cold_call_agent',
     ];
 
     // ── Real estate roles ──
 
     public const REALESTATE_ROLES = [
-        'admin', 'listing_agent', 'buyers_agent', 'agent',
+        'owner', 'admin', 'listing_agent', 'buyers_agent', 'agent',
+        'cold_call_agent',
     ];
 
     /**
@@ -364,12 +366,16 @@ class BusinessModeService
     }
 
     /**
-     * Agent role names (excludes admin) for the current business mode.
-     * Useful for building agent dropdowns, report filters, and team queries.
+     * Agent role names (excludes the elevated owner/admin roles) for the
+     * current business mode. Useful for building agent dropdowns, report
+     * filters, and team queries.
      */
     public static function getAgentRoleNames(?Tenant $tenant = null): array
     {
-        return array_values(array_filter(self::getRoles($tenant), fn ($r) => $r !== 'admin'));
+        return array_values(array_filter(
+            self::getRoles($tenant),
+            fn ($r) => ! in_array($r, ['owner', 'admin'], true)
+        ));
     }
 
     /**
@@ -415,6 +421,7 @@ class BusinessModeService
     {
         if (self::isRealEstate($tenant)) {
             return [
+                'owner' => __('Owner'),
                 'admin' => __('Admin'),
                 'listing_agent' => __('Listing Agent'),
                 'buyers_agent' => __('Buyers Agent'),
@@ -423,6 +430,7 @@ class BusinessModeService
         }
 
         return [
+            'owner' => __('Owner'),
             'admin' => __('Admin'),
             'acquisition_agent' => __('Acquisition Agent'),
             'disposition_agent' => __('Disposition Agent'),

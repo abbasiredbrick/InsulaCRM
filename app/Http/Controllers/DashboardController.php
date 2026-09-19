@@ -29,7 +29,10 @@ class DashboardController extends Controller
         $taskQuery = Task::query();
 
         if ($user->isAgent() || $user->isDispositionAgent()) {
-            $leadQuery->where('agent_id', $user->id);
+            $leadQuery->where(function ($q) use ($user) {
+                $q->where('agent_id', $user->id)
+                    ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
+            });
             $dealQuery->where('agent_id', $user->id);
             $taskQuery->where('agent_id', $user->id);
         }
