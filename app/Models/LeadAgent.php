@@ -26,6 +26,7 @@ class LeadAgent extends Model
         'external_company',
         'commission_pct',
         'share_funding',
+        'a2a_contract_id',
         'status',
     ];
 

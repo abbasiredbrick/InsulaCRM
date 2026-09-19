@@ -13,7 +13,11 @@ class A2aContract extends Model
     public const STATUS_DRAFT = 'draft';
     public const STATUS_SENT = 'sent';
     public const STATUS_SIGNED = 'signed';
+    public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_VOID = 'void';
+
+    public const SCOPE_LEAD = 'lead';
+    public const SCOPE_PROPERTY = 'property';
 
     protected $fillable = [
         'tenant_id',
@@ -26,9 +30,15 @@ class A2aContract extends Model
         'share_pct',
         'funding_source',
         'terms',
+        'scope_type',
+        'lead_id',
+        'property_id',
+        'transaction_type',
         'status',
         'sent_at',
         'signed_at',
+        'confirmed_at',
+        'confirmed_by',
         'signed_file_path',
         'signed_original_name',
     ];
@@ -39,6 +49,7 @@ class A2aContract extends Model
             'share_pct' => 'decimal:2',
             'sent_at' => 'datetime',
             'signed_at' => 'datetime',
+            'confirmed_at' => 'datetime',
         ];
     }
 
@@ -67,6 +78,60 @@ class A2aContract extends Model
     public function isSigned(): bool
     {
         return $this->status === self::STATUS_SIGNED;
+    }
+
+    public function isConfirmed(): bool
+    {
+        return $this->status === self::STATUS_CONFIRMED;
+    }
+
+    /**
+     * Whether this contract is scoped to a specific lead (lead-specific A2A).
+     */
+    public function isLeadScoped(): bool
+    {
+        return $this->scope_type === self::SCOPE_LEAD;
+    }
+
+    /**
+     * Whether this contract is scoped to a specific property (property-specific A2A).
+     */
+    public function isPropertyScoped(): bool
+    {
+        return $this->scope_type === self::SCOPE_PROPERTY;
+    }
+
+    public function lead()
+    {
+        return $this->belongsTo(Lead::class);
+    }
+
+    public function property()
+    {
+        return $this->belongsTo(\App\Models\Property::class);
+    }
+
+    public function confirmer()
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function getScopeLabelAttribute(): string
+    {
+        return match ($this->scope_type) {
+            self::SCOPE_LEAD => __('Lead'),
+            self::SCOPE_PROPERTY => __('Property'),
+            default => __('Standalone'),
+        };
+    }
+
+    public function getTransactionLabelAttribute(): string
+    {
+        return match ($this->transaction_type) {
+            'sale' => __('Sale'),
+            'lease' => __('Lease'),
+            default => __('—'),
+        };
     }
 
     public function getFundingLabelAttribute(): string

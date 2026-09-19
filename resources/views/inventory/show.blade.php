@@ -24,6 +24,7 @@
     </div>
     <div class="btn-list">
         <a href="{{ route('inventory.portal') }}" class="btn btn-outline-secondary">{{ __('Portals') }}</a>
+        <a href="{{ route('a2a.create', ['property_id' => $property->id]) }}" class="btn btn-outline-indigo">{{ __('Create A2A') }}</a>
         <a href="{{ route('inventory.edit', $property) }}" class="btn btn-primary">{{ __('Edit') }}</a>
         <form method="POST" action="{{ route('inventory.destroy', $property) }}" class="d-inline" onsubmit="return confirm('{{ __('Delete this unit and its media? This cannot be undone.') }}');">
             @csrf

@@ -187,12 +187,15 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         // A2A commission-sharing contracts with external agents
         Route::get('/a2a', [\App\Http\Controllers\A2aContractController::class, 'index'])->name('a2a.index');
         Route::get('/a2a/create', [\App\Http\Controllers\A2aContractController::class, 'create'])->name('a2a.create');
+        Route::get('/a2a/leads/search', [\App\Http\Controllers\A2aContractController::class, 'searchLeads'])->name('a2a.leads-search');
+        Route::get('/a2a/properties/search', [\App\Http\Controllers\A2aContractController::class, 'searchProperties'])->name('a2a.properties-search');
         Route::post('/a2a', [\App\Http\Controllers\A2aContractController::class, 'store'])->name('a2a.store');
         Route::get('/a2a/{contract}', [\App\Http\Controllers\A2aContractController::class, 'show'])->name('a2a.show');
         Route::get('/a2a/{contract}/print', [\App\Http\Controllers\A2aContractController::class, 'printContract'])->name('a2a.print');
         Route::patch('/a2a/{contract}/mark-sent', [\App\Http\Controllers\A2aContractController::class, 'markSent'])->name('a2a.markSent');
         Route::post('/a2a/{contract}/upload-signed', [\App\Http\Controllers\A2aContractController::class, 'uploadSigned'])->name('a2a.uploadSigned');
         Route::get('/a2a/{contract}/download', [\App\Http\Controllers\A2aContractController::class, 'downloadSigned'])->name('a2a.downloadSigned');
+        Route::patch('/a2a/{contract}/confirm', [\App\Http\Controllers\A2aContractController::class, 'confirmComplete'])->name('a2a.confirm');
         Route::patch('/a2a/{contract}/void', [\App\Http\Controllers\A2aContractController::class, 'void'])->name('a2a.void');
         Route::post('/a2a/{contract}/attach', [\App\Http\Controllers\A2aContractController::class, 'attachToLead'])->name('a2a.attach');
 

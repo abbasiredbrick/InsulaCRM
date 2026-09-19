@@ -15,7 +15,16 @@
             <div class="card-header">
                 <h3 class="card-title">{{ __('Contract') }} {{ $contract->contract_number }}</h3>
                 <div class="card-actions">
-                    <span class="badge {{ $contract->isSigned() ? 'bg-green-lt' : ($contract->status === 'sent' ? 'bg-azure-lt' : ($contract->status === 'void' ? 'bg-secondary-lt' : 'bg-yellow-lt')) }}">
+                    @php
+                        $statusColors = [
+                            'draft' => 'bg-yellow-lt',
+                            'sent' => 'bg-azure-lt',
+                            'signed' => 'bg-blue-lt',
+                            'confirmed' => 'bg-green',
+                            'void' => 'bg-secondary-lt',
+                        ];
+                    @endphp
+                    <span class="badge {{ $statusColors[$contract->status] ?? 'bg-secondary-lt' }}">
                         {{ ucfirst(__($contract->status)) }}
                     </span>
                     <a href="{{ route('a2a.print', $contract) }}" target="_blank" class="btn btn-outline-primary btn-sm">
@@ -28,6 +37,36 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Prepared by') }}</div>
                         <div class="datagrid-content">{{ $contract->agent?->name ?? '—' }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Scope') }}</div>
+                        <div class="datagrid-content">{{ $contract->scope_label }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Linked lead') }}</div>
+                        <div class="datagrid-content">
+                            @if($contract->lead)
+                                <a href="{{ route('leads.show', $contract->lead) }}">{{ $contract->lead->full_name }}</a>
+                            @else
+                                —
+                            @endif
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Linked property') }}</div>
+                        <div class="datagrid-content">
+                            @if($contract->property)
+                                <a href="{{ route('inventory.show', $contract->property) }}">{{ $contract->property->display_name }}</a>
+                            @elseif($contract->lead?->property)
+                                <a href="{{ route('inventory.show', $contract->lead->property) }}">{{ $contract->lead->property->display_name }}</a>
+                            @else
+                                —
+                            @endif
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Transaction') }}</div>
+                        <div class="datagrid-content">{{ $contract->transaction_label }}</div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Counterparty') }}</div>
@@ -61,7 +100,17 @@
                         <div class="datagrid-title">{{ __('Signed') }}</div>
                         <div class="datagrid-content">{{ $contract->signed_at?->format('M d, Y') ?? '—' }}</div>
                     </div>
+                    @if($contract->isConfirmed())
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Confirmed') }}</div>
+                        <div class="datagrid-content">
+                            {{ $contract->confirmed_at?->format('M d, Y') }}
+                            @if($contract->confirmer) — {{ $contract->confirmer->name }} @endif
+                        </div>
+                    </div>
+                    @endif
                 </div>
+
                 @if($contract->terms)
                 <div class="mt-3">
                     <div class="text-secondary text-uppercase fw-bold mb-1" style="font-size:0.75rem;">{{ __('Terms') }}</div>
@@ -70,6 +119,20 @@
                 @endif
             </div>
         </div>
+
+        @if($contract->isConfirmed() && $contract->lead)
+        <div class="alert alert-success alert-dismissible">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <div class="fw-bold">{{ __('External agent activated') }}</div>
+                    {{ __(':name was automatically added as the external co-agent on the linked lead.', ['name' => $contract->counterparty_name]) }}
+                </div>
+                <a href="{{ route('leads.show', $contract->lead) }}" class="btn btn-sm btn-outline-success">
+                    {{ __('Open lead') }} — {{ $contract->lead->full_name }}
+                </a>
+            </div>
+        </div>
+        @endif
 
         <div class="card mb-3">
             <div class="card-header">
@@ -85,7 +148,7 @@
                     </form>
                     @endif
 
-                    @if(! $contract->isSigned() && in_array($contract->status, ['draft','sent']))
+                    @if(! $contract->isSigned() && ! $contract->isConfirmed() && in_array($contract->status, ['draft','sent']))
                     <form method="POST" action="{{ route('a2a.uploadSigned', $contract) }}" enctype="multipart/form-data" class="d-inline-flex gap-2 align-items-center">
                         @csrf
                         <input type="file" name="signed_copy" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png" required>
@@ -97,7 +160,19 @@
                     <a href="{{ route('a2a.downloadSigned', $contract) }}" class="btn btn-outline-primary">{{ __('Download signed copy') }}</a>
                     @endif
 
-                    @if($contract->status !== 'void' && $contract->status !== 'signed')
+                    @if($contract->isSigned())
+                        @if($canConfirm)
+                        <form method="POST" action="{{ route('a2a.confirm', $contract) }}" onsubmit="return confirm('{{ __('Confirm this contract? The external agent will be activated on the linked lead.') }}')">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" class="btn btn-success">{{ __('Confirm completion') }}</button>
+                        </form>
+                        @else
+                        <span class="badge bg-blue-lt align-self-center">{{ __('Sent to manager for approval') }}</span>
+                        @endif
+                    @endif
+
+                    @if($contract->status !== 'void' && ! in_array($contract->status, ['signed', 'confirmed']))
                     <form method="POST" action="{{ route('a2a.void', $contract) }}" onsubmit="return confirm('{{ __('Void this contract?') }}')">
                         @csrf
                         @method('PATCH')
@@ -105,12 +180,23 @@
                     </form>
                     @endif
                 </div>
+
+                @if($contract->isSigned() && ! $canConfirm)
+                <p class="form-hint mt-3 mb-0">
+                    {{ __('Once the signed copy is uploaded, your manager can review it and confirm completion. Confirming activates the external agent on the linked lead.') }}
+                </p>
+                @endif
+                @if($canConfirm && $contract->isSigned())
+                <p class="form-hint mt-3 mb-0">
+                    {{ __('Confirming this contract marks it complete and — for lead-specific contracts — automatically adds :name as the external co-agent on the linked lead.', ['name' => $contract->counterparty_name]) }}
+                </p>
+                @endif
             </div>
         </div>
     </div>
 
     <div class="col-lg-5">
-        @if($contract->isSigned())
+        @if(in_array($contract->status, ['signed','confirmed']) && $contract->scope_type !== 'lead')
         <div class="card mb-3">
             <div class="card-header">
                 <h3 class="card-title">{{ __('Attach to a lead') }}</h3>
@@ -135,7 +221,7 @@
                     <button type="submit" class="btn btn-primary btn-sm w-100">{{ __('Attach to lead') }}</button>
                 </form>
                 @else
-                <p class="text-secondary mb-0">{{ __('No leads owned by you yet. Create a lead first, then attach this contract.') }}</p>
+                <p class="text-secondary mb-0">{{ __('No leads available yet. Once the client lead exists, attach this contract from here.') }}</p>
                 @endif
             </div>
         </div>

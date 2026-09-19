@@ -25,11 +25,11 @@
                     <tr>
                         <th>{{ __('Number') }}</th>
                         <th>{{ __('Counterparty') }}</th>
-                        <th>{{ __('Company') }}</th>
+                        <th>{{ __('Scope') }}</th>
                         <th>{{ __('Share') }}</th>
                         <th>{{ __('Funding') }}</th>
                         <th>{{ __('Status') }}</th>
-                        <th>{{ __('Sent / Signed') }}</th>
+                        <th>{{ __('Progress') }}</th>
                         <th class="text-end">{{ __('') }}</th>
                     </tr>
                 </thead>
@@ -37,13 +37,27 @@
                     @foreach($contracts as $contract)
                     <tr>
                         <td><a href="{{ route('a2a.show', $contract) }}" class="fw-semibold text-reset">{{ $contract->contract_number }}</a></td>
-                        <td>{{ $contract->counterparty_name }}</td>
-                        <td class="text-secondary">{{ $contract->counterparty_company ?? '—' }}</td>
+                        <td>
+                            {{ $contract->counterparty_name }}
+                            <div class="text-secondary small">{{ $contract->counterparty_company ?? '—' }}</div>
+                        </td>
+                        <td>
+                            <span class="badge {{ $contract->scope_type === 'lead' ? 'bg-blue-lt' : ($contract->scope_type === 'property' ? 'bg-purple-lt' : 'bg-secondary-lt') }}">
+                                {{ $contract->scope_label }}
+                            </span>
+                            @if($contract->lead)
+                                <a href="{{ route('leads.show', $contract->lead) }}" class="small text-reset d-block">{{ $contract->lead->full_name }}</a>
+                            @elseif($contract->property)
+                                <a href="{{ route('inventory.show', $contract->property) }}" class="small text-reset d-block">{{ $contract->property->display_name }}</a>
+                            @endif
+                        </td>
                         <td>{{ rtrim(rtrim((string) $contract->share_pct, '0'), '.') }}%</td>
                         <td class="small text-secondary">{{ $contract->funding_source }}</td>
                         <td>
-                            @if($contract->isSigned())
-                                <span class="badge bg-green-lt">{{ __('Signed') }}</span>
+                            @if($contract->isConfirmed())
+                                <span class="badge bg-green">{{ __('Confirmed') }}</span>
+                            @elseif($contract->isSigned())
+                                <span class="badge bg-blue-lt">{{ __('Signed') }}</span>
                             @elseif($contract->status === 'sent')
                                 <span class="badge bg-azure-lt">{{ __('Sent') }}</span>
                             @elseif($contract->status === 'void')
@@ -53,10 +67,12 @@
                             @endif
                         </td>
                         <td class="small text-secondary">
-                            @if($contract->signed_at)
-                                {{ $contract->signed_at->format('M d, Y') }}
+                            @if($contract->isConfirmed())
+                                <span class="text-green d-block fw-semibold">{{ __('Confirmed') }} {{ $contract->confirmed_at?->format('M d, Y') }}</span>
+                            @elseif($contract->isSigned())
+                                {{ __('Signed') }} {{ $contract->signed_at?->format('M d, Y') }}
                             @elseif($contract->sent_at)
-                                {{ $contract->sent_at->format('M d, Y') }}
+                                {{ __('Sent') }} {{ $contract->sent_at->format('M d, Y') }}
                             @else
                                 —
                             @endif

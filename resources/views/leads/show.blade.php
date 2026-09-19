@@ -55,6 +55,10 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 17v-4"/><path d="M15 17v-2"/></svg>
                         {{ __('Follow-ups') }}
                     </a>
+                    <a href="{{ route('a2a.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-indigo btn-sm me-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11v-1a3 3 0 0 1 6 0v1"/><path d="M8 11h8a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2z"/><path d="M12 9l0 .01"/></svg>
+                        {{ __('Create A2A') }}
+                    </a>
                     @endif
                     @if($canReassign)
                     <button type="button" class="btn btn-outline-warning btn-sm me-1" data-bs-toggle="modal" data-bs-target="#reassignModal">
