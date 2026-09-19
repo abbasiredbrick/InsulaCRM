@@ -97,7 +97,7 @@ class SettingsController extends Controller
     {
         $tenant = auth()->user()->tenant;
 
-        $data = $request->only(['name', 'timezone', 'currency', 'date_format', 'country', 'measurement_system', 'locale']);
+        $data = $request->only(['name', 'email', 'address', 'phone', 'website', 'timezone', 'currency', 'date_format', 'country', 'measurement_system', 'locale']);
 
         if ($request->hasFile('logo')) {
             $path = $request->file('logo')->store('logos', 'public');
@@ -109,52 +109,6 @@ class SettingsController extends Controller
         AuditLog::log('settings.updated', $tenant);
 
         return redirect()->route('settings.index', ['tab' => 'general'])->with('success', 'Settings updated.');
-    }
-
-    /**
-     * Tenant-specific branding for printable documents such as A2A commission
-     * sharing agreements. Fields are stored per tenant in custom_options so each
-     * workspace renders its own logo, header and footer on the generated PDFs.
-     */
-    public function updateContractBranding(Request $request)
-    {
-        $request->validate([
-            'contract_company_name' => 'nullable|string|max:255',
-            'contract_address' => 'nullable|string|max:500',
-            'contract_phone' => 'nullable|string|max:100',
-            'contract_website' => 'nullable|string|max:255',
-            'contract_email' => 'nullable|email|max:255',
-            'contract_logo' => 'nullable|image|mimes:jpeg,png,gif,svg|max:2048',
-        ]);
-
-        $tenant = auth()->user()->tenant;
-        $options = $tenant->custom_options ?? [];
-        $branding = $options['a2a_branding'] ?? [];
-
-        if ($request->hasFile('contract_logo')) {
-            $branding['logo_path'] = $request->file('contract_logo')->store('logos', 'public');
-        }
-
-        foreach ([
-            'company_name' => 'contract_company_name',
-            'address' => 'contract_address',
-            'phone' => 'contract_phone',
-            'website' => 'contract_website',
-            'email' => 'contract_email',
-        ] as $key => $input) {
-            if ($request->filled($input)) {
-                $branding[$key] = $request->input($input);
-            } else {
-                unset($branding[$key]);
-            }
-        }
-
-        $options['a2a_branding'] = $branding;
-        $tenant->update(['custom_options' => $options]);
-
-        AuditLog::log('settings.contract_branding_updated', $tenant);
-
-        return redirect()->route('settings.index', ['tab' => 'general'])->with('success', __('Contract branding updated.'));
     }
 
     public function updateStorage(Request $request)

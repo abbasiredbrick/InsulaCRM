@@ -326,37 +326,37 @@ class A2aContractFlowTest extends TestCase
         $this->assertSame((string) $property->id, $response->json('results.0.value'));
     }
 
-    public function test_contract_branding_stored_per_tenant(): void
+    public function test_general_settings_store_contract_contact_info(): void
     {
         $this->reAdmin();
 
-        $this->put(route('settings.updateContractBranding'), [
-            'contract_company_name' => 'Atlas Properties LLC',
-            'contract_address' => '1 Marina Walk, Downtown Dubai',
-            'contract_phone' => '+971 4 123 4567',
-            'contract_website' => 'www.atlasproperties.ae',
-            'contract_email' => 'hello@atlasproperties.ae',
+        $this->put(route('settings.updateGeneral'), [
+            'name' => 'Atlas Properties LLC',
+            'email' => 'hello@atlasproperties.ae',
+            'address' => '1 Marina Walk, Downtown Dubai',
+            'phone' => '+971 4 123 4567',
+            'website' => 'www.atlasproperties.ae',
         ])->assertRedirect();
 
-        $options = $this->tenant->fresh()->custom_options;
-        $this->assertSame('Atlas Properties LLC', $options['a2a_branding']['company_name']);
-        $this->assertSame('1 Marina Walk, Downtown Dubai', $options['a2a_branding']['address']);
-        $this->assertSame('www.atlasproperties.ae', $options['a2a_branding']['website']);
-        $this->assertArrayNotHasKey('logo_path', $options['a2a_branding']);
+        $tenant = $this->tenant->fresh();
+        $this->assertSame('Atlas Properties LLC', $tenant->name);
+        $this->assertSame('1 Marina Walk, Downtown Dubai', $tenant->address);
+        $this->assertSame('+971 4 123 4567', $tenant->phone);
+        $this->assertSame('www.atlasproperties.ae', $tenant->website);
+        $this->assertSame('hello@atlasproperties.ae', $tenant->email);
     }
 
-    public function test_contract_branding_logo_uploaded(): void
+    public function test_general_settings_logo_uploaded(): void
     {
         $this->reAdmin();
         Storage::fake('public');
 
-        $this->put(route('settings.updateContractBranding'), [
-            'contract_company_name' => 'Atlas Properties LLC',
-            'contract_logo' => UploadedFile::fake()->image('logo.png', 200, 80),
+        $this->put(route('settings.updateGeneral'), [
+            'name' => 'Atlas Properties LLC',
+            'logo' => UploadedFile::fake()->image('logo.png', 200, 80),
         ])->assertRedirect();
 
-        $options = $this->tenant->fresh()->custom_options;
-        $this->assertArrayHasKey('logo_path', $options['a2a_branding']);
+        $this->assertNotNull($this->tenant->fresh()->logo_path);
     }
 
     public function test_print_uses_tenant_branding_not_pristine_defaults(): void
@@ -377,12 +377,12 @@ class A2aContractFlowTest extends TestCase
             'status' => 'signed',
         ]);
 
-        $this->put(route('settings.updateContractBranding'), [
-            'contract_company_name' => 'Atlas Properties LLC',
-            'contract_address' => '1 Marina Walk, Downtown Dubai',
-            'contract_phone' => '+971 4 123 4567',
-            'contract_website' => 'www.atlasproperties.ae',
-            'contract_email' => 'hello@atlasproperties.ae',
+        $this->put(route('settings.updateGeneral'), [
+            'name' => 'Atlas Properties LLC',
+            'email' => 'hello@atlasproperties.ae',
+            'address' => '1 Marina Walk, Downtown Dubai',
+            'phone' => '+971 4 123 4567',
+            'website' => 'www.atlasproperties.ae',
         ]);
 
         $response = $this->get(route('a2a.print', $contract));

@@ -62,16 +62,14 @@
 </head>
 <body>
     @php
-        $branding = $tenant->custom_options['a2a_branding'] ?? [];
-
-        $docCompanyName = ($branding['company_name'] ?? '') ?: $tenant->name;
-        $docLogo = $branding['logo_path'] ?? $tenant->logo_path;
+        $docCompanyName = $tenant->name;
+        $docLogo = $tenant->logo_path;
         $docLogoUrl = $docLogo ? \Illuminate\Support\Facades\Storage::disk('public')->url($docLogo) : null;
 
-        $brokerAddress = $branding['address'] ?? '';
-        $brokerPhone = $branding['phone'] ?? '';
-        $brokerWebsite = $branding['website'] ?? '';
-        $brokerEmail = $branding['email'] ?? '';
+        $brokerAddress = $tenant->address ?? '';
+        $brokerPhone = $tenant->phone ?? '';
+        $brokerWebsite = $tenant->website ?? '';
+        $brokerEmail = $tenant->email ?? '';
 
         $footerParts = array_values(array_filter([$brokerAddress, $brokerPhone ? 'Tel: '.$brokerPhone : '', $brokerWebsite, $brokerEmail]));
         $footerLine = implode(' &nbsp;|&nbsp; ', $footerParts);

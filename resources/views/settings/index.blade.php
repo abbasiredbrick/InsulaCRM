@@ -202,60 +202,28 @@
                             <small class="form-hint">{{ __('Drop language JSON files into') }} <code>lang/</code> {{ __('to add more languages') }}</small>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>
-                </form>
-
-                <hr class="my-4">
-
-                @php
-                    $branding = $tenant->custom_options['a2a_branding'] ?? [];
-                    $brandingLogo = $branding['logo_path'] ?? null;
-                @endphp
-                <h4 class="mb-1">{{ __('Contract Branding') }}</h4>
-                <p class="text-secondary">
-                    {{ __('Used on printable documents such as A2A commission sharing agreements. Each workspace uses its own logo, header and footer. Leave fields empty to hide them.') }}
-                </p>
-                <form action="{{ route('settings.updateContractBranding') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    @method('PUT')
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">{{ __('Company Name on Contract') }}</label>
-                            <input type="text" name="contract_company_name" class="form-control" value="{{ $branding['company_name'] ?? '' }}" placeholder="{{ $tenant->name }}">
-                            <small class="form-hint">{{ __('Defaults to the workspace company name.') }}</small>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">{{ __('Contract Logo') }}</label>
-                            @if($brandingLogo)
-                                <div class="mb-2">
-                                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($brandingLogo) }}" alt="Contract Logo" style="max-height: 60px; max-width: 200px;" class="rounded border p-1">
-                                </div>
-                            @endif
-                            <input type="file" name="contract_logo" class="form-control" accept="image/jpeg,image/png,image/gif,image/svg+xml">
-                            <small class="form-hint">{{ __('JPG, PNG, GIF or SVG. Max 2MB. Falls back to the company logo.') }}</small>
-                        </div>
-                    </div>
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">{{ __('Address Line') }}</label>
-                            <input type="text" name="contract_address" class="form-control" value="{{ $branding['address'] ?? '' }}" placeholder="e.g. 103 Al Reem Plaza, Zayed The First Street, Abu Dhabi, UAE">
+                            <label class="form-label">{{ __('Email') }}</label>
+                            <input type="email" name="email" class="form-control" value="{{ $tenant->email }}" placeholder="info@yourcompany.com">
+                            <small class="form-hint">{{ __('Shown on printable documents and used as the workspace contact.') }}</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">{{ __('Phone') }}</label>
-                            <input type="text" name="contract_phone" class="form-control" value="{{ $branding['phone'] ?? '' }}" placeholder="e.g. (+971) 2 583 4206">
+                            <input type="text" name="phone" class="form-control" value="{{ $tenant->phone }}" placeholder="e.g. (+971) 2 583 4206">
                         </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">{{ __('Website') }}</label>
-                            <input type="text" name="contract_website" class="form-control" value="{{ $branding['website'] ?? '' }}" placeholder="e.g. www.pristineproperties.ae">
+                            <label class="form-label">{{ __('Address') }}</label>
+                            <input type="text" name="address" class="form-control" value="{{ $tenant->address }}" placeholder="e.g. 103 Al Reem Plaza, Zayed The First Street, Abu Dhabi, UAE">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">{{ __('Email') }}</label>
-                            <input type="text" name="contract_email" class="form-control" value="{{ $branding['email'] ?? '' }}" placeholder="e.g. info@pristineproperties.ae">
+                            <label class="form-label">{{ __('Website') }}</label>
+                            <input type="text" name="website" class="form-control" value="{{ $tenant->website }}" placeholder="e.g. www.pristineproperties.ae">
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">{{ __('Save Contract Branding') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>
                 </form>
 
                 <hr class="my-4">

@@ -15,6 +15,10 @@ class GeneralSettingsRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'address' => 'nullable|string|max:500',
+            'phone' => 'nullable|string|max:100',
+            'website' => 'nullable|string|max:255',
             'timezone' => 'nullable|string|max:100',
             'currency' => 'nullable|string|max:3',
             'date_format' => 'nullable|string|max:20',
