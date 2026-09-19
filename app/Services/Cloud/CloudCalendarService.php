@@ -174,7 +174,10 @@ class CloudCalendarService
 
     protected function buildEvent(Model $record): array
     {
-        $tz = config('app.timezone');
+        $tenantId = $record->getAttribute('tenant_id');
+        $tz = $tenantId
+            ? (Tenant::withoutGlobalScopes()->find($tenantId)?->timezone ?: config('app.timezone'))
+            : config('app.timezone');
 
         if ($record instanceof Showing) {
             $allDay = blank($record->showing_time) || ! $this->isParseableTime($record->showing_time);
