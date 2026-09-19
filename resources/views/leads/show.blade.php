@@ -208,12 +208,6 @@
                                             @endforeach
                                         </select>
                                     </div>
-                                    <div class="mb-2">
-                                        <label class="form-label small mb-1">{{ __('Or external collaborator (email)') }}</label>
-                                        <input type="text" name="external_name" class="form-control form-control-sm mb-1" placeholder="{{ __('Name') }}">
-                                        <input type="email" name="external_email" class="form-control form-control-sm mb-1" placeholder="{{ __('Email') }}">
-                                        <input type="text" name="external_company" class="form-control form-control-sm" placeholder="{{ __('Company') }}">
-                                    </div>
                                     <div class="row g-2 mb-2">
                                         <div class="col-6">
                                             <label class="form-label small mb-1">{{ __('Commission % (optional)') }}</label>

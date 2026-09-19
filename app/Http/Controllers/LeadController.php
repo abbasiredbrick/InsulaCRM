@@ -352,44 +352,32 @@ class LeadController extends Controller
         $this->authorize('shareAgents', $lead);
 
         $data = $request->validate([
-            'agent_id' => 'nullable|integer|exists:users,id',
-            'external_name' => 'nullable|string|max:190',
-            'external_email' => 'nullable|email|max:190',
-            'external_company' => 'nullable|string|max:190',
+            'agent_id' => 'required|integer|exists:users,id',
             'commission_pct' => 'nullable|numeric|min:0|max:100',
             'share_funding' => 'nullable|in:from_agent,from_company,from_both',
         ]);
 
-        if (empty($data['agent_id']) && blank($data['external_email'])) {
-            return back()->withErrors(['co_agent' => __('Choose a colleague or provide an external email.')])->withInput();
-        }
-
         $user = auth()->user();
 
-        if (! empty($data['agent_id'])) {
-            $target = User::where('tenant_id', $user->tenant_id)
-                ->where('is_active', true)
-                ->find($data['agent_id']);
+        $target = User::where('tenant_id', $user->tenant_id)
+            ->where('is_active', true)
+            ->find($data['agent_id']);
 
-            if (! $target) {
-                return back()->withErrors(['co_agent' => __('Selected agent is not active in your organisation.')])->withInput();
-            }
+        if (! $target) {
+            return back()->withErrors(['co_agent' => __('Selected agent is not active in your organisation.')])->withInput();
+        }
 
-            if ($target->id === $lead->agent_id) {
-                return back()->withErrors(['co_agent' => __('This agent already owns the lead.')])->withInput();
-            }
+        if ($target->id === $lead->agent_id) {
+            return back()->withErrors(['co_agent' => __('This agent already owns the lead.')])->withInput();
+        }
 
-            if ($lead->hasCoAgent($target)) {
-                return back()->withErrors(['co_agent' => __('This agent already shares the lead.')])->withInput();
-            }
+        if ($lead->hasCoAgent($target)) {
+            return back()->withErrors(['co_agent' => __('This agent already shares the lead.')])->withInput();
         }
 
         $lead->leadAgents()->create([
             'tenant_id' => $user->tenant_id,
-            'agent_id' => $data['agent_id'] ?? null,
-            'external_name' => $data['external_name'] ?? null,
-            'external_email' => $data['external_email'] ?? null,
-            'external_company' => $data['external_company'] ?? null,
+            'agent_id' => $data['agent_id'],
             'commission_pct' => ! blank($data['commission_pct'] ?? null) ? $data['commission_pct'] : null,
             'share_funding' => $data['share_funding'] ?? null,
             'status' => \App\Models\LeadAgent::STATUS_ACTIVE,

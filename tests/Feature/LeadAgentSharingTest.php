@@ -84,27 +84,22 @@ class LeadAgentSharingTest extends TestCase
         $this->assertDatabaseHas('leads', ['id' => $lead->id]);
     }
 
-    public function test_add_external_collaborator_with_share_terms(): void
+    public function test_external_collaborators_cannot_be_added_manually(): void
     {
         $owner = $this->createUserWithRole('agent');
         $lead = $this->createLeadOwnedBy($owner);
 
         $this->actingAs($owner);
 
+        // External collaborators are created exclusively through A2A contracts;
+        // manually sharing a lead is limited to internal colleagues.
         $this->post(route('leads.coAgents.store', $lead), [
             'external_name' => 'Freelancer One',
             'external_email' => 'freelancer@example.com',
             'external_company' => 'A2A Partners',
-            'commission_pct' => 10,
-            'share_funding' => LeadAgent::FUNDING_FROM_BOTH,
-        ])->assertSessionHasNoErrors()->assertRedirect();
+        ])->assertSessionHasErrors('agent_id');
 
-        $share = $lead->activeLeadAgents()->first();
-        $this->assertTrue($share->isExternal());
-        $this->assertSame('Freelancer One', $share->external_name);
-        $this->assertSame('freelancer@example.com', $share->external_email);
-        $this->assertSame('A2A Partners', $share->external_company);
-        $this->assertSame(LeadAgent::FUNDING_FROM_BOTH, $share->share_funding);
+        $this->assertSame(0, $lead->activeLeadAgents()->count());
     }
 
     public function test_cannot_add_owner_or_duplicate_co_agent(): void
