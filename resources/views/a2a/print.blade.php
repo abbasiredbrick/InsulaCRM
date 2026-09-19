@@ -24,6 +24,8 @@
         .contract-page { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 48px 44px; }
 
         .contract-header { text-align: center; border-bottom: 2px solid #0054a6; padding-bottom: 16px; margin-bottom: 24px; }
+        .contract-header .brand-logo { max-height: 64px; max-width: 220px; margin-bottom: 8px; }
+        .contract-header .brand-company { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 6px; }
         .contract-header h1 { font-size: 17px; font-weight: 700; color: #0054a6; text-transform: uppercase; letter-spacing: 0.5px; }
         .contract-header .num { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 4px; }
 
@@ -60,16 +62,24 @@
 </head>
 <body>
     @php
+        $branding = $tenant->custom_options['a2a_branding'] ?? [];
+
+        $docCompanyName = ($branding['company_name'] ?? '') ?: $tenant->name;
+        $docLogo = $branding['logo_path'] ?? $tenant->logo_path;
+        $docLogoUrl = $docLogo ? \Illuminate\Support\Facades\Storage::disk('public')->url($docLogo) : null;
+
+        $brokerAddress = $branding['address'] ?? '';
+        $brokerPhone = $branding['phone'] ?? '';
+        $brokerWebsite = $branding['website'] ?? '';
+        $brokerEmail = $branding['email'] ?? '';
+
+        $footerParts = array_values(array_filter([$brokerAddress, $brokerPhone ? 'Tel: '.$brokerPhone : '', $brokerWebsite, $brokerEmail]));
+        $footerLine = implode(' &nbsp;|&nbsp; ', $footerParts);
+
         $agent1 = $contract->agent?->name ?: $tenant->name;
         $agent2 = $contract->counterparty_name;
         $company2 = $contract->counterparty_company;
         $address2 = $contract->counterparty_address;
-
-        $brokerAddress = $tenant->custom_options['a2a_company_address'] ?? '103 Al Reem Plaza, Zayed The First Street, Abu Dhabi, UAE';
-        $brokerPhone = $tenant->custom_options['a2a_company_phone'] ?? '(+971) 2 583 4206';
-        $brokerWebsite = $tenant->custom_options['a2a_company_website'] ?? 'www.pristineproperties.ae';
-        $brokerEmail = $tenant->custom_options['a2a_company_email'] ?? 'info@pristineproperties.ae';
-
         $propertyName = $contract->property?->display_name
             ?? $contract->lead?->property?->display_name
             ?? ($contract->property?->address)
@@ -92,6 +102,11 @@
 
         <div class="contract-page">
             <div class="contract-header">
+                @if($docLogoUrl)
+                    <img src="{{ $docLogoUrl }}" alt="{{ $docCompanyName }}" class="brand-logo">
+                @else
+                    <div class="brand-company">{{ $docCompanyName }}</div>
+                @endif
                 <h1>{{ __('Agent to Agent Commission Sharing Agreement') }}</h1>
                 <div class="num">{{ $contract->contract_number }}</div>
             </div>
@@ -106,7 +121,7 @@
                     <div class="label">{{ __('Agent 1') }}</div>
                     <div class="name">{{ $agent1 }}</div>
                     <div class="detail">{{ $contract->agent?->role?->display_name ?? 'Licensed real estate agent' }}</div>
-                    <div class="detail">{{ $tenant->name }}</div>
+                    <div class="detail">{{ $docCompanyName }}</div>
                     <div class="detail">{{ $brokerAddress }}</div>
                 </div>
                 <div class="party">
@@ -139,7 +154,7 @@
 
             <h2>2. {{ __('Roles and Responsibilities') }}</h2>
             <ul>
-                <li>{{ $agent1 }} shall represent <strong>{{ $tenant->name }}</strong> and shall be responsible for coordinating viewings and negotiating offers.</li>
+                <li>{{ $agent1 }} shall represent <strong>{{ $docCompanyName }}</strong> and shall be responsible for coordinating viewings and negotiating offers.</li>
                 <li>{{ $agent2 }} shall act as the counterparty agent {{ $company2 ? 'of '.$company2 : '' }} and shall be responsible for sourcing the client, facilitating negotiations, and coordinating contracts.</li>
                 <li>Both agents shall perform their duties in accordance with applicable UAE laws, regulations (including AADREC guidelines), and their respective brokerage agreements.</li>
             </ul>
@@ -213,7 +228,7 @@
             <div class="signatures">
                 <div class="signature">
                     <div class="line"></div>
-                    <div class="who"><strong>{{ $agent1 }}</strong>{{ $tenant->name }}</div>
+                    <div class="who"><strong>{{ $agent1 }}</strong>{{ $docCompanyName }}</div>
                 </div>
                 <div class="signature">
                     <div class="line"></div>
@@ -227,7 +242,9 @@
         </div>
 
         <div class="foot">
-            {{ $brokerAddress }} &nbsp;|&nbsp; Tel: {{ $brokerPhone }} &nbsp;|&nbsp; {{ $brokerWebsite }} &nbsp;|&nbsp; {{ $brokerEmail }}
+            @if($brokerAddress || $brokerPhone || $brokerWebsite || $brokerEmail)
+                {{ $footerLine }}
+            @endif
         </div>
     </div>
 </body>

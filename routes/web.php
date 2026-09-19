@@ -591,6 +591,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings/general', [SettingsController::class, 'updateGeneral'])->name('settings.updateGeneral');
+        Route::put('/settings/contract-branding', [SettingsController::class, 'updateContractBranding'])->name('settings.updateContractBranding');
         Route::post('/settings/invite-agent', [SettingsController::class, 'inviteAgent'])->name('settings.inviteAgent');
         Route::put('/settings/agents/{user}', [SettingsController::class, 'updateAgent'])->name('settings.updateAgent');
         Route::patch('/settings/agents/{user}/toggle', [SettingsController::class, 'toggleAgent'])->name('settings.toggleAgent');

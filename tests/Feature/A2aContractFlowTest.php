@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\A2aContract;
 use App\Models\LeadAgent;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class A2aContractFlowTest extends TestCase
@@ -322,5 +324,73 @@ class A2aContractFlowTest extends TestCase
 
         $response->assertOk()->assertJsonStructure(['results' => [['value', 'label']]]);
         $this->assertSame((string) $property->id, $response->json('results.0.value'));
+    }
+
+    public function test_contract_branding_stored_per_tenant(): void
+    {
+        $this->reAdmin();
+
+        $this->put(route('settings.updateContractBranding'), [
+            'contract_company_name' => 'Atlas Properties LLC',
+            'contract_address' => '1 Marina Walk, Downtown Dubai',
+            'contract_phone' => '+971 4 123 4567',
+            'contract_website' => 'www.atlasproperties.ae',
+            'contract_email' => 'hello@atlasproperties.ae',
+        ])->assertRedirect();
+
+        $options = $this->tenant->fresh()->custom_options;
+        $this->assertSame('Atlas Properties LLC', $options['a2a_branding']['company_name']);
+        $this->assertSame('1 Marina Walk, Downtown Dubai', $options['a2a_branding']['address']);
+        $this->assertSame('www.atlasproperties.ae', $options['a2a_branding']['website']);
+        $this->assertArrayNotHasKey('logo_path', $options['a2a_branding']);
+    }
+
+    public function test_contract_branding_logo_uploaded(): void
+    {
+        $this->reAdmin();
+        Storage::fake('public');
+
+        $this->put(route('settings.updateContractBranding'), [
+            'contract_company_name' => 'Atlas Properties LLC',
+            'contract_logo' => UploadedFile::fake()->image('logo.png', 200, 80),
+        ])->assertRedirect();
+
+        $options = $this->tenant->fresh()->custom_options;
+        $this->assertArrayHasKey('logo_path', $options['a2a_branding']);
+    }
+
+    public function test_print_uses_tenant_branding_not_pristine_defaults(): void
+    {
+        $this->reAdmin();
+        $lead = $this->createLead();
+
+        $contract = A2aContract::create([
+            'tenant_id' => $this->tenant->id,
+            'agent_id' => $this->adminUser->id,
+            'counterparty_name' => 'Adja Traore',
+            'counterparty_company' => 'Vierra',
+            'share_pct' => 10,
+            'funding_source' => 'from_agent',
+            'scope_type' => 'lead',
+            'lead_id' => $lead->id,
+            'transaction_type' => 'lease',
+            'status' => 'signed',
+        ]);
+
+        $this->put(route('settings.updateContractBranding'), [
+            'contract_company_name' => 'Atlas Properties LLC',
+            'contract_address' => '1 Marina Walk, Downtown Dubai',
+            'contract_phone' => '+971 4 123 4567',
+            'contract_website' => 'www.atlasproperties.ae',
+            'contract_email' => 'hello@atlasproperties.ae',
+        ]);
+
+        $response = $this->get(route('a2a.print', $contract));
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('Atlas Properties LLC', $html);
+        $this->assertStringContainsString('+971 4 123 4567', $html);
+        $this->assertStringNotContainsString('www.pristineproperties.ae', $html);
+        $this->assertStringNotContainsString('Al Reem Plaza', $html);
     }
 }
