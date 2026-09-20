@@ -38,6 +38,8 @@ class Showing extends Model
         'notes',
         'calendar_provider',
         'calendar_event_id',
+        'main_calendar_provider',
+        'main_calendar_event_id',
         'reminder_minutes',
         'reminder_sent_at',
     ];

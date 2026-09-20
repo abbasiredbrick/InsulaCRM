@@ -60,7 +60,52 @@ class CloudCalendarService
     }
 
     /**
-     * The calendar connection to write events to for a record.
+     * The calendar targets to write events to for a record, keyed by slot.
+     *
+     * - "assigned": the agent assigned to the record (mandatory). The record
+     *   is declined (not pushed) when that agent has no calendar connection.
+     * - "main": the lead's owning (main) agent, pushed only when they already
+     *   have their own calendar connection *and* differ from the assigned one.
+     */
+    public function calendarTargets(Model $record, ?User $actingUser = null): array
+    {
+        $targets = [];
+
+        $assigned = $record->getAttribute('agent_id')
+            ? User::withoutGlobalScopes()->find($record->getAttribute('agent_id'))
+            : null;
+
+        $assignedConnection = $assigned?->calendarConnections()->latest()->first();
+
+        if ($assignedConnection) {
+            $targets['assigned'] = $assignedConnection;
+        }
+
+        if (! $record instanceof Showing) {
+            return $targets;
+        }
+
+        $lead = $record->relationLoaded('lead') ? $record->getRelation('lead') : $record->lead;
+
+        if ($lead && $lead->getAttribute('agent_id')) {
+            $mainAgentId = (int) $lead->getAttribute('agent_id');
+
+            if ($mainAgentId !== (int) $record->getAttribute('agent_id')) {
+                $main = User::withoutGlobalScopes()->find($mainAgentId);
+                $mainConnection = $main?->calendarConnections()->latest()->first();
+
+                if ($mainConnection) {
+                    $targets['main'] = $mainConnection;
+                }
+            }
+        }
+
+        return $targets;
+    }
+
+    /**
+     * Backward-compatible single-connection resolver: the assigned agent's
+     * calendar, falling back to the acting user's.
      */
     public function connectionFor(Model $record, ?User $actingUser = null): ?UserCloudConnection
     {
@@ -78,8 +123,11 @@ class CloudCalendarService
     }
 
     /**
-     * Create/update/delete the external calendar event for a record. Best
+     * Create/update/delete the external calendar events for a record. Best
      * effort – never fails the underlying business request.
+     *
+     * Events are pushed to the assigned agent's calendar (declined when that
+     * agent has no connection) and, where possible, the lead's main agent.
      */
     public function sync(Model $record, ?User $actingUser = null): void
     {
@@ -87,44 +135,56 @@ class CloudCalendarService
             return;
         }
 
-        $connection = $this->connectionFor($record, $actingUser);
-
         if ($this->shouldRemove($record)) {
             $this->removeEvent($record);
 
             return;
         }
 
-        if (! $connection) {
+        $targets = $this->calendarTargets($record, $actingUser);
+
+        if (! isset($targets['assigned'])) {
             return;
         }
+
+        foreach ($targets as $slot => $connection) {
+            $this->syncSlot($record, $slot, $connection);
+        }
+    }
+
+    protected function syncSlot(Model $record, string $slot, UserCloudConnection $connection): void
+    {
+        $providerColumn = $slot === 'main' ? 'main_calendar_provider' : 'calendar_provider';
+        $eventColumn = $slot === 'main' ? 'main_calendar_event_id' : 'calendar_event_id';
 
         try {
             $provider = $this->factory->make($connection->provider, $connection);
             $payload = $this->buildEvent($record);
 
-            if (! blank($record->calendar_event_id)) {
-                $provider->updateCalendarEvent((string) $record->calendar_event_id, $payload);
+            if (! blank($record->getAttribute($eventColumn))) {
+                $provider->updateCalendarEvent((string) $record->getAttribute($eventColumn), $payload);
 
                 return;
             }
 
             $eventId = $provider->createCalendarEvent($payload);
             $record->forceFill([
-                'calendar_provider' => $connection->provider,
-                'calendar_event_id' => $eventId,
+                $providerColumn => $connection->provider,
+                $eventColumn => $eventId,
             ])->save();
         } catch (\Throwable $e) {
             Log::warning('CloudCalendarService sync failed', [
                 'record' => get_class($record),
                 'record_id' => $record->getKey(),
+                'slot' => $slot,
                 'error' => $e->getMessage(),
             ]);
         }
     }
 
     /**
-     * Remove a stale external event (cancelled/completed records).
+     * Remove stale external events (cancelled/completed records) from both
+     * the assigned and main agent calendars.
      */
     public function removeEvent(Model $record): void
     {
@@ -132,27 +192,39 @@ class CloudCalendarService
             return;
         }
 
-        if (blank($record->calendar_event_id)) {
-            return;
-        }
+        $slots = [
+            ['calendar_provider', 'calendar_event_id'],
+            ['main_calendar_provider', 'main_calendar_event_id'],
+        ];
 
-        $connection = $record->calendar_provider && $record->getAttribute('agent_id')
-            ? UserCloudConnection::where('user_id', $record->getAttribute('agent_id'))
-                ->where('provider', $record->calendar_provider)
-                ->where('scope', 'calendar')
-                ->first()
-            : null;
+        foreach ($slots as [$providerColumn, $eventColumn]) {
+            $provider = $record->getAttribute($providerColumn);
+            $eventId = $record->getAttribute($eventColumn);
 
-        if ($connection) {
-            try {
-                $this->factory->make($connection->provider, $connection)
-                    ->deleteCalendarEvent((string) $record->calendar_event_id);
-            } catch (\Throwable $e) {
-                Log::warning('CloudCalendarService delete failed', ['error' => $e->getMessage()]);
+            if (! $provider) {
+                continue;
             }
-        }
 
-        $record->forceFill(['calendar_provider' => null, 'calendar_event_id' => null])->save();
+            if (filled($eventId)) {
+                $connection = $record->getAttribute('agent_id')
+                    ? UserCloudConnection::where('user_id', $record->getAttribute('agent_id'))
+                        ->where('provider', $provider)
+                        ->where('scope', 'calendar')
+                        ->first()
+                    : null;
+
+                if ($connection) {
+                    try {
+                        $this->factory->make($connection->provider, $connection)
+                            ->deleteCalendarEvent((string) $eventId);
+                    } catch (\Throwable $e) {
+                        Log::warning('CloudCalendarService delete failed', ['error' => $e->getMessage()]);
+                    }
+                }
+            }
+
+            $record->forceFill([$providerColumn => null, $eventColumn => null])->save();
+        }
     }
 
     protected function shouldRemove(Model $record): bool
@@ -187,6 +259,12 @@ class CloudCalendarService
             $lines = [];
             if ($record->lead) {
                 $lines[] = __('Client').': '.$record->lead->full_name;
+                if (filled($record->lead->phone)) {
+                    $lines[] = __('Mobile').': '.$record->lead->phone;
+                }
+            }
+            if ($record->property) {
+                $lines[] = __('Unit').': '.$record->property->optionLabel();
             }
             if ($record->agent) {
                 $lines[] = __('Agent').': '.$record->agent->name;

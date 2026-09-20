@@ -129,7 +129,7 @@ class ShowingController extends Controller
 
         $data = $request->validated();
         $data['tenant_id'] = auth()->user()->tenant_id;
-        $data['agent_id'] = $data['agent_id'] ?? auth()->id();
+        $data['agent_id'] = $data['agent_id'] ?? $lead->agent_id ?? auth()->id();
         $data['lead_id'] = $lead->id;
 
         $showing = Showing::create($data);
