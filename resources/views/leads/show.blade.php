@@ -518,16 +518,8 @@
                 </div>
                 <form action="{{ route('leads.activities.store', $lead) }}" method="POST">
                     @csrf
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label mb-1">{{ __('Type') }}</label>
-                            <input type="hidden" name="type" id="activity-type-input" value="call">
-                            <div class="form-control-plaintext fw-semibold py-1" id="activity-type-label">{{ __('Call') }}</div>
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label mb-1">{{ __('Subject (optional)') }}</label>
-                            <input type="text" name="subject" class="form-control" placeholder="{{ __('Subject (optional)') }}">
-                        </div>
+                    <div class="mb-3">
+                        <input type="hidden" name="type" id="activity-type-input" value="call">
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-4">
