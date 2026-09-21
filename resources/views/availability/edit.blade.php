@@ -107,6 +107,8 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">{{ __('Column mapping') }}</h3>
                         <div class="d-flex gap-2">
+                            <a href="{{ route('availability-sources.guide') }}" class="btn btn-sm btn-outline-secondary">{{ __('Guide') }}</a>
+                            <a href="{{ route('availability-sources.sample', $source) }}" class="btn btn-sm btn-outline-secondary">{{ __('Sample CSV') }}</a>
                             <button type="button" class="btn btn-sm btn-outline-primary" id="addMappingRow">{{ __('Add Column') }}</button>
                             <button type="button" class="btn btn-sm btn-outline-success" id="relevatePreset">{{ __('Load Relevate layout') }}</button>
                         </div>

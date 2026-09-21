@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', __('Availability Lists'))
-@section('page-title', __('Availability Lists'))
+@section('title', __('Inventory Sources'))
+@section('page-title', __('Inventory Sources'))
 
 @section('content')
 @if($pendingReviews->isNotEmpty())
@@ -22,7 +22,11 @@
     <div>
         <p class="text-muted mb-0">{{ __('Property-management companies (AMS, etc.) share availability sheets in Excel, CSV, PDFs or emails. Import each one here and it keeps units in sync — new units are added, changed units updated, and units that leave the sheet are marked unlisted.') }}</p>
     </div>
-    <a href="{{ route('availability-sources.create') }}" class="btn btn-primary">{{ __('Add Source') }}</a>
+    <div class="text-nowrap">
+        <a href="{{ route('availability-sources.guide') }}" class="btn btn-outline-secondary">{{ __('Import Guide') }}</a>
+        <a href="{{ route('availability-sources.template') }}" class="btn btn-outline-secondary">{{ __('Sample CSV') }}</a>
+        <a href="{{ route('availability-sources.create') }}" class="btn btn-primary">{{ __('Add Source') }}</a>
+    </div>
 </div>
 
 @if($sources->isEmpty())
@@ -82,6 +86,7 @@
                             <a href="{{ route('availability-sources.import', $source) }}" class="btn btn-sm btn-primary" title="{{ __('Upload a refreshed sheet — existing units update in place') }}">{{ __('Re-import') }}</a>
                         @endif
                         <a href="{{ route('availability-sources.edit', $source) }}" class="btn btn-sm btn-outline-secondary">{{ __('Mapping') }}</a>
+                        <a href="{{ route('availability-sources.sample', $source) }}" class="btn btn-sm btn-outline-secondary" title="{{ __('Download a sample CSV matching this source\'s mapping') }}">{{ __('Sample') }}</a>
                     </td>
                 </tr>
                 @endforeach

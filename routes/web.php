@@ -279,6 +279,10 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
             ->name('availability-sources.index');
         Route::get('/availability-sources/create', [\App\Http\Controllers\AvailabilitySourceController::class, 'create'])
             ->name('availability-sources.create');
+        Route::get('/availability-sources/template', [\App\Http\Controllers\AvailabilitySourceController::class, 'template'])
+            ->name('availability-sources.template');
+        Route::get('/availability-sources/guide', [\App\Http\Controllers\AvailabilitySourceController::class, 'guide'])
+            ->name('availability-sources.guide');
         Route::post('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'store'])
             ->name('availability-sources.store');
         Route::get('/availability-sources/{source}/edit', [\App\Http\Controllers\AvailabilitySourceController::class, 'edit'])
@@ -287,6 +291,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
             ->name('availability-sources.update');
         Route::get('/availability-sources/{source}/import', [\App\Http\Controllers\AvailabilitySourceController::class, 'importShow'])
             ->name('availability-sources.import');
+        Route::get('/availability-sources/{source}/sample', [\App\Http\Controllers\AvailabilitySourceController::class, 'sample'])
+            ->name('availability-sources.sample');
         Route::post('/availability-sources/{source}/import', [\App\Http\Controllers\AvailabilitySourceController::class, 'importParse'])
             ->name('availability-sources.import-parse');
         Route::get('/availability-sources/{source}/review', [\App\Http\Controllers\AvailabilitySourceController::class, 'importReview'])

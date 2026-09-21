@@ -51,6 +51,14 @@
                     <li>{{ __('Units already on the sheet are updated in place; ones that left the sheet become unlisted.') }}</li>
                 </ul>
 
+                <div class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="small">{{ __('Preparing the sheet yourself? Use the sample that matches this source\'s mapping, then save it as CSV.') }}</div>
+                    <div class="text-nowrap">
+                        <a href="{{ route('availability-sources.sample', $source) }}" class="btn btn-sm btn-outline-primary">{{ __('Download sample CSV') }}</a>
+                        <a href="{{ route('availability-sources.guide') }}" class="btn btn-sm btn-link">{{ __('Import guide') }}</a>
+                    </div>
+                </div>
+
                 <form method="POST" action="{{ route('availability-sources.import-parse', $source) }}" enctype="multipart/form-data">
                     @csrf
                     <div class="mb-3">

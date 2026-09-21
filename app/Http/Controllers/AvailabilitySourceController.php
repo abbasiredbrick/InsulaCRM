@@ -8,6 +8,7 @@ use App\Models\AvailabilitySource;
 use App\Services\AvailabilityIngestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AvailabilitySourceController extends Controller
 {
@@ -150,6 +151,29 @@ class AvailabilitySourceController extends Controller
         ]);
 
         return back()->with('success', __('Source and mapping saved.'));
+    }
+
+    public function guide()
+    {
+        return view('availability.guide');
+    }
+
+    /**
+     * Download a CSV template for a source, using the exact headers its saved
+     * mapping expects (or the standard layout when no mapping exists yet), so a
+     * PM's refreshed sheet can be prepared to import cleanly.
+     */
+    public function sample(AvailabilitySource $source)
+    {
+        return $this->csvDownload($this->sampleRows($source), $this->sampleFilename($source));
+    }
+
+    /**
+     * The standard "blank" template for a source that has no mapping yet.
+     */
+    public function template()
+    {
+        return $this->csvDownload($this->sampleRows(null), 'availability-import-template.csv');
     }
 
     public function importShow(AvailabilitySource $source)
@@ -581,5 +605,154 @@ class AvailabilitySourceController extends Controller
 
         return redirect()->route('availability-sources.import', $source)
             ->with('info', __('Import cancelled.'));
+    }
+
+    // ── Sample / template CSV generation ───────────────────────────────────
+
+    protected function sampleFilename(AvailabilitySource $source): string
+    {
+        $slug = Str::slug($source->name) ?: 'source';
+
+        return "availability-sample-{$slug}.csv";
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    protected function sampleRows(?AvailabilitySource $source): array
+    {
+        $map = $source?->column_map ?: [];
+        $map = $map ?: $this->defaultTemplateMap();
+
+        $headers = [];
+        foreach ($map as $header => $target) {
+            $headers[] = $this->sampleHeader((string) $header, (string) $target);
+        }
+
+        return [
+            $headers,
+            array_map(fn ($target) => $this->sampleValue((string) $target, 1), $map),
+            array_map(fn ($target) => $this->sampleValue((string) $target, 2), $map),
+        ];
+    }
+
+    /**
+     * The canonical availability-sheet layout used when a source has no saved
+     * mapping yet (or when a user downloads the blank template).
+     *
+     * @return array<string, string>
+     */
+    protected function defaultTemplateMap(): array
+    {
+        return [
+            'Unit No' => 'unit_no',
+            'Building' => 'building',
+            'Community' => 'community',
+            'Unit Type' => 'features',
+            'Area (Sqft)' => 'square_footage',
+            'Bedrooms' => 'bedrooms',
+            'Rent' => 'rent',
+            'Deposit' => 'deposit',
+            'Admin Fee' => 'admin_fee',
+            'Tawtheeq Fee' => 'tawtheeq',
+            'Status' => 'status',
+            'Balcony' => 'balcony',
+            'View' => 'view',
+            'Available From' => 'available_from',
+            'Parking' => 'parking',
+            'Furnishing' => 'furnishing',
+            'Category' => 'property_category',
+            'Amenities' => 'amenities',
+            'Remarks' => 'remarks',
+        ];
+    }
+
+    /**
+     * Keep a source's real header name (so the sample matches its mapping),
+     * otherwise derive a friendly label from the mapped field.
+     */
+    protected function sampleHeader(string $header, string $target): string
+    {
+        if ($header !== '' && ! preg_match('/^col\d+$/i', $header)) {
+            return $header;
+        }
+
+        return $this->sampleLabel($target);
+    }
+
+    protected function sampleLabel(string $target): string
+    {
+        return [
+            'unit_no' => 'Unit No',
+            'building' => 'Building',
+            'community' => 'Community',
+            'city' => 'City',
+            'features' => 'Unit Type',
+            'bedrooms' => 'Bedrooms',
+            'bathrooms' => 'Bathrooms',
+            'square_footage' => 'Area (Sqft)',
+            'rent' => 'Rent',
+            'rent_price' => 'Rent',
+            'deposit' => 'Deposit',
+            'deposit_amount' => 'Deposit',
+            'admin_fee' => 'Admin Fee',
+            'tawtheeq' => 'Tawtheeq Fee',
+            'tawtheeq_fee' => 'Tawtheeq Fee',
+            'status' => 'Status',
+            'source_status' => 'Status',
+            'parking' => 'Parking',
+            'balcony' => 'Balcony',
+            'view' => 'View',
+            'key_date' => 'Key / Vacant Date',
+            'available_from' => 'Available From',
+            'handover_date' => 'Handover Date',
+            'furnishing' => 'Furnishing',
+            'property_category' => 'Category',
+            'amenities' => 'Amenities',
+            'remarks' => 'Remarks',
+        ][$target] ?? ucwords(str_replace('_', ' ', $target));
+    }
+
+    protected function sampleValue(string $target, int $row): string
+    {
+        $upcoming = $row === 2;
+
+        return match ($target) {
+            'unit_no' => $row === 1 ? '1201' : '1502',
+            'building' => 'Burj Al Shams',
+            'community' => 'Al Reem Island',
+            'city' => 'Abu Dhabi',
+            'features' => $row === 1 ? '2 BHK' : '3 BHK + M',
+            'bedrooms' => $row === 1 ? '2' : '3',
+            'bathrooms' => '2',
+            'square_footage' => $row === 1 ? '1121' : '1639',
+            'rent', 'rent_price' => $row === 1 ? '100000' : '125000',
+            'deposit', 'deposit_amount' => $row === 1 ? '5000' : '6250',
+            'admin_fee' => '1050',
+            'tawtheeq', 'tawtheeq_fee' => '150',
+            'status', 'source_status' => $upcoming ? 'Upcoming' : 'Available for viewing',
+            'parking' => $row === 1 ? '1' : '2',
+            'balcony' => $row === 1 ? 'Yes' : 'No',
+            'view' => $row === 1 ? 'Sea View' : 'Community view',
+            'key_date' => $upcoming ? '14 Sep 2026' : 'Available',
+            'available_from' => $upcoming ? '26 Sep 2026' : '',
+            'handover_date' => $upcoming ? '01 Oct 2026' : '',
+            'furnishing' => 'Furnished',
+            'property_category' => 'Apartment',
+            'amenities' => 'Gym, Pool',
+            default => '',
+        };
+    }
+
+    protected function csvDownload(array $rows, string $filename)
+    {
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens it cleanly
+            foreach ($rows as $row) {
+                fputcsv($out, $row);
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

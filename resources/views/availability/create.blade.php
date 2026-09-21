@@ -64,7 +64,10 @@
                             <div class="form-hint">{{ __('Sheets: dropped = rented. Published links (e.g. RDK): hidden = off the market, use Unlisted.') }}</div>
                         </div>
                     </div>
-                    <div class="form-hint mb-3">{{ __('You define the column mapping on the next screen. After that, importing a refreshed list is a one-click job that reuses the same layout.') }}</div>
+                    <div class="form-hint mb-3">{{ __('You define the column mapping on the next screen. After that, importing a refreshed list is a one-click job that reuses the same layout.') }}
+                        <a href="{{ route('availability-sources.guide') }}">{{ __('Read the import guide') }}</a> ·
+                        <a href="{{ route('availability-sources.template') }}">{{ __('download a blank CSV template') }}</a>.
+                    </div>
                     <button class="btn btn-primary">{{ __('Save & Configure Mapping') }}</button>
                     <a href="{{ route('availability-sources.index') }}" class="btn btn-link">{{ __('Cancel') }}</a>
                 </form>

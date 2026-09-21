@@ -1415,4 +1415,54 @@ class AvailabilityImportTest extends TestCase
         $fallback = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->where('source_unit_ref', '502')->first();
         $this->assertSame('Abu Dhabi', $fallback->city);
     }
+
+    public function test_blank_template_downloads_standard_csv(): void
+    {
+        $response = $this->get(route('availability-sources.template'));
+
+        $response->assertOk();
+        $this->assertStringContainsString('text/csv', $response->headers->get('content-type'));
+
+        $csv = $response->streamedContent();
+
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
+        $this->assertStringContainsString('Unit No', $csv);
+        $this->assertStringContainsString('Available From', $csv);
+        $this->assertStringContainsString('Available for viewing', $csv);
+        $this->assertStringContainsString('Upcoming', $csv);
+    }
+
+    public function test_sample_csv_matches_source_saved_mapping(): void
+    {
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'comma', 'has_header' => true],
+            'column_map' => [
+                'Unit No' => 'unit_no',
+                'Unit Type' => 'features',
+                'Status' => 'status',
+                'Expected vacating date' => 'available_from',
+            ],
+        ]);
+
+        $response = $this->get(route('availability-sources.sample', $source));
+
+        $response->assertOk();
+        $csv = $response->streamedContent();
+
+        $this->assertStringContainsString('Unit No', $csv);
+        $this->assertStringContainsString('Unit Type', $csv);
+        $this->assertStringContainsString('Expected vacating date', $csv);
+        $this->assertStringContainsString('Available for viewing', $csv);
+        $this->assertStringContainsString('Upcoming', $csv);
+    }
+
+    public function test_guide_page_loads(): void
+    {
+        $this->get(route('availability-sources.guide'))
+            ->assertOk()
+            ->assertSee('Availability Import Guide');
+    }
 }

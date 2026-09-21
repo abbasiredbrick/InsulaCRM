@@ -728,6 +728,68 @@ sudo systemctl restart httpd php-fpm</pre>
 ') . '<h3>AI Property Description</h3>
 <p>If AI is enabled, you can click <strong>Generate Description</strong> on any property to create a professional property description based on its attributes. Useful for marketing materials and ' . (BusinessModeService::isRealEstate() ? 'client' : 'buyer') . ' notifications.</p>',
                     ],
+                    [
+                        'slug' => 'importing-availability-lists',
+                        'title' => __('Importing Inventory Sources (CSV / Excel)'),
+                        'summary' => __('Prepare a PM availability sheet, map its columns, and re-import refreshed lists so inventory stays in sync.'),
+                        'tags' => ['availability', 'import', 'csv', 'excel', 'inventory', 'mapping', 'ams', 'relevate'],
+                        'body' => '<h3>What it does</h3>
+<p>Inventory Sources (under Settings &rarr; Inventory Sources) let you import the unit lists property-management companies (AMS, Relevate, Bloom, RDK and others) share by Excel, CSV, PDF or email. Each source keeps its own column mapping, so a refreshed sheet is a one-click re-import: existing units update in place, new units are added, and units that leave the sheet are reconciled (marked leased, or unlisted for published links).</p>
+
+<h3>Preparing the file</h3>
+<ol>
+<li>One unit per row, with a header row of column names. Do not merge cells or add totals/summary rows.</li>
+<li>Keep unit number, rent and status in their own columns. Rent and fees must be plain numbers (125000, not "AED 125k").</li>
+<li>If the sheet mixes buildings, include a <strong>Building</strong> column, or set a <strong>Default building</strong> on the source and import one building per file.</li>
+<li>Save as <strong>CSV UTF-8</strong> (Excel: File &rarr; Save As &rarr; CSV UTF-8), or upload the original .xlsx, or paste the text straight from the email.</li>
+</ol>
+
+<h3>Which columns map to what</h3>
+<table>
+<thead><tr><th>Column</th><th>Maps to</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Unit No</td><td>unit_no</td><td>1201</td></tr>
+<tr><td>Building</td><td>building</td><td>Burj Al Shams</td></tr>
+<tr><td>Community</td><td>community</td><td>Al Reem Island</td></tr>
+<tr><td>Unit Type</td><td>features</td><td>2 BHK, 3 BHK + M</td></tr>
+<tr><td>Area (Sqft) / Area (Sqm)</td><td>square_footage</td><td>1121</td></tr>
+<tr><td>Rent</td><td>rent</td><td>100000</td></tr>
+<tr><td>Deposit</td><td>deposit</td><td>5000</td></tr>
+<tr><td>Admin Fee / Tawtheeq Fee</td><td>admin_fee / tawtheeq</td><td>1050 / 150</td></tr>
+<tr><td>Status</td><td>status</td><td>Available for viewing</td></tr>
+<tr><td>Balcony / View</td><td>balcony / view</td><td>Yes / Sea View</td></tr>
+<tr><td>Available From</td><td>available_from</td><td>26 Sep 2026</td></tr>
+</tbody>
+</table>
+<p>Common synonyms are detected automatically; anything you map explicitly on the source always wins. Column names do not have to match exactly.</p>
+
+<h3>Status words</h3>
+<ul>
+<li><strong>Available / Available for viewing / Vacant</strong> &rarr; Ready to List</li>
+<li><strong>Upcoming / Up-coming</strong> &rarr; Upcoming, with the date from the Available From column</li>
+<li><strong>Under offer / Reserved / Booked</strong> &rarr; Reserved</li>
+<li><strong>Rented / Leased / Let</strong> &rarr; Leased</li>
+<li><strong>Sold</strong> &rarr; Sold &middot; <strong>Withdrawn / Off market</strong> &rarr; Unlisted</li>
+</ul>
+<p>Override any of these on the source screen with lines like <code>Under Offer =&gt; reserved</code>.</p>
+
+<h3>Dates, fees and deposit</h3>
+<ul>
+<li>Dates are read in many formats (14 Sep 2026, Sep 14, 2026, 14/09/2026, 2026-09-14). The word "Available" in a date column means ready now.</li>
+<li>Admin/Tawtheeq fees fall back to the source defaults when the sheet has no column for them.</li>
+<li>Deposit can be a fixed default, or a formula such as "the higher of AED 5,000 or 5% of the annual rent" &mdash; set the percentage and minimum on the source.</li>
+</ul>
+
+<h3>Importing</h3>
+<ol>
+<li>Open the source &rarr; <strong>Re-import</strong> (or Sync now for a published URL).</li>
+<li>Upload the refreshed sheet, preview the parsed rows, and run the import.</li>
+<li>Units update in place &mdash; nothing is duplicated. A listed unit that disappears from a rented sheet is queued for a decision instead of being unlisted.</li>
+</ol>
+
+<h3>Sample templates</h3>
+<p>Under Settings &rarr; Inventory Sources, use <strong>Sample CSV</strong> to download a spreadsheet with the expected columns and two example rows &mdash; either the blank template or one that matches a specific source. Open it in Excel, replace the examples, save as CSV and import. A step-by-step guide is available on the Inventory Sources screen under <strong>Import Guide</strong>.</p>',
+                    ],
                 ],
             ],
 

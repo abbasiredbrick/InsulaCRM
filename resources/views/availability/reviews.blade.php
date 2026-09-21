@@ -10,7 +10,7 @@
             {{ __('These units are currently listed, but the PM availability sheet shows them as leased. Since the madhmoun listing permit is costly to re-issue, they were NOT unlisted automatically. Choose to keep them listed (leads keep coming in and can be diverted to other units) or unlist them.') }}
         </p>
     </div>
-    <a href="{{ route('availability-sources.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Back to Availability') }}</a>
+    <a href="{{ route('availability-sources.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Back to Inventory Sources') }}</a>
 </div>
 
 @if($pending->isEmpty())
