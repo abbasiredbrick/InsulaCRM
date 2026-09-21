@@ -11,12 +11,12 @@
             @php
                 $intentColors = ['rent' => 'blue', 'sale' => 'green', 'both' => 'purple'];
                 $availabilityColors = [
-                    'draft' => 'secondary', 'ready_to_list' => 'azure', 'listed' => 'green',
+                    'draft' => 'secondary', 'ready_to_list' => 'azure', 'upcoming' => 'cyan', 'listed' => 'green',
                     'reserved' => 'orange', 'leased' => 'blue', 'sold' => 'purple', 'unlisted' => 'dark',
                 ];
             @endphp
             <span class="badge bg-{{ $intentColors[$property->intent] ?? 'secondary' }}">{{ __(\App\Models\Property::INTENTS[$property->intent] ?? $property->intent) }}</span>
-            <span class="badge bg-{{ $availabilityColors[$property->availability] ?? 'secondary' }}">{{ __(\App\Models\Property::AVAILABILITIES[$property->availability] ?? $property->availability) }}</span>
+            <span class="badge bg-{{ $availabilityColors[$property->availability] ?? 'secondary' }}">{{ __($property->availability_label) }}</span>
             @if($property->is_portal_ready)
                 <span class="badge bg-teal">{{ __('Portal ready') }}</span>
             @endif
@@ -81,6 +81,12 @@
                         <div class="text-muted small">{{ __('Handover / Key') }}</div>
                         <div class="fw-bold">{{ $property->handover_date ? $property->handover_date->format('d M Y') : '—' }}</div>
                     </div>
+                    @if($property->available_from)
+                        <div class="col-md-4">
+                            <div class="text-muted small">{{ __('Available from') }}</div>
+                            <div class="fw-bold">{{ $property->available_from->format('d M Y') }}</div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

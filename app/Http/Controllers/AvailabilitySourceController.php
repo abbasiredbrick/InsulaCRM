@@ -236,7 +236,7 @@ class AvailabilitySourceController extends Controller
         $counts = ['total' => count($preview['rows']), 'mapped' => 0];
         $mappedHeaders = [];
         foreach ($columnMap as $header => $target) {
-            if (in_array($target, ['unit_no', 'building', 'community', 'city', 'features', 'rent', 'deposit', 'admin_fee', 'tawtheeq', 'status', 'parking', 'key_date', 'amenities', 'remarks'])) {
+            if (in_array($target, ['unit_no', 'building', 'community', 'city', 'features', 'rent', 'deposit', 'admin_fee', 'tawtheeq', 'status', 'parking', 'key_date', 'available_from', 'amenities', 'remarks'])) {
                 $mappedHeaders[] = $header;
             }
         }

@@ -181,15 +181,20 @@
                         </div>
                     </div>
                     <div class="row mt-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">{{ __('Developer (off-plan)') }}</label>
                             <input type="text" name="developer_name" class="form-control" value="{{ old('developer_name', $property->developer_name) }}">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">{{ __('Handover date') }}</label>
                             <input type="date" name="handover_date" class="form-control" value="{{ old('handover_date', $property->handover_date?->format('Y-m-d')) }}">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label">{{ __('Available from') }}</label>
+                            <input type="date" name="available_from" class="form-control" value="{{ old('available_from', $property->available_from?->format('Y-m-d')) }}">
+                            <div class="form-hint">{{ __('Used for Upcoming units (date they become available).') }}</div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label">{{ __('Virtual tour URL') }}</label>
                             <input type="url" name="virtual_tour_url" class="form-control" value="{{ old('virtual_tour_url', $property->virtual_tour_url) }}" placeholder="https://...">
                         </div>

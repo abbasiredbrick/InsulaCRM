@@ -27,6 +27,7 @@ class Property extends Model
     public const AVAILABILITIES = [
         'draft' => 'Draft',
         'ready_to_list' => 'Ready to List',
+        'upcoming' => 'Upcoming',
         'listed' => 'Listed',
         'reserved' => 'Reserved',
         'leased' => 'Leased',
@@ -110,6 +111,7 @@ class Property extends Model
         'sub_community',
         'developer_name',
         'handover_date',
+        'available_from',
         'title_deed_no',
         'rera_permit_no',
         'plot_no',
@@ -170,6 +172,7 @@ class Property extends Model
             'listed_at' => 'date',
             'sold_at' => 'date',
             'handover_date' => 'date',
+            'available_from' => 'date',
             'bayut_listed_at' => 'date',
             'dubizzle_listed_at' => 'date',
             'propertyfinder_listed_at' => 'date',
@@ -380,6 +383,21 @@ class Property extends Model
         }
 
         return $bits ? implode(' • ', $bits) : '—';
+    }
+
+    /**
+     * Human label for the availability badge. "Upcoming" units append the date
+     * they become available (e.g. "Upcoming · 14 Sep 2026").
+     */
+    public function getAvailabilityLabelAttribute(): string
+    {
+        $label = self::AVAILABILITIES[$this->availability] ?? (string) $this->availability;
+
+        if ($this->availability === 'upcoming' && $this->available_from) {
+            return $label.' · '.$this->available_from->format('d M Y');
+        }
+
+        return $label;
     }
 
     /**

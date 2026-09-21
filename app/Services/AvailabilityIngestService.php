@@ -442,13 +442,18 @@ class AvailabilityIngestService
                 $availability = $this->resolveAvailability($statusMap, $rawStatus);
 
                 $handover = null;
+                $explicitAvailableFrom = null;
                 $keyNotes = [];
                 $availableNow = false;
-                foreach (['key_date', 'handover_date'] as $fd) {
+                foreach (['key_date', 'handover_date', 'available_from'] as $fd) {
                     if (! empty($data[$fd])) {
                         $parsed = $this->parseFlexibleDate($data[$fd]);
                         if ($parsed) {
-                            $handover = $parsed;
+                            if ($fd === 'available_from') {
+                                $explicitAvailableFrom = $parsed;
+                            } else {
+                                $handover = $parsed;
+                            }
                         } elseif ($this->isAvailableNow($data[$fd])) {
                             $availableNow = true;
                         } else {
@@ -456,6 +461,13 @@ class AvailabilityIngestService
                         }
                     }
                 }
+
+                // "Upcoming" units carry the date they become available (the sheet's
+                // expected vacating date) in the dedicated available_from field; that
+                // date is not a handover date, so keep handover_date clear for them.
+                $isUpcoming = $availability === 'upcoming';
+                $availableFrom = $explicitAvailableFrom ?: ($isUpcoming ? $handover : null);
+                $handoverDate = $isUpcoming ? null : $handover;
 
                 $bedrooms = $data['bedrooms'] ?? $features['bedrooms'];
                 $squareFootage = $data['square_footage'] ?? $features['square_footage'];
@@ -494,7 +506,9 @@ class AvailabilityIngestService
                 if ($rawStatus !== '') {
                     $notesParts[] = "Status on sheet: {$rawStatus}.";
                 }
-                if ($handover) {
+                if ($availableFrom) {
+                    $notesParts[] = "Available from: {$availableFrom->format('d.m.Y')}.";
+                } elseif ($handover) {
                     $notesParts[] = "Vacant by: {$handover->format('d.m.Y')}.";
                 }
                 foreach ($keyNotes as $keyNote) {
@@ -578,7 +592,8 @@ class AvailabilityIngestService
                     'admin_fee' => $adminFee,
                     'tawtheeq_fee' => $tawtheeqFee,
                     'rent_period' => 'yearly',
-                    'handover_date' => $handover ? $handover->toDateString() : null,
+                    'handover_date' => $handoverDate ? $handoverDate->toDateString() : null,
+                    'available_from' => $availableFrom ? $availableFrom->toDateString() : null,
                     'address' => $address,
                     'marketing_title' => $marketingTitle,
                     'marketing_description' => $marketingDescription,
@@ -816,7 +831,7 @@ class AvailabilityIngestService
             'bathrooms' => $this->bathroomCount($value),
             'balcony' => $this->balcony($value),
             'square_footage' => $this->areaNumeric($value),
-            'handover_date', 'key_date' => $value,
+            'handover_date', 'available_from', 'key_date' => $value,
             'source_status', 'status' => $value,
             'furnishing' => $this->furnishing($value),
             'property_category' => $this->detectCategory($value),
@@ -1092,12 +1107,12 @@ class AvailabilityIngestService
             'vacant' => 'ready_to_list',
             'ready' => 'ready_to_list',
             'available' => 'ready_to_list',
-            'availableforviewing' => 'listed',
-            'availableforviewingnow' => 'listed',
-            'openforviewing' => 'listed',
-            'readyforviewing' => 'listed',
-            'upcoming' => 'ready_to_list',
-            'upcomingsoon' => 'ready_to_list',
+            'availableforviewing' => 'ready_to_list',
+            'availableforviewingnow' => 'ready_to_list',
+            'openforviewing' => 'ready_to_list',
+            'readyforviewing' => 'ready_to_list',
+            'upcoming' => 'upcoming',
+            'upcomingsoon' => 'upcoming',
             'underoffer' => 'reserved',
             'reserved' => 'reserved',
             'booked' => 'reserved',
@@ -1304,10 +1319,12 @@ class AvailabilityIngestService
             'vacating date' => 'key_date',
             'expected vacating date' => 'key_date',
             'expected vacancy date' => 'key_date',
-            'expected availability date' => 'key_date',
-            'expected available date' => 'key_date',
+            'expected availability date' => 'available_from',
+            'expected available date' => 'available_from',
+            'availability date' => 'available_from',
+            'available date' => 'available_from',
             'vacant from' => 'key_date',
-            'available from' => 'key_date',
+            'available from' => 'available_from',
             'facilities' => 'amenities',
             'amenities' => 'amenities',
             'remarks' => 'remarks',
@@ -1363,6 +1380,8 @@ class AvailabilityIngestService
             '/type.*balcony/' => 'features',
             '/unit\s*type/' => 'features',
             '/property\s*type/' => 'features',
+            '/available\s*(?:from|date)/' => 'available_from',
+            '/availability\s*date/' => 'available_from',
             '/expected\s*(?:vacan(?:t|cy)|vacating|availability|available|move[\s-]?in)/' => 'key_date',
             '/listing\s*price/' => 'rent',
             '/asking\s*(?:rent|price)/' => 'rent',

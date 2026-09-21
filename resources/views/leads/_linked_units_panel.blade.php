@@ -15,7 +15,7 @@
                                 • {{ $unit->price_line }}
                             </span>
                         </a>
-                        <span class="badge bg-azure-lt">{{ __(\App\Models\Property::AVAILABILITIES[$unit->availability] ?? $unit->availability) }}</span>
+                        <span class="badge bg-azure-lt">{{ __($unit->availability_label) }}</span>
                         <form method="POST" action="{{ route('leads.property.unlink', [$lead, $unit]) }}" class="d-inline">
                             @csrf
                             @method('DELETE')

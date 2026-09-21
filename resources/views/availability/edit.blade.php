@@ -160,7 +160,7 @@
                             ->implode("\n");
                     @endphp
                     <textarea name="status_map" rows="6" class="form-control font-monospace" placeholder="Vacant => ready_to_list&#10;Up-coming => ready_to_list&#10;Under Offer => reserved&#10;Rented => leased">{{ old('status_map', $statusLines) }}</textarea>
-                    <div class="form-hint">{{ __('Leave empty for defaults (vacant → ready_to_list, upcoming → ready_to_list, under offer → reserved, rented → leased, sold → sold). Lines: source => destination.') }}</div>
+                    <div class="form-hint">{{ __('Leave empty for defaults (vacant → ready_to_list, upcoming → upcoming, under offer → reserved, rented → leased, sold → sold). Lines: source => destination.') }}</div>
                 </div>
             </div>
 
@@ -250,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         'balcony': 'Balcony (Yes/No)',
         'view': 'View (sea, community…)',
         'key_date': 'Key / vacant date',
+        'available_from': 'Availability date',
         'amenities': 'Amenities / facilities',
         'remarks': 'Remarks & commission',
         'community': 'Community / area',
@@ -290,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ['Balcony', 'balcony'],
             ['View', 'view'],
             ['Status', 'status'],
-            ['Expected vacating date', 'key_date'],
+            ['Expected vacating date', 'available_from'],
             ['Listing price', 'rent'],
         ].forEach(([src, tgt]) => body.appendChild(createRow(src, tgt)));
         const set = (name, value) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.value = value; };
@@ -303,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         set('delimiter', 'comma');
         setCheck('has_header', true);
         const sm = document.querySelector('[name="status_map"]');
-        if (sm) sm.value = 'Available for viewing => listed\nUpcoming => ready_to_list';
+        if (sm) sm.value = 'Available for viewing => ready_to_list\nUpcoming => upcoming';
     });
 });
 </script>

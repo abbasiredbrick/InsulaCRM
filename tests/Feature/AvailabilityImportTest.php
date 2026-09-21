@@ -56,6 +56,11 @@ class AvailabilityImportTest extends TestCase
                 'col7' => 'parking',
                 'col8' => 'key_date',
             ],
+            'status_map' => [
+                'vacant' => 'ready_to_list',
+                'up-coming' => 'ready_to_list',
+                'under offer' => 'reserved',
+            ],
         ]);
     }
 
@@ -201,6 +206,11 @@ class AvailabilityImportTest extends TestCase
                 'Key Location' => 'key_date',
                 'Facilities' => 'amenities',
                 'Remarks' => 'remarks',
+            ],
+            'status_map' => [
+                'vacant' => 'ready_to_list',
+                'up-coming' => 'ready_to_list',
+                'under offer' => 'reserved',
             ],
         ]);
     }
@@ -473,7 +483,7 @@ class AvailabilityImportTest extends TestCase
                 'Balcony' => 'balcony',
                 'View' => 'view',
                 'Status' => 'status',
-                'Expected vacating date' => 'key_date',
+                'Expected vacating date' => 'available_from',
                 'Listing price' => 'rent',
             ],
         ]);
@@ -523,21 +533,24 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(1639, $u->square_footage); // sqft is NOT ×10.7639
         $this->assertSame('no', $u->balcony);
         $this->assertSame('Community view', $u->view);
-        $this->assertSame('listed', $u->availability); // "Available for viewing"
+        $this->assertSame('ready_to_list', $u->availability); // "Available for viewing"
         $this->assertSame(125000, (int) $u->rent_price);
         $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
         $this->assertSame(1050, (int) $u->admin_fee);
         $this->assertSame(150, (int) $u->tawtheeq_fee);
+        $this->assertNull($u->available_from); // no date on the sheet
         $this->assertStringContainsString('Balcony: No', $u->marketing_description);
         $this->assertStringContainsString('View: Community view', $u->marketing_description);
 
         $u = $byRef['1703'];
-        $this->assertSame('ready_to_list', $u->availability); // "Upcoming"
-        $this->assertSame('2026-09-14', $u->handover_date?->toDateString());
+        $this->assertSame('upcoming', $u->availability); // "Upcoming"
+        $this->assertSame('2026-09-14', $u->available_from?->toDateString());
+        $this->assertNull($u->handover_date); // date is an availability date, not handover
         $this->assertSame('no', $u->balcony);
         $this->assertSame('Sea View', $u->view);
 
         $u = $byRef['1605'];
+        $this->assertSame('ready_to_list', $u->availability);
         $this->assertNull($u->handover_date);
         $this->assertStringContainsString('Available immediately', $u->notes);
         $this->assertSame(5100, (int) $u->deposit_amount);
@@ -638,14 +651,16 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(1639, $u->square_footage); // sqft, not ×10.7639
         $this->assertSame('no', $u->balcony);
         $this->assertSame('Community view', $u->view);
-        $this->assertSame('listed', $u->availability);
+        $this->assertSame('ready_to_list', $u->availability); // "Available for viewing"
         $this->assertSame(125000, (int) $u->rent_price);
         $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
         $this->assertSame(1050, (int) $u->admin_fee);
         $this->assertSame(150, (int) $u->tawtheeq_fee);
 
-        $this->assertSame('ready_to_list', $units['1703']->availability);
-        $this->assertSame('2026-09-14', $units['1703']->handover_date?->toDateString());
+        $this->assertSame('upcoming', $units['1703']->availability); // "Upcoming"
+        $this->assertSame('2026-09-14', $units['1703']->available_from?->toDateString());
+        $this->assertNull($units['1703']->handover_date);
+        $this->assertSame('upcoming', $units['1810']->availability);
         $this->assertSame(5000, (int) $units['1810']->deposit_amount); // floor
     }
 

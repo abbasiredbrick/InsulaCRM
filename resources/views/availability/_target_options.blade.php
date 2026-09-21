@@ -11,6 +11,7 @@
     'balcony' => 'Balcony (Yes/No)',
     'view' => 'View (sea, community…)',
     'key_date' => 'Key / vacant date',
+    'available_from' => 'Availability date',
     'amenities' => 'Amenities / facilities',
     'remarks' => 'Remarks & commission',
     'community' => 'Community / area',

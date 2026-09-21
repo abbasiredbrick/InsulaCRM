@@ -354,11 +354,12 @@
                         @php
                             $availabilityColors = [
                                 'draft' => 'secondary', 'ready_to_list' => 'azure',
+                                'upcoming' => 'cyan',
                                 'listed' => 'green', 'reserved' => 'orange',
                                 'leased' => 'blue', 'sold' => 'purple', 'unlisted' => 'dark',
                             ];
                         @endphp
-                        <span class="badge bg-{{ $availabilityColors[$unit->availability] ?? 'secondary' }}">{{ __(\App\Models\Property::AVAILABILITIES[$unit->availability] ?? $unit->availability) }}</span>
+                        <span class="badge bg-{{ $availabilityColors[$unit->availability] ?? 'secondary' }}">{{ __($unit->availability_label) }}</span>
                     </td>
                     <td>
                         @forelse($unit->leads as $linkedLead)

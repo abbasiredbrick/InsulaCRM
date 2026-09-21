@@ -49,7 +49,7 @@
                             • {{ $unit->price_line }}
                         </span>
                     </span>
-                    <span class="badge bg-azure-lt">{{ __(\App\Models\Property::AVAILABILITIES[$unit->availability] ?? $unit->availability) }}</span>
+                    <span class="badge bg-azure-lt">{{ __($unit->availability_label) }}</span>
                 </label>
             @empty
                 <div class="list-group-item text-muted">{{ __('No inventory yet. Add units under Inventory first.') }}</div>
