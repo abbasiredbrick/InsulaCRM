@@ -400,6 +400,189 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(5, $result['updated']);
     }
 
+    // ── The real Relevate (Burj Al Shams) CSV layout ───────────────────────
+    //
+    // Relevate emails a comma CSV whose header labels carry embedded newlines
+    // ("Unit No\n"), a "listing price", a "balcony" and "view" column, an
+    // "expected vacating date" column (dates like "Sep 14, 2026" or the word
+    // "Available" for units ready now), and trailing empty columns. There is no
+    // building column, so the source carries default_building.
+
+    protected function relevateCsv(): string
+    {
+        $header = ["Unit No\n", "Area (Sqft)\n", "Unit Type\n", "Balcony\n", "View\n", "Status\n", "Expected vacating date\n", "Listing price\n"];
+        $rows = [
+            ['1901', '1639', "3 BHK\n", "No\n", "Community view\n", "Available for viewing\n", '', '125000'],
+            ['1605', '1121', "2 BHK\n", "Yes\n", "Sea View\n", "Available for viewing\n", "Available\n", '102000'],
+            ['1703', '1227', "2 BHK\n", "No\n", "Sea View\n", "Upcoming\n", 'Sep 14, 2026', '105000'],
+            ['1810', '1121', "2 BHK\n", "No\n", "Community view\n", "Upcoming\n", 'Sep 26, 2026', '100000'],
+            ['2404', '1104', "2 BHK\n", "Yes\n", "Sea View\n", "Upcoming\n", 'Sep 28, 2026', '103000'],
+            ['1407', '1104', "2 BHK\n", "Yes\n", "Sea View\n", "Upcoming\n", 'Sep 15, 2026', '108000'],
+            ['1806', '1460', "2 BHK + M\n", "No\n", "Sea View\n", "Upcoming\n", 'Oct 1, 2026', '120000'],
+        ];
+        $encode = fn (array $cells): string => implode(',', array_map(
+            fn ($cell) => (function (string $cell): string {
+                $cell = trim($cell);
+                if (str_contains($cell, ',') || str_contains($cell, '"') || str_contains($cell, "\n")) {
+                    return '"'.str_replace('"', '""', $cell).'"';
+                }
+
+                return $cell;
+            })((string) $cell),
+            $cells
+        ));
+        $lines = [$encode($header).','];
+        foreach ($rows as $row) {
+            $lines[] = $encode($row).',,,,,,,,,,,,,,';
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    protected function parseRelevateCsv(string $delimiter = 'comma', ?bool $hasHeader = null): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'relevate_csv_');
+        file_put_contents($path, $this->relevateCsv());
+
+        try {
+            return (new AvailabilityIngestService)->parseFile($path, 'csv', [
+                'delimiter' => $delimiter,
+                'has_header' => $hasHeader ?? false,
+            ]);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    protected function relevateSource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_city' => 'Abu Dhabi',
+            'default_building' => 'Burj Al Shams',
+            'default_deposit_pct' => 5,
+            'default_deposit_min' => 5000,
+            'default_admin_fee' => 1050,
+            'default_tawtheeq_fee' => 150,
+            'parse_options' => ['delimiter' => 'comma', 'has_header' => true],
+            'column_map' => [
+                'Unit No' => 'unit_no',
+                'Area (Sqft)' => 'square_footage',
+                'Unit Type' => 'features',
+                'Balcony' => 'balcony',
+                'View' => 'view',
+                'Status' => 'status',
+                'Expected vacating date' => 'key_date',
+                'Listing price' => 'rent',
+            ],
+        ]);
+    }
+
+    public function test_relevate_csv_is_auto_detected_and_fully_mapped(): void
+    {
+        // A brand-new source has no mapping yet — the Relevate layout (header
+        // auto-detected, sqft area, balcony/view, status, date, listing price)
+        // must be rebuilt automatically on the first upload.
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_building' => 'Burj Al Shams',
+            'default_city' => 'Abu Dhabi',
+            'default_deposit_pct' => 5,
+            'default_deposit_min' => 5000,
+            'default_admin_fee' => 1050,
+            'default_tawtheeq_fee' => 150,
+            'parse_options' => ['delimiter' => 'auto', 'has_header' => false],
+        ]);
+
+        $table = $this->parseRelevateCsv('auto', false);
+
+        $this->assertSame('Unit No', $table['header'][0]);
+        $this->assertSame('Area (Sqft)', $table['header'][1]);
+        $this->assertSame('Expected vacating date', $table['header'][6]);
+        $this->assertCount(7, $table['rows']);
+
+        $result = (new AvailabilityIngestService)->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertTrue($result['mapping_rebuilt']);
+        $this->assertSame(7, $result['created']);
+        $this->assertSame(0, $result['skipped']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get();
+        $this->assertCount(7, $units);
+        $this->assertSame(0, $units->where('sub_community', 'Other')->count());
+
+        $byRef = $units->keyBy('source_unit_ref');
+
+        $u = $byRef['1901'];
+        $this->assertSame('Burj Al Shams', $u->sub_community);
+        $this->assertSame('1901', $u->unit_no);
+        $this->assertSame(3, $u->bedrooms);
+        $this->assertSame(1639, $u->square_footage); // sqft is NOT ×10.7639
+        $this->assertSame('no', $u->balcony);
+        $this->assertSame('Community view', $u->view);
+        $this->assertSame('listed', $u->availability); // "Available for viewing"
+        $this->assertSame(125000, (int) $u->rent_price);
+        $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
+        $this->assertSame(1050, (int) $u->admin_fee);
+        $this->assertSame(150, (int) $u->tawtheeq_fee);
+        $this->assertStringContainsString('Balcony: No', $u->marketing_description);
+        $this->assertStringContainsString('View: Community view', $u->marketing_description);
+
+        $u = $byRef['1703'];
+        $this->assertSame('ready_to_list', $u->availability); // "Upcoming"
+        $this->assertSame('2026-09-14', $u->handover_date?->toDateString());
+        $this->assertSame('no', $u->balcony);
+        $this->assertSame('Sea View', $u->view);
+
+        $u = $byRef['1605'];
+        $this->assertNull($u->handover_date);
+        $this->assertStringContainsString('Available immediately', $u->notes);
+        $this->assertSame(5100, (int) $u->deposit_amount);
+    }
+
+    public function test_relevate_deposit_formula_uses_minimum_floor(): void
+    {
+        $source = $this->relevateSource();
+
+        $path = tempnam(sys_get_temp_dir(), 'relevate_csv_');
+        file_put_contents($path, $this->relevateCsv());
+
+        try {
+            $table = (new AvailabilityIngestService)->parseFile($path, 'csv', $source->parse_options);
+        } finally {
+            @unlink($path);
+        }
+
+        $result = (new AvailabilityIngestService)->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+        $this->assertFalse($result['mapping_rebuilt']);
+        $this->assertSame(7, $result['created']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get()->keyBy('source_unit_ref');
+
+        // max(5,000, 5% × rent): 125,000 → 6,250; 102,000 → 5,100; 100,000 → 5,000 (floor); 120,000 → 6,000.
+        $this->assertSame(6250, (int) $units['1901']->deposit_amount);
+        $this->assertSame(5100, (int) $units['1605']->deposit_amount);
+        $this->assertSame(5000, (int) $units['1810']->deposit_amount);
+        $this->assertSame(6000, (int) $units['1806']->deposit_amount);
+    }
+
+    public function test_relevate_source_without_formula_uses_fixed_deposit(): void
+    {
+        $source = $this->relevateSource();
+        $source->update(['default_deposit_pct' => null, 'default_deposit_min' => null, 'default_deposit' => 4000]);
+
+        $table = $this->parseRelevateCsv('comma', true);
+        (new AvailabilityIngestService)->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '1901')->first();
+        $this->assertSame(4000, (int) $unit->deposit_amount);
+    }
+
     public function test_units_missing_from_latest_sheet_become_leased(): void
     {
         $source = $this->createAmsSource();

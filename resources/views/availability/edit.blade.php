@@ -47,6 +47,17 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('Default deposit (AED)') }}</label>
                             <input type="number" name="default_deposit" min="0" step="0.01" class="form-control" value="{{ old('default_deposit', $source->default_deposit) }}">
+                            <div class="form-hint">{{ __('Fixed amount, or leave blank to use a formula.') }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Deposit % of annual rent') }}</label>
+                            <input type="number" name="default_deposit_pct" min="0" max="100" step="0.01" class="form-control" value="{{ old('default_deposit_pct', $source->default_deposit_pct) }}">
+                            <div class="form-hint">{{ __('e.g. 5 → max(min, 5% × rent) per unit.') }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ __('Minimum deposit (AED)') }}</label>
+                            <input type="number" name="default_deposit_min" min="0" step="0.01" class="form-control" value="{{ old('default_deposit_min', $source->default_deposit_min) }}">
+                            <div class="form-hint">{{ __('e.g. 5000 → "AED 5,000/- or 5%, whichever is higher".') }}</div>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label class="form-label">{{ __('Default admin fee (AED)') }}</label>
@@ -95,7 +106,10 @@
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h3 class="card-title mb-0">{{ __('Column mapping') }}</h3>
-                        <button type="button" class="btn btn-sm btn-outline-primary" id="addMappingRow">{{ __('Add Column') }}</button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="addMappingRow">{{ __('Add Column') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="relevatePreset">{{ __('Load Relevate layout') }}</button>
+                        </div>
                     </div>
                 </div>
                 <div class="table-responsive">
@@ -222,29 +236,74 @@
 document.addEventListener('DOMContentLoaded', () => {
     const body = document.getElementById('mappingBody');
     const addRow = document.getElementById('addMappingRow');
-    const nextIndex = () => {
-        if (body.querySelector('.text-muted')) return 0;
-        let max = -1;
-        body.querySelectorAll('[name^="column_map"]').forEach(el => {
-            const m = el.name.match(/\[(\d+)\]/);
-            if (m) max = Math.max(max, parseInt(m[1], 10));
-        });
-        return max + 1;
+    const relevatePreset = document.getElementById('relevatePreset');
+    const TARGETS = {
+        'unit_no': 'Unit No.',
+        'building': 'Building',
+        'features': 'Unit features (beds, size, view, kitchen)',
+        'rent': 'Rent (AED)',
+        'deposit': 'Deposit (AED)',
+        'admin_fee': 'Admin fee (AED)',
+        'tawtheeq': 'Tawtheeq fee (AED)',
+        'status': 'Status word (Vacant / Up-coming…)',
+        'parking': 'Parking',
+        'balcony': 'Balcony (Yes/No)',
+        'view': 'View (sea, community…)',
+        'key_date': 'Key / vacant date',
+        'amenities': 'Amenities / facilities',
+        'remarks': 'Remarks & commission',
+        'community': 'Community / area',
+        'city': 'City',
+        'bedrooms': 'Bedrooms',
+        'bathrooms': 'Bathrooms',
+        'square_footage': 'Square footage',
+        'furnishing': 'Furnishing',
+        'property_category': 'Category',
+        'handover_date': 'Handover date',
+        'notes': 'Notes',
     };
-    addRow.addEventListener('click', () => {
-        if (body.querySelector('.text-muted')) body.innerHTML = '';
-        const n = nextIndex();
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><input type="text" class="form-control" name="column_map[${n}][source]" placeholder="{{ __('e.g. Unit No. or col1') }}"></td>
-            <td><select class="form-select" name="column_map[${n}][target]">
-                @include('availability._target_options', ['selected' => null])
-            </select></td>
+    const createRow = (source, target) => {
+        const n = Math.floor(Date.now() % 100000) + Math.floor(Math.random() * 1000);
+        const opts = Object.entries(TARGETS).map(([v, l]) =>
+            `<option value="${v}" ${v === target ? 'selected' : ''}>${l}</option>`).join('');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="form-control" name="column_map[${n}][source]" value="${source}"></td>
+            <td><select class="form-select" name="column_map[${n}][target]">${opts}</select></td>
             <td><label class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" name="column_map[${n}][inherit]" value="1">
                 <span class="form-check-label">{{ __('repeat') }}</span>
             </label></td>`;
-        body.appendChild(row);
+        return tr;
+    };
+    addRow.addEventListener('click', () => {
+        if (body.querySelector('.text-muted')) body.innerHTML = '';
+        body.appendChild(createRow('', ''));
+    });
+    relevatePreset.addEventListener('click', () => {
+        if (! confirm('{{ __("Replace the column mapping, status map and default fees with the Relevate (Burj Al Shams) layout?") }}')) return;
+        body.innerHTML = '';
+        [
+            ['Unit No', 'unit_no'],
+            ['Area (Sqft)', 'square_footage'],
+            ['Unit Type', 'features'],
+            ['Balcony', 'balcony'],
+            ['View', 'view'],
+            ['Status', 'status'],
+            ['Expected vacating date', 'key_date'],
+            ['Listing price', 'rent'],
+        ].forEach(([src, tgt]) => body.appendChild(createRow(src, tgt)));
+        const set = (name, value) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.value = value; };
+        const setCheck = (name, on) => { const el = document.querySelector(`[name="${name}"]`); if (el) el.checked = on; };
+        set('default_building', 'Burj Al Shams');
+        set('default_deposit_pct', '5');
+        set('default_deposit_min', '5000');
+        set('default_admin_fee', '1050');
+        set('default_tawtheeq_fee', '150');
+        set('delimiter', 'comma');
+        setCheck('has_header', true);
+        const sm = document.querySelector('[name="status_map"]');
+        if (sm) sm.value = 'Available for viewing => listed\nUpcoming => ready_to_list';
     });
 });
 </script>

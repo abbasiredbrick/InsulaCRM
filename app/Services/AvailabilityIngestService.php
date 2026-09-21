@@ -309,6 +309,8 @@ class AvailabilityIngestService
             }
         }
 
+        $areaUnit = $this->inferAreaUnit($columnMap);
+
         $created = 0;
         $updated = 0;
         $skipped = 0;
@@ -335,7 +337,7 @@ class AvailabilityIngestService
 
         DB::transaction(function () use (
             $rows, $columnMap, $parseOptions, $statusMap, $city, $source, $tenantId, $runId,
-            &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples,
+            $areaUnit, &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples,
             &$lastBuilding, &$lastCommunity
         ) {
             foreach ($rows as $row) {
@@ -364,6 +366,11 @@ class AvailabilityIngestService
                         }
                         if ($field === 'remarks') {
                             $remarksRaw = trim(($remarksRaw !== '' ? $remarksRaw.' / ' : '').$raw);
+
+                            continue;
+                        }
+                        if ($field === 'square_footage') {
+                            $data[$field] = $this->areaNumeric($raw, $areaUnit === 'sqft');
 
                             continue;
                         }
@@ -429,11 +436,14 @@ class AvailabilityIngestService
 
                 $handover = null;
                 $keyNotes = [];
+                $availableNow = false;
                 foreach (['key_date', 'handover_date'] as $fd) {
                     if (! empty($data[$fd])) {
                         $parsed = $this->parseFlexibleDate($data[$fd]);
                         if ($parsed) {
                             $handover = $parsed;
+                        } elseif ($this->isAvailableNow($data[$fd])) {
+                            $availableNow = true;
                         } else {
                             $keyNotes[] = $data[$fd];
                         }
@@ -450,8 +460,6 @@ class AvailabilityIngestService
                 $commissionNote = preg_match('/commission/i', $remarkLine) ? $remarkLine : null;
                 $amenityLine = trim((string) $amenitiesRaw);
 
-                $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? $source->default_deposit ?? null;
-                $adminFee = $data['admin_fee'] ?? $source->default_admin_fee ?? null;
                 $rentPrice = $data['rent'] ?? $data['rent_price'] ?? null;
                 $perSqm = (bool) ($parseOptions['rent_is_per_sqm'] ?? false);
                 if ($rentPrice !== null && ($perSqm || ($rentRaw !== '' && preg_match('/\bper\s*sq/', strtolower($rentRaw))))) {
@@ -463,6 +471,11 @@ class AvailabilityIngestService
                 if ($rentPrice === null && $remarkLine !== '') {
                     $rentPrice = $this->rentFromRemarks($remarkLine);
                 }
+                // Deposit is resolved after rent so a "max(min, pct × rent)"
+                // source default (e.g. AED 5,000 or 5% of annual rent,
+                // whichever is higher) can be computed per row.
+                $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? $this->defaultDeposit($source, $rentPrice);
+                $adminFee = $data['admin_fee'] ?? $source->default_admin_fee ?? null;
                 $tawtheeqFee = $data['tawtheeq'] ?? $data['tawtheeq_fee'] ?? $source->default_tawtheeq_fee ?? null;
 
                 $notesParts = ["Source: {$source->name} availability sheet."];
@@ -480,6 +493,9 @@ class AvailabilityIngestService
                 foreach ($keyNotes as $keyNote) {
                     $notesParts[] = "Keys: {$keyNote}.";
                 }
+                if ($availableNow) {
+                    $notesParts[] = 'Available immediately.';
+                }
                 if ($commissionNote) {
                     $notesParts[] = "{$commissionNote}.";
                 } elseif (preg_match('/commission/i', $remarkLine)) {
@@ -495,6 +511,12 @@ class AvailabilityIngestService
                 }
                 if ($amenityLine !== '') {
                     $descriptionParts[] = "Amenities: {$amenityLine}.";
+                }
+                if (! empty($data['view'])) {
+                    $descriptionParts[] = 'View: '.$data['view'].'.';
+                }
+                if (! empty($data['balcony'])) {
+                    $descriptionParts[] = 'Balcony: '.ucfirst((string) $data['balcony']).'.';
                 }
                 if ($remarkLine !== '') {
                     $descriptionParts[] = $remarkLine;
@@ -542,6 +564,8 @@ class AvailabilityIngestService
                     'square_footage' => $squareFootage,
                     'furnishing' => $furnishing,
                     'parking' => $parking,
+                    'balcony' => $data['balcony'] ?? null,
+                    'view' => $data['view'] ?? null,
                     'rent_price' => $rentPrice,
                     'deposit_amount' => $deposit,
                     'admin_fee' => $adminFee,
@@ -783,6 +807,7 @@ class AvailabilityIngestService
             'parking' => $this->parkingCount($value),
             'bedrooms' => $this->bedroomCount($value),
             'bathrooms' => $this->bathroomCount($value),
+            'balcony' => $this->balcony($value),
             'square_footage' => $this->areaNumeric($value),
             'handover_date', 'key_date' => $value,
             'source_status', 'status' => $value,
@@ -824,6 +849,23 @@ class AvailabilityIngestService
         }
 
         return null;
+    }
+
+    /**
+     * Deposit default for a row with no explicit deposit column: either the
+     * fixed default_deposit or the formula max(default_deposit_min,
+     * default_deposit_pct% × annual rent) used by Relevate-style sheet policies.
+     */
+    protected function defaultDeposit(AvailabilitySource $source, $rentPrice): ?float
+    {
+        $pct = $source->default_deposit_pct;
+        if ($pct !== null && $rentPrice !== null && (float) $rentPrice > 0) {
+            $amount = max((float) ($source->default_deposit_min ?? 0), (float) $rentPrice * ((float) $pct / 100));
+
+            return round($amount, 2);
+        }
+
+        return $source->default_deposit !== null ? (float) $source->default_deposit : null;
     }
 
     protected function parkingCount(string $value): ?int
@@ -898,7 +940,7 @@ class AvailabilityIngestService
         return $value === '' ? null : (int) $value;
     }
 
-    protected function areaNumeric(string $value): ?int
+    protected function areaNumeric(string $value, bool $bareIsSqft = false): ?int
     {
         if (preg_match('/([\d]+(?:[.,][\d]+)?)\s*(sqm|square\s*m(?:eter|etre)s?|sq\s*m|m²)/i', $value, $m)) {
             $num = (float) str_replace(',', '', $m[1]);
@@ -909,10 +951,48 @@ class AvailabilityIngestService
             return (int) round((float) str_replace(',', '', $m[1]));
         }
         if (preg_match('/^\s*([\d]+(?:[.,][\d]+)?)\s*$/', $value, $m)) {
-            return (int) round((float) str_replace(',', '', $m[1]) * 10.7639);
+            $num = (float) str_replace(',', '', $m[1]);
+
+            return (int) round($bareIsSqft ? $num : $num * 10.7639);
         }
 
         return null;
+    }
+
+    protected function balcony(string $value): ?string
+    {
+        $value = strtolower(trim($value));
+        if (in_array($value, ['yes', 'y', 'true', '1', '1st', 'have', 'with'], true)) {
+            return 'yes';
+        }
+        if (in_array($value, ['no', 'n', 'false', '0', 'none', 'nil', 'without'], true)) {
+            return 'no';
+        }
+
+        return null;
+    }
+
+    /**
+     * Decide whether an "Area (Sqft)"-style header means bare area numbers are
+     * already square feet (as Relevate provides them) rather than square metres.
+     * Falls back to the historical square-metre interpretation.
+     */
+    protected function inferAreaUnit(array $columnMap): string
+    {
+        foreach ($columnMap as $header => $field) {
+            if ($field !== 'square_footage') {
+                continue;
+            }
+            $header = strtolower((string) $header);
+            if (preg_match('/\bsqft\b|sq\.?\s*ft|square\s*foot|square\s*feet/', $header)) {
+                return 'sqft';
+            }
+            if (preg_match('/\bsqm\b|sq\.?\s*m|square\s*m(?:eter|etre)|m²/', $header)) {
+                return 'sqm';
+            }
+        }
+
+        return 'sqm';
     }
 
     protected function furnishing(string $value): ?string
@@ -1005,6 +1085,10 @@ class AvailabilityIngestService
             'vacant' => 'ready_to_list',
             'ready' => 'ready_to_list',
             'available' => 'ready_to_list',
+            'availableforviewing' => 'listed',
+            'availableforviewingnow' => 'listed',
+            'openforviewing' => 'listed',
+            'readyforviewing' => 'listed',
             'upcoming' => 'ready_to_list',
             'upcomingsoon' => 'ready_to_list',
             'underoffer' => 'reserved',
@@ -1071,7 +1155,7 @@ class AvailabilityIngestService
         if ($value === '') {
             return null;
         }
-        foreach (['d.m.Y', 'd/m/Y', 'd-m-Y', 'Y-m-d', 'd M Y'] as $format) {
+        foreach (['d.m.Y', 'd/m/Y', 'd-m-Y', 'Y-m-d', 'M d, Y', 'M j, Y', 'd M Y', 'j M Y', 'F d, Y'] as $format) {
             try {
                 $date = Carbon::createFromFormat($format, $value);
                 if ($date && $date->format($format) === $value) {
@@ -1083,6 +1167,17 @@ class AvailabilityIngestService
         }
 
         return null;
+    }
+
+    /**
+     * A sheet's date column sometimes says "Available" / "Immediate" instead of
+     * a concrete date — the unit is ready now, not a noisy "Keys: …" note.
+     */
+    protected function isAvailableNow(string $value): bool
+    {
+        $value = strtolower(trim($value));
+
+        return (bool) preg_match('/^(available|available\s+now|immediate|immediately|now|vacant(\s+now)?|ready(\s+now)?)$/', $value);
     }
 
     // ── Grid to rows ────────────────────────────────────────────────────────
@@ -1172,23 +1267,38 @@ class AvailabilityIngestService
             'features' => 'features',
             'property type' => 'features',
             'type' => 'features',
+            'unit type' => 'features',
+            'area (sqft)' => 'square_footage',
+            'area (sqm)' => 'square_footage',
+            'balcony' => 'balcony',
+            'balconies' => 'balcony',
+            'view' => 'view',
+            'view type' => 'view',
             'rent' => 'rent',
             'rent (aed)' => 'rent',
             'rent price' => 'rent',
             'asking rent' => 'rent',
             'annual rent' => 'rent',
+            'listing price' => 'rent',
+            'listing price (aed)' => 'rent',
             'deposit' => 'deposit',
             'security deposit' => 'deposit',
             'admin fee' => 'admin_fee',
             'admin charges' => 'admin_fee',
             'status' => 'status',
             'availability' => 'status',
+            'property status' => 'status',
             'parking' => 'parking',
             'parking spaces' => 'parking',
             'parkings' => 'parking',
             'key location' => 'key_date',
             'key date' => 'key_date',
             'vacancy date' => 'key_date',
+            'vacating date' => 'key_date',
+            'expected vacating date' => 'key_date',
+            'expected vacancy date' => 'key_date',
+            'expected availability date' => 'key_date',
+            'expected available date' => 'key_date',
             'vacant from' => 'key_date',
             'available from' => 'key_date',
             'facilities' => 'amenities',
@@ -1216,7 +1326,45 @@ class AvailabilityIngestService
             }
         }
 
+        // Second pass for near-miss headers (e.g. Relevate's "Unit Type / Balcony"
+        // or "Expected Move-In Date") — only unmatched columns get a fuzzy hit.
+        foreach ($header as $name) {
+            $key = strtolower((string) $name);
+            if ($key === '' || isset($map[$name])) {
+                continue;
+            }
+            foreach ($this->fuzzyFieldColumns() as $pattern => $field) {
+                if (preg_match($pattern, $key)) {
+                    $map[$name] = $field;
+                    break;
+                }
+            }
+        }
+
         return $map;
+    }
+
+    /**
+     * Regex fallbacks used when a header is not one of the known exact synonyms.
+     * Order matters: "Unit Type / Balcony" must map to features, not balcony.
+     *
+     * @return array<string, string>
+     */
+    protected function fuzzyFieldColumns(): array
+    {
+        return [
+            '/type.*balcony/' => 'features',
+            '/unit\s*type/' => 'features',
+            '/property\s*type/' => 'features',
+            '/expected\s*(?:vacan(?:t|cy)|vacating|availability|available|move[\s-]?in)/' => 'key_date',
+            '/listing\s*price/' => 'rent',
+            '/asking\s*(?:rent|price)/' => 'rent',
+            '/security\s*deposit/' => 'deposit',
+            '/square\s*(?:foot|feet|meter)|sq\.?\s*(?:ft|m)/' => 'square_footage',
+            '/bedrooms?/' => 'bedrooms',
+            '/balcony/' => 'balcony',
+            '/^view(?:ing|s)?$/' => 'view',
+        ];
     }
 
     /**

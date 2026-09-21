@@ -124,6 +124,8 @@ class Property extends Model
         'service_charge',
         'furnishing',
         'parking',
+        'balcony',
+        'view',
         'availability',
         'assigned_agent_id',
         'owner_name',

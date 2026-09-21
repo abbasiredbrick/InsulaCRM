@@ -8,6 +8,8 @@
     'tawtheeq' => 'Tawtheeq fee (AED)',
     'status' => 'Status word (Vacant / Up-coming…)',
     'parking' => 'Parking',
+    'balcony' => 'Balcony (Yes/No)',
+    'view' => 'View (sea, community…)',
     'key_date' => 'Key / vacant date',
     'amenities' => 'Amenities / facilities',
     'remarks' => 'Remarks & commission',
