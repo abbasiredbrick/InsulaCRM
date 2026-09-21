@@ -27,38 +27,17 @@ class LeadController extends Controller
 
         $query = Lead::with(['agent', 'property', 'properties'])->withCount('lists');
 
+        $user = auth()->user();
+
         // Automatic scoping to the logged-in user: admins see every lead,
         // managers see their own + their team's (plus unassigned), and plain
-        // agents only ever see the leads assigned to them.
-        $user = auth()->user();
-        $viewableAgentIds = null;
-
-        if (! $user->isAdmin()) {
-            if ($user->isManager()) {
-                $viewableAgentIds = array_merge([$user->id], $user->teamUserIds());
-                $query->where(function ($q) use ($viewableAgentIds) {
-                    $q->whereIn('agent_id', $viewableAgentIds)
-                        ->orWhereNull('agent_id')
-                        ->orWhereHas('leadAgents', fn ($lq) => $lq->whereIn('agent_id', $viewableAgentIds)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
-                });
-            } else {
-                $viewableAgentIds = [$user->id];
-                $query->where(function ($q) use ($user) {
-                    $q->where('agent_id', $user->id)
-                        ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
-                });
-            }
-        }
+        // agents only ever see the leads assigned to them. This is the shared
+        // app-wide rule — see LeadSearchService.
+        $viewableAgentIds = $this->leadSearch()->visibleAgentIds($user);
+        $this->leadSearch()->applyVisibleScope($query, $user);
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('reference', 'like', "%{$search}%");
-            });
+            $this->leadSearch()->applyTerm($query, $request->search);
         }
 
         // Unit search: match leads whose linked unit(s) match any unit parameter.
@@ -737,18 +716,11 @@ class LeadController extends Controller
 
         $query = Lead::with('agent');
 
-        if (auth()->user()->isAgent()) {
-            $query->where('agent_id', auth()->id());
-        }
+        // Same app-wide visibility rules as the leads list (see LeadSearchService).
+        $this->leadSearch()->applyVisibleScope($query, auth()->user());
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+            $this->leadSearch()->applyTerm($query, $request->search);
         }
 
         if ($request->filled('source')) {
@@ -861,5 +833,13 @@ class LeadController extends Controller
                 ->orWhere('source_unit_ref', 'like', $like)
                 ->orWhere('property_category', 'like', $like);
         });
+    }
+
+    /**
+     * Shared app-wide lead search service (see App\Services\LeadSearchService).
+     */
+    private function leadSearch(): \App\Services\LeadSearchService
+    {
+        return app(\App\Services\LeadSearchService::class);
     }
 }

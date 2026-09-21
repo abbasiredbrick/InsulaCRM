@@ -4,10 +4,21 @@
 @section('page-title', __('Leads'))
 
 @section('content')
+@php $filters = request()->only(['agent_id', 'search', 'source', 'temperature']); @endphp
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">{{ __('All Leads') }}</h3>
         <div class="card-actions">
+            <div class="btn-group me-2" role="group" aria-label="{{ __('View') }}">
+                <a href="{{ route('leads.table', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.table') ? 'active' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                    {{ __('Table') }}
+                </a>
+                <a href="{{ route('leads.index', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.index', 'leads.kanban') ? 'active' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="10" y="3" width="4" height="12" rx="1"/><rect x="15" y="3" width="6" height="7" rx="1"/></svg>
+                    {{ __('Kanban') }}
+                </a>
+            </div>
             <a href="{{ route('leads.export', request()->query()) }}" class="btn btn-outline-secondary">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
                 {{ __('Export CSV') }}
@@ -59,7 +70,7 @@
         </form>
     </div>
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('leads.index') }}" class="row g-2" data-live-filter>
+        <form method="GET" action="{{ route('leads.table') }}" class="row g-2" data-live-filter>
             <div class="col-md-3">
                 <label for="filter-search" class="visually-hidden">{{ __('Search') }}</label>
                 <input type="text" name="search" id="filter-search" class="form-control" placeholder="{{ __('Search name, phone, email...') }}" value="{{ request('search') }}">
@@ -100,13 +111,13 @@
             <div class="col-auto">
                 <div class="btn-group" role="group">
                     @if(($businessMode ?? 'wholesale') === 'wholesale')
-                    <a href="{{ route('leads.index', ['stacked' => 1]) }}" class="btn btn-sm {{ request('stacked') ? 'btn-purple' : 'btn-outline-purple' }}">{{ __('Stacked') }}</a>
+                    <a href="{{ route('leads.table', ['stacked' => 1]) }}" class="btn btn-sm {{ request('stacked') ? 'btn-purple' : 'btn-outline-purple' }}">{{ __('Stacked') }}</a>
                     @endif
                 </div>
             </div>
             @if(request()->hasAny(['search', 'unit', 'source', 'status', 'agent_id', 'stacked']))
             <div class="col-md-1">
-                <a href="{{ route('leads.index') }}" class="btn btn-outline-secondary w-100">{{ __('Clear') }}</a>
+                <a href="{{ route('leads.table') }}" class="btn btn-outline-secondary w-100">{{ __('Clear') }}</a>
             </div>
             @endif
         </form>
@@ -259,7 +270,7 @@
                     <td colspan="12" class="text-center py-4">
                         @if(request()->hasAny(['search', 'unit', 'source', 'status', 'agent_id', 'stacked']))
                             <div class="text-secondary mb-2">{{ __('No leads match your current filters.') }}</div>
-                            <a href="{{ route('leads.index') }}" class="btn btn-sm btn-outline-secondary">
+                            <a href="{{ route('leads.table') }}" class="btn btn-sm btn-outline-secondary">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg>
                                 {{ __('Clear Filters') }}
                             </a>

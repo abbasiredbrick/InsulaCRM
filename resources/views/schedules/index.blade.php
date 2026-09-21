@@ -11,7 +11,7 @@
         'meetings' => $items->where('type', 'meeting')->count(),
     ];
     $defaultType = in_array($filters['type'], ['viewings', 'tasks', 'meetings'], true) ? $filters['type'] : null;
-    $preselectedLeadName = $leadOptions->isNotEmpty() ? ($leadOptions->first()->first_name.' '.$leadOptions->first()->last_name) : '';
+    $preselectedLeadName = $preselectedLead ? trim($preselectedLead->first_name.' '.$preselectedLead->last_name) : '';
 @endphp
 <div class="card">
     <div class="card-header">
@@ -40,13 +40,14 @@
 
     {{-- Filters --}}
     <div class="card-body border-bottom py-3">
-        <form method="GET" action="{{ route('schedules.index') }}" class="row g-2 align-items-end">
+        <form method="GET" action="{{ route('schedules.index') }}" class="row g-2 align-items-end" data-live-filter>
             @if($filters['lead'])
             <input type="hidden" name="lead" value="{{ $filters['lead'] }}">
             @endif
+            <input type="hidden" name="type" value="{{ $defaultType ?? 'all' }}">
             <div class="col-md-2">
-                <label class="form-label">{{ __('Status') }}</label>
-                <select name="status" class="form-select form-select-sm" data-live-filter>
+                <label class="form-label" for="sched-filter-status">{{ __('Status') }}</label>
+                <select name="status" id="sched-filter-status" class="form-select form-select-sm">
                     <option value="">{{ __('All Statuses') }}</option>
                     @foreach(['scheduled' => 'Scheduled', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'no_show' => 'No Show'] as $key => $label)
                         <option value="{{ $key }}" {{ $filters['status'] === $key ? 'selected' : '' }}>{{ $label }}</option>
@@ -54,17 +55,17 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label">{{ __('From') }}</label>
-                <input type="date" name="from" class="form-control form-control-sm" value="{{ $filters['from'] }}">
+                <label class="form-label" for="sched-filter-from">{{ __('From') }}</label>
+                <input type="date" name="from" id="sched-filter-from" class="form-control form-control-sm" value="{{ $filters['from'] }}">
             </div>
             <div class="col-md-2">
-                <label class="form-label">{{ __('To') }}</label>
-                <input type="date" name="to" class="form-control form-control-sm" value="{{ $filters['to'] }}">
+                <label class="form-label" for="sched-filter-to">{{ __('To') }}</label>
+                <input type="date" name="to" id="sched-filter-to" class="form-control form-control-sm" value="{{ $filters['to'] }}">
             </div>
             @if($agents->isNotEmpty())
             <div class="col-md-2">
-                <label class="form-label">{{ __('Agent') }}</label>
-                <select name="agent" class="form-select form-select-sm">
+                <label class="form-label" for="sched-filter-agent">{{ __('Agent') }}</label>
+                <select name="agent" id="sched-filter-agent" class="form-select form-select-sm">
                     <option value="">{{ __('All Agents') }}</option>
                     @foreach($agents as $agent)
                         <option value="{{ $agent->id }}" {{ (string) $filters['agent'] === (string) $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
@@ -73,17 +74,19 @@
             </div>
             @endif
             <div class="col-md-3">
-                <label class="form-label">{{ __('Search') }}</label>
-                <input type="text" name="search" class="form-control form-control-sm" value="{{ $filters['search'] }}" placeholder="{{ __('Lead, phone, unit, location, source...') }}">
+                <label class="form-label" for="sched-filter-search">{{ __('Search') }}</label>
+                <input type="text" name="search" id="sched-filter-search" class="form-control form-control-sm" value="{{ $filters['search'] }}" placeholder="{{ __('Lead, phone, unit, location, source...') }}">
             </div>
+            @if(request()->hasAny(['status', 'from', 'to', 'agent', 'lead', 'search']))
             <div class="col-auto">
-                <button type="submit" class="btn btn-sm btn-primary">{{ __('Filter') }}</button>
                 <a href="{{ route('schedules.index') }}{{ $filters['lead'] ? '?lead=' . $filters['lead'] : '' }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
             </div>
+            @endif
         </form>
     </div>
 
     {{-- Tabs --}}
+    <div data-live-results>
     <div class="card-body border-bottom p-0">
         <ul class="nav nav-tabs border-bottom-0" role="tablist" id="sched-tabs">
             <li class="nav-item" role="presentation">
@@ -213,6 +216,7 @@
         <div class="list-group-item text-center text-secondary py-5">{{ __('Nothing scheduled yet. Schedule a viewing, meeting or task to get started.') }}</div>
         @endforelse
     </div>
+    </div>
 </div>
 
 {{-- ── Create Meeting Modal ─────────────────────────────────────────── --}}
@@ -227,11 +231,14 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">{{ __('Lead') }} <span class="text-danger">*</span></label>
-                    <div class="lead-picker-wrap" data-preselect="{{ $filters['lead'] }}">
-                        <input type="text" class="form-control lead-picker-input" placeholder="{{ __('Search lead by name or phone...') }}" autocomplete="off">
-                        <input type="hidden" name="lead_id" class="lead-picker-value">
-                        <div class="lead-picker-results list-group mt-1" style="display:none;max-height:220px;overflow:auto;"></div>
-                    </div>
+                    <x-searchable-select
+                        name="lead_id"
+                        :options="$leadOptions"
+                        :selected="$filters['lead']"
+                        :placeholder="__('Search lead...')"
+                        :search-placeholder="__('Search by name, phone, email or reference...')"
+                        :remote="route('schedules.leads.search')"
+                    />
                 </div>
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -287,11 +294,12 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label">{{ __('Lead') }} <span class="text-danger">*</span></label>
-                    <div class="lead-picker-wrap">
-                        <input type="text" class="form-control lead-picker-input" placeholder="{{ __('Search lead by name or phone...') }}" autocomplete="off">
-                        <input type="hidden" name="lead_id" class="lead-picker-value">
-                        <div class="lead-picker-results list-group mt-1" style="display:none;max-height:220px;overflow:auto;"></div>
-                    </div>
+                    <x-searchable-select
+                        name="lead_id"
+                        :placeholder="__('Search lead...')"
+                        :search-placeholder="__('Search by name, phone, email or reference...')"
+                        :remote="route('schedules.leads.search')"
+                    />
                 </div>
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -456,118 +464,80 @@
 <script>
 (function () {
     // ── Tabs: filter the single chronological feed client-side ──
-    var tabs = document.querySelectorAll('#sched-tabs [data-sched-tab]');
-    var rows = document.querySelectorAll('[data-sched-row]');
+    var currentTab = '{{ $defaultType ?? 'all' }}';
+    var TABS_SEL = '#sched-tabs [data-sched-tab]';
+    var ROWS_SEL = '[data-sched-row]';
 
     function applyTab(type) {
-        rows.forEach(function (row) {
+        currentTab = type;
+        document.querySelectorAll(ROWS_SEL).forEach(function (row) {
             row.style.display = (type === 'all' || row.dataset.schedRow === type) ? '' : 'none';
         });
-        tabs.forEach(function (tab) {
+        document.querySelectorAll(TABS_SEL).forEach(function (tab) {
             tab.classList.toggle('active', tab.dataset.schedTab === type);
         });
     }
 
-    tabs.forEach(function (tab) {
-        tab.addEventListener('click', function (e) {
-            e.preventDefault();
-            applyTab(tab.dataset.schedTab);
-        });
-    });
-
-    applyTab('{{ $defaultType ?? 'all' }}');
-
-    // ── Lead picker (AJAX search) ──
-    document.querySelectorAll('.lead-picker-wrap').forEach(function (wrap) {
-        var input = wrap.querySelector('.lead-picker-input');
-        var value = wrap.querySelector('.lead-picker-value');
-        var results = wrap.querySelector('.lead-picker-results');
-        var preselect = wrap.dataset.preselect;
-
-        if (preselect) {
-            value.value = preselect;
-            input.readOnly = true;
-            input.placeholder = '{{ $preselectedLeadName }}';
-        }
-
-        var timer = null;
-        function search(q) {
-            clearTimeout(timer);
-            if (!q || q.length < 2) { results.style.display = 'none'; return; }
-            timer = setTimeout(function () {
-                fetch('{{ route('schedules.leads.search') }}?q=' + encodeURIComponent(q), {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
-                }).then(function (r) { return r.json(); }).then(function (data) {
-                    results.innerHTML = '';
-                    (data.results || []).forEach(function (lead) {
-                        var a = document.createElement('a');
-                        a.href = '#';
-                        a.className = 'list-group-item list-group-item-action py-1 small lead-picker-option';
-                        a.setAttribute('data-id', lead.id);
-                        a.textContent = lead.label;
-                        a.addEventListener('click', function (e) {
-                            e.preventDefault();
-                            value.value = lead.id;
-                            input.value = lead.label;
-                            results.style.display = 'none';
-                        });
-                        results.appendChild(a);
-                    });
-                    results.style.display = (data.results || []).length ? '' : 'none';
-                });
-            }, 220);
-        }
-
-        input.addEventListener('input', function () { search(input.value.trim()); });
-        input.addEventListener('focus', function () { if (input.value.trim().length >= 2) search(input.value.trim()); });
-    });
-
     // ── Feedback modal ──
-    document.querySelectorAll('.sched-feedback-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var form = document.getElementById('feedbackForm');
-            form.action = btn.dataset.feedbackUrl;
-            document.getElementById('feedbackModalTitle').textContent =
-                (btn.dataset.feedbackType.charAt(0).toUpperCase() + btn.dataset.feedbackType.slice(1)) + ': ' + btn.dataset.feedbackTitle;
-            document.getElementById('feedbackStatus').value = '';
-            form.querySelector('[name=feedback]').value = '';
-            bootstrap.Modal.getOrCreateInstance(document.getElementById('feedbackModal')).show();
-        });
-    });
+    function openFeedback(btn) {
+        var form = document.getElementById('feedbackForm');
+        form.action = btn.dataset.feedbackUrl;
+        document.getElementById('feedbackModalTitle').textContent =
+            (btn.dataset.feedbackType.charAt(0).toUpperCase() + btn.dataset.feedbackType.slice(1)) + ': ' + btn.dataset.feedbackTitle;
+        document.getElementById('feedbackStatus').value = '';
+        form.querySelector('[name=feedback]').value = '';
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('feedbackModal')).show();
+    }
 
     // ── Edit modals (meeting / task) ──
-    document.querySelectorAll('.sched-edit-btn').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            var type = btn.dataset.type;
-            var modalEl = document.getElementById(type === 'meeting' ? 'editMeetingModal' : 'editTaskModal');
-            var form = document.getElementById(type === 'meeting' ? 'editMeetingForm' : 'editTaskForm');
-            fetch(btn.dataset.editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    var ent = data.entity;
-                    form.action = (type === 'meeting' ? '{{ route('meetings.update', 0) }}' : '{{ route('tasks.update', 0) }}').replace('/0', '/' + ent.id);
-                    form.querySelector('[name=title]').value = ent.title || '';
-                    if (type === 'meeting') {
-                        form.querySelector('[name=scheduled_at]').value = ent.scheduled_at || '';
-                        form.querySelector('[name=duration_minutes]').value = ent.duration_minutes || '';
-                        form.querySelector('[name=notes]').value = ent.notes || '';
-                        form.querySelector('[name=status]').value = 'scheduled';
-                    } else {
-                        form.querySelector('[name=due_date]').value = ent.due_date || '';
-                        form.querySelector('[name=due_time]').value = ent.due_time || '';
-                        form.querySelector('[name=status]').value = 'scheduled';
-                    }
-                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                });
-        });
+    function openEdit(btn) {
+        var type = btn.dataset.type;
+        var modalEl = document.getElementById(type === 'meeting' ? 'editMeetingModal' : 'editTaskModal');
+        var form = document.getElementById(type === 'meeting' ? 'editMeetingForm' : 'editTaskForm');
+        fetch(btn.dataset.editUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var ent = data.entity;
+                form.action = (type === 'meeting' ? '{{ route('meetings.update', 0) }}' : '{{ route('tasks.update', 0) }}').replace('/0', '/' + ent.id);
+                form.querySelector('[name=title]').value = ent.title || '';
+                if (type === 'meeting') {
+                    form.querySelector('[name=scheduled_at]').value = ent.scheduled_at || '';
+                    form.querySelector('[name=duration_minutes]').value = ent.duration_minutes || '';
+                    form.querySelector('[name=notes]').value = ent.notes || '';
+                    form.querySelector('[name=status]').value = 'scheduled';
+                } else {
+                    form.querySelector('[name=due_date]').value = ent.due_date || '';
+                    form.querySelector('[name=due_time]').value = ent.due_time || '';
+                    form.querySelector('[name=status]').value = 'scheduled';
+                }
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+            });
+    }
+
+    // Delegated handlers survive the live-filter swap of the results region.
+    document.addEventListener('click', function (e) {
+        if (!(e.target instanceof Element)) { return; }
+        var tab = e.target.closest(TABS_SEL);
+        if (tab) { e.preventDefault(); applyTab(tab.dataset.schedTab); return; }
+        var fbtn = e.target.closest('.sched-feedback-btn');
+        if (fbtn) { openFeedback(fbtn); return; }
+        var ebtn = e.target.closest('.sched-edit-btn');
+        if (ebtn) { e.preventDefault(); openEdit(ebtn); }
     });
 
     // ── Delete confirm ──
-    document.querySelectorAll('.sched-delete-form').forEach(function (form) {
-        form.addEventListener('submit', function (e) {
-            if (!window.confirm('{{ __('Delete this item? This cannot be undone.') }}')) { e.preventDefault(); }
-        });
+    document.addEventListener('submit', function (e) {
+        if (!(e.target instanceof Element)) { return; }
+        if (e.target.closest('form.sched-delete-form') && !window.confirm('{{ __('Delete this item? This cannot be undone.') }}')) {
+            e.preventDefault();
+        }
+    });
+
+    applyTab(currentTab);
+
+    // Re-apply the active tab after the results region is swapped in.
+    document.addEventListener('insulacrm:live-updated', function () {
+        applyTab(currentTab);
     });
 })();
 </script>

@@ -62,6 +62,24 @@ class SchedulesHubTest extends TestCase
         $response->assertSee('Ada Lovelace');
     }
 
+    public function test_hub_uses_live_filter_search_ui(): void
+    {
+        $this->reAdmin();
+
+        $response = $this->get(route('schedules.index'));
+
+        $response->assertOk();
+        $response->assertSee('data-live-filter', false);
+        $response->assertSee('data-live-results', false);
+        $response->assertSee('id="sched-tabs"', false);
+        $response->assertSee('id="sched-list"', false);
+        $response->assertDontSee('Filter');
+
+        $filtered = $this->get(route('schedules.index', ['status' => 'scheduled']));
+        $filtered->assertOk();
+        $filtered->assertSee('Reset');
+    }
+
     public function test_hub_filters_by_lead(): void
     {
         $this->reAdmin();

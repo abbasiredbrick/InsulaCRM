@@ -6,6 +6,7 @@ use App\Http\Requests\ShowingRequest;
 use App\Models\Lead;
 use App\Models\Property;
 use App\Models\Showing;
+use App\Services\LeadSearchService;
 use App\Services\LeadViewingService;
 use App\Services\ScheduleActivityService;
 
@@ -19,8 +20,12 @@ class ShowingController extends Controller
             ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
-        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'phone', 'email'])
-            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => $l->pickerLabel()])
+        $leadOptions = app(LeadSearchService::class)
+            ->scopedLeads(auth()->user())
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'phone', 'email'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => app(LeadSearchService::class)->label($l, ['withPhone' => false])])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
@@ -120,8 +125,12 @@ class ShowingController extends Controller
             ->get(Property::optionLabelColumns())
             ->map(fn (Property $p) => ['value' => $p->id, 'label' => $p->optionLabel()])
             ->values();
-        $leadOptions = Lead::orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'phone', 'email'])
-            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => $l->pickerLabel()])
+        $leadOptions = app(LeadSearchService::class)
+            ->scopedLeads(auth()->user())
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'phone', 'email'])
+            ->map(fn (Lead $l) => ['value' => $l->id, 'label' => app(LeadSearchService::class)->label($l, ['withPhone' => false])])
             ->values();
         $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
             ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))

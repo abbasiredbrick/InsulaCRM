@@ -43,7 +43,7 @@ class LeadAgentSharingTest extends TestCase
 
         $this->get(route('leads.show', $lead))->assertOk()->assertSee($coAgent->name);
         $this->get(route('leads.index'))->assertSee($lead->full_name);
-        $this->get(route('leads.kanban'))->assertOk();
+        $this->get(route('leads.index'))->assertOk();
     }
 
     public function test_co_agent_can_log_activity_and_task_but_not_delete_lead(): void

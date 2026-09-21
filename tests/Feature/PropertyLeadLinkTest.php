@@ -192,7 +192,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
 
         $this->createLinkedLead('Other', 'Person');
 
-        $this->get(route('leads.index', ['unit' => 'Sky Gardens']))
+        $this->get(route('leads.table', ['unit' => 'Sky Gardens']))
             ->assertOk()
             ->assertSee('Rashid Ali')
             ->assertSee('Mona Said')
@@ -213,7 +213,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
             'community'       => 'Jumeirah Village Circle',
         ]);
 
-        $this->get(route('leads.index', ['unit' => 'Dubai Marina']))
+        $this->get(route('leads.table', ['unit' => 'Dubai Marina']))
             ->assertOk()
             ->assertSee('Hana Yousuf')
             ->assertDontSee('Marina Heights 3');
@@ -229,7 +229,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
         $lead = $this->createLinkedLead('Sara', 'Nader');
         $unit->leads()->attach($lead->id);
 
-        $this->get(route('leads.index'))
+        $this->get(route('leads.table'))
             ->assertOk()
             ->assertSee('Palm Tower A')
             ->assertSee('Sara Nader');

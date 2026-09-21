@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lead;
+use App\Models\User;
 use App\Services\CustomFieldService;
+use App\Services\LeadSearchService;
 use Illuminate\Http\Request;
 
 class LeadKanbanController extends Controller
@@ -13,21 +15,56 @@ class LeadKanbanController extends Controller
         $user = auth()->user();
         $statuses = CustomFieldService::getOptions('lead_status');
 
-        $query = Lead::with(['agent', 'tags']);
+        $search = app(LeadSearchService::class);
 
-        if (!$user->isAdmin()) {
-            $query->where(fn ($q) => $q->where('agent_id', $user->id)
-                ->orWhereHas('leadAgents', fn ($lq) => $lq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
-        } elseif ($request->filled('agent_id')) {
-            $query->where('agent_id', $request->agent_id);
+        $query = $search->applyVisibleScope(Lead::with(['agent', 'tags']), $user);
+
+        if ($request->filled('agent_id')) {
+            $agentId = (int) $request->agent_id;
+            // Non-admins can only filter by an agent they can actually see.
+            $viewableAgentIds = $search->visibleAgentIds($user);
+            if ($viewableAgentIds === null || in_array($agentId, $viewableAgentIds, true)) {
+                $query->where('agent_id', $agentId);
+            }
+        }
+
+        if ($request->filled('search')) {
+            $search->applyTerm($query, $request->search);
+        }
+
+        if ($request->filled('source')) {
+            $query->where('lead_source', $request->source);
+        }
+
+        if ($request->filled('temperature')) {
+            $query->where('temperature', $request->temperature);
         }
 
         $leads = $query->get()->groupBy('status');
 
-        $agents = $user->isAdmin()
-            ? \App\Models\User::where('tenant_id', $user->tenant_id)->where('is_active', true)->get()
-            : collect();
+        $agents = (! $user->isAgent() || $user->isManager()) ? $this->getAgents() : collect();
 
         return view('leads.kanban', compact('statuses', 'leads', 'agents'));
+    }
+
+    private function getAgents()
+    {
+        $user = auth()->user();
+
+        if ($user->isManager()) {
+            $teamIds = $user->teamUserIds();
+            $teamIds[] = $user->id;
+
+            return User::assignable($user->tenant)
+                ->whereIn('id', $teamIds)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get();
+        }
+
+        return User::assignable($user->tenant)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
     }
 }

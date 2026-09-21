@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssigned;
 use App\Services\Cloud\CloudCalendarService;
+use App\Services\LeadSearchService;
 use App\Services\LeadViewingService;
 use App\Services\ScheduleActivityService;
 use Illuminate\Http\Request;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\Notification;
  */
 class ScheduleHubController extends Controller
 {
-    public function __construct(protected CloudCalendarService $calendar) {}
+    public function __construct(
+        protected CloudCalendarService $calendar,
+        protected LeadSearchService $leadSearch,
+    ) {}
 
     public function index(Request $request)
     {
@@ -74,40 +78,52 @@ class ScheduleHubController extends Controller
                 ->get(['id', 'name'])
             : collect();
 
+        $leadOptions = collect();
+        $preselectedLead = null;
+
+        if ($filters['lead']) {
+            // Re-resolve through the canonical scope so a stale/inaccessible
+            // lead cannot be used to prefill the picker.
+            $preselectedLead = $this->leadScope($user)->whereKey($filters['lead'])->first();
+
+            if ($preselectedLead) {
+                $leadOptions = collect([[
+                    'value' => (string) $preselectedLead->id,
+                    'label' => $this->leadSearch->label($preselectedLead),
+                ]]);
+            }
+        }
+
         return view('schedules.index', [
             'items' => $items,
             'filters' => $filters,
             'agents' => $agents,
-            'leadOptions' => $filters['lead'] ? Lead::whereKey($filters['lead'])->get(['id', 'first_name', 'last_name', 'phone']) : collect(),
+            'leadOptions' => $leadOptions,
+            'preselectedLead' => $preselectedLead,
         ]);
     }
 
     /**
-     * Search leads (for the hub's lead picker), scoped to what the user can see.
+     * Search leads (for the hub's lead picker), scoped to what the user can
+     * see and matching the same columns as the leads list (see LeadSearchService).
+     * Returns the shared `{results:[{value,label}]}` contract used by the
+     * x-searchable-select component.
      */
     public function searchLeads(Request $request)
     {
         $term = trim((string) $request->query('q'));
 
-        $query = $this->leadScope(auth()->user())
+        $leads = $this->leadSearch
+            ->matchingLeads(auth()->user(), $term, ['includeUnassigned' => true])
             ->select('id', 'first_name', 'last_name', 'phone', 'email')
             ->orderBy('updated_at', 'desc')
-            ->limit(25);
-
-        if ($term !== '') {
-            $query->where(function ($q) use ($term) {
-                $q->where('first_name', 'like', "%{$term}%")
-                    ->orWhere('last_name', 'like', "%{$term}%")
-                    ->orWhere('phone', 'like', "%{$term}%")
-                    ->orWhere('email', 'like', "%{$term}%")
-                    ->orWhere('reference', 'like', "%{$term}%");
-            });
-        }
+            ->limit(25)
+            ->get();
 
         return response()->json([
-            'results' => $query->get()->map(fn (Lead $l) => [
-                'id' => $l->id,
-                'label' => trim($l->first_name.' '.$l->last_name).' · '.$l->phone,
+            'results' => $leads->map(fn (Lead $lead) => [
+                'value' => (string) $lead->id,
+                'label' => $this->leadSearch->label($lead),
             ]),
         ]);
     }
@@ -328,23 +344,17 @@ class ScheduleHubController extends Controller
     }
 
     /**
-     * Leads a user may see, mirroring LeadController's role scoping.
+     * Leads a user may see, mirroring the app-wide visibility rules
+     * (see LeadSearchService). The hub also exposes unassigned leads so agents
+     * can schedule follow-ups on the shared pool.
      */
     protected function leadScope(User $user)
     {
-        $query = Lead::query();
-
         if ($user->isAdmin() || $user->isOwner()) {
-            return $query;
+            return Lead::query();
         }
 
-        $ids = $user->isManager() ? array_merge([$user->id], $user->teamUserIds()) : [$user->id];
-
-        return $query->where(function ($q) use ($ids) {
-            $q->whereIn('agent_id', $ids)
-                ->orWhereNull('agent_id')
-                ->orWhereHas('leadAgents', fn ($lq) => $lq->whereIn('agent_id', $ids)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE));
-        });
+        return $this->leadSearch->scopedLeads($user, ['includeUnassigned' => true]);
     }
 
     protected function query($query, \Closure $scope, array $filters, string $dateColumn, ?string $timeColumn = null)
@@ -374,13 +384,8 @@ class ScheduleHubController extends Controller
         if ($filters['search'] !== '') {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
-                $q->whereHas('lead', function ($lq) use ($search) {
-                    $lq->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('reference', 'like', "%{$search}%");
-                });
+                // Same lead-search columns as the leads list (see LeadSearchService).
+                $this->leadSearch->applyRelatedTerm($q, 'lead', $search);
 
                 if ($q->getModel() instanceof Showing) {
                     $q->orWhereHas('property', function ($pq) use ($search) {

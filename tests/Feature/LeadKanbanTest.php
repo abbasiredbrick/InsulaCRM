@@ -10,7 +10,7 @@ class LeadKanbanTest extends TestCase
     {
         $this->actingAsAdmin();
 
-        $response = $this->get(route('leads.kanban'));
+        $response = $this->get(route('leads.index'));
 
         $response->assertStatus(200);
         $response->assertSee('Lead Kanban Board');
@@ -23,7 +23,7 @@ class LeadKanbanTest extends TestCase
         $this->createLead(['first_name' => 'KanbanLead', 'status' => 'new']);
         $this->createLead(['first_name' => 'ContactedLead', 'status' => 'contacted']);
 
-        $response = $this->get(route('leads.kanban'));
+        $response = $this->get(route('leads.index'));
 
         $response->assertSee('KanbanLead');
         $response->assertSee('ContactedLead');
@@ -37,7 +37,7 @@ class LeadKanbanTest extends TestCase
         $this->createLead(['first_name' => 'AdminLead', 'agent_id' => $this->adminUser->id, 'status' => 'new']);
         $this->createLead(['first_name' => 'AgentLead', 'agent_id' => $agent->id, 'status' => 'new']);
 
-        $response = $this->get(route('leads.kanban'));
+        $response = $this->get(route('leads.index'));
 
         $response->assertSee('AgentLead');
         $response->assertDontSee('AdminLead');

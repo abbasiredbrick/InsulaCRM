@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\LeadAgent;
 use App\Models\Property;
+use App\Services\LeadSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -348,22 +349,19 @@ class A2aContractController extends Controller
 
     /**
      * JSON search used by the scoped selects on the create form (lead searches).
+     * Same app-wide lead search rules as everywhere else (see LeadSearchService);
+     * the term also matches the lead's reference for LA2A paperwork lookups.
      */
     public function searchLeads(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
         $user = auth()->user();
 
-        $leads = Lead::with('property')
-            ->when(! $user->isAdmin(), fn ($query) => $query->where('agent_id', $user->id))
-            ->when($q !== '', function ($query) use ($q) {
-                $query->where(function ($sub) use ($q) {
-                    $sub->where('first_name', 'like', "%{$q}%")
-                        ->orWhere('last_name', 'like', "%{$q}%")
-                        ->orWhere('phone', 'like', "%{$q}%")
-                        ->orWhere('reference', 'like', "%{$q}%");
-                });
-            })
+        $leads = app(LeadSearchService::class)
+            ->matchingLeads($user, $q, [
+                'columns' => ['first_name', 'last_name', 'phone', 'reference'],
+            ])
+            ->with('property')
             ->latest()
             ->limit(20)
             ->get();
@@ -371,9 +369,7 @@ class A2aContractController extends Controller
         return response()->json([
             'results' => $leads->map(fn (Lead $lead) => [
                 'value' => (string) $lead->id,
-                'label' => trim($lead->full_name ?: $lead->phone ?: '#'.$lead->id)
-                    .($lead->property ? ' — '.$lead->property->display_name : '')
-                    .($lead->phone ? ' • '.$lead->phone : ''),
+                'label' => app(LeadSearchService::class)->label($lead, ['withProperty' => true]),
             ]),
         ]);
     }

@@ -105,7 +105,7 @@ class LeadManagementTest extends TestCase
         $this->createLead(['status' => 'new']);
         $this->createLead(['status' => 'dead']);
 
-        $response = $this->get('/leads?status=new');
+        $response = $this->get('/leads/table?status=new');
         $response->assertStatus(200);
     }
 
@@ -114,7 +114,7 @@ class LeadManagementTest extends TestCase
         $this->actingAsAdmin();
         $this->createLead(['first_name' => 'UniqueTestName']);
 
-        $response = $this->get('/leads?search=UniqueTestName');
+        $response = $this->get('/leads/table?search=UniqueTestName');
         $response->assertStatus(200);
     }
 
@@ -174,7 +174,7 @@ class LeadManagementTest extends TestCase
         $response->assertSee('ManagerSee');
         $response->assertSee('TeamAgentSee');
         $response->assertDontSee('OutsideSee');
-        $response->assertSee('filter-agent');
+        $response->assertSee('kanban-agent');
     }
 
     public function test_manager_can_filter_by_a_team_agent(): void
@@ -193,16 +193,29 @@ class LeadManagementTest extends TestCase
 
         $this->actingAs($manager);
 
-        $this->get('/leads?agent_id=' . $teamAgent->id)
+        $this->get('/leads?agent_id='.$teamAgent->id)
             ->assertOk()
             ->assertSee('TeamFilteredLead')
             ->assertDontSee('ManagerOwnLead')
             ->assertDontSee('OutsideFiltered');
 
         // An out-of-team agent id cannot widen a manager's scope.
-        $this->get('/leads?agent_id=' . $outsideAgent->id)
+        $this->get('/leads?agent_id='.$outsideAgent->id)
             ->assertOk()
             ->assertDontSee('OutsideFiltered');
+    }
+
+    public function test_kanban_uses_live_filter_search_ui(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->get('/leads');
+
+        $response->assertOk();
+        $response->assertSee('data-live-filter', false);
+        $response->assertSee('data-live-results', false);
+        $response->assertSee('kanban-board', false);
+        $response->assertDontSee('Filter');
     }
 
     public function test_agent_cannot_widen_scope_via_agent_id_filter(): void
@@ -214,7 +227,7 @@ class LeadManagementTest extends TestCase
         $myLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $agent->id, 'first_name' => 'OnlyMyLead']);
         $otherLead = Lead::factory()->create(['tenant_id' => $this->tenant->id, 'agent_id' => $other->id, 'first_name' => 'NotMyLead']);
 
-        $this->get('/leads?agent_id=' . $other->id)
+        $this->get('/leads?agent_id='.$other->id)
             ->assertOk()
             ->assertSee('OnlyMyLead')
             ->assertDontSee('NotMyLead');
