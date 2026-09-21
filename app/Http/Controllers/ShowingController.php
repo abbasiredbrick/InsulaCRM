@@ -3,62 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ShowingRequest;
-use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\Property;
 use App\Models\Showing;
 use App\Services\LeadViewingService;
-use Illuminate\Http\Request;
+use App\Services\ScheduleActivityService;
 
 class ShowingController extends Controller
 {
-    public function index(Request $request)
-    {
-        $this->authorize('viewAny', Showing::class);
-
-        $query = Showing::with(['property', 'lead', 'agent']);
-
-        if (! auth()->user()->isAdmin()) {
-            $query->where('agent_id', auth()->id());
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('agent')) {
-            $query->where('agent_id', $request->agent);
-        }
-
-        if ($request->filled('from')) {
-            $query->where('showing_date', '>=', $request->from);
-        }
-
-        if ($request->filled('to')) {
-            $query->where('showing_date', '<=', $request->to);
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('property', fn ($pq) => $pq->where('address', 'like', "%{$search}%"))
-                    ->orWhereHas('lead', fn ($lq) => $lq->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"));
-            });
-        }
-
-        $showings = $query->orderBy('showing_date', 'desc')->orderBy('showing_time', 'desc')->paginate(25);
-
-        $agents = collect();
-        if (auth()->user()->isAdmin()) {
-            $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
-                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'listing_agent', 'buyers_agent']))
-                ->orderBy('name')
-                ->get(['id', 'name']);
-        }
-
-        return view('showings.index', compact('showings', 'agents'));
-    }
-
     public function create()
     {
         $this->authorize('create', Showing::class);
@@ -87,6 +39,7 @@ class ShowingController extends Controller
         $data = $request->validated();
         $data['tenant_id'] = auth()->user()->tenant_id;
         $data['agent_id'] = $data['agent_id'] ?? auth()->id();
+        $data['created_by'] = auth()->id();
 
         $showing = Showing::create($data);
 
@@ -98,20 +51,17 @@ class ShowingController extends Controller
 
         // Log activity on the lead if linked
         if ($showing->lead_id) {
-            Activity::create([
-                'tenant_id' => auth()->user()->tenant_id,
-                'lead_id' => $showing->lead_id,
-                'deal_id' => $showing->deal_id,
-                'agent_id' => auth()->id(),
-                'type' => 'meeting',
-                'subject' => __('Viewing scheduled'),
-                'body' => __('Showing at :address on :date at :time', [
+            app(ScheduleActivityService::class)->log(
+                $showing->lead,
+                'viewing',
+                __('Viewing scheduled'),
+                __('Showing at :address on :date at :time', [
                     'address' => $showing->property->address ?? '',
                     'date' => $showing->showing_date->format('M j, Y'),
                     'time' => $showing->showing_time,
                 ]),
-                'logged_at' => now(),
-            ]);
+                $showing,
+            );
         }
 
         $calendar->sync($showing, auth()->user());
@@ -131,25 +81,23 @@ class ShowingController extends Controller
         $data['tenant_id'] = auth()->user()->tenant_id;
         $data['agent_id'] = $data['agent_id'] ?? $lead->agent_id ?? auth()->id();
         $data['lead_id'] = $lead->id;
+        $data['created_by'] = auth()->id();
 
         $showing = Showing::create($data);
 
         app(LeadViewingService::class)->advanceToStage($lead, 'viewing_scheduled');
 
-        Activity::create([
-            'tenant_id' => auth()->user()->tenant_id,
-            'lead_id' => $lead->id,
-            'deal_id' => $showing->deal_id,
-            'agent_id' => auth()->id(),
-            'type' => 'meeting',
-            'subject' => __('Viewing scheduled'),
-            'body' => __('Showing at :address on :date at :time', [
+        app(ScheduleActivityService::class)->log(
+            $lead,
+            'viewing',
+            __('Viewing scheduled'),
+            __('Showing at :address on :date at :time', [
                 'address' => $showing->property->address ?? '',
                 'date' => $showing->showing_date->format('M j, Y'),
                 'time' => $showing->showing_time,
             ]),
-            'logged_at' => now(),
-        ]);
+            $showing,
+        );
 
         $calendar->sync($showing, auth()->user());
 
@@ -194,30 +142,24 @@ class ShowingController extends Controller
         if ($oldStatus !== $showing->status && $showing->status === 'completed' && $showing->lead_id) {
             app(LeadViewingService::class)->advanceToStage($showing->lead, 'viewing_done');
 
-            Activity::create([
-                'tenant_id' => auth()->user()->tenant_id,
-                'lead_id' => $showing->lead_id,
-                'deal_id' => $showing->deal_id,
-                'agent_id' => auth()->id(),
-                'type' => 'meeting',
-                'subject' => __('Unit viewed'),
-                'body' => __('Unit was shown to the client on :date', ['date' => $showing->showing_date->format('M j, Y')]),
-                'logged_at' => now(),
-            ]);
+            app(ScheduleActivityService::class)->log(
+                $showing->lead,
+                'viewing',
+                __('Unit viewed'),
+                __('Unit was shown to the client on :date', ['date' => $showing->showing_date->format('M j, Y')]),
+                $showing,
+            );
         } elseif ($oldStatus !== $showing->status && $showing->lead_id) {
-            Activity::create([
-                'tenant_id' => auth()->user()->tenant_id,
-                'lead_id' => $showing->lead_id,
-                'deal_id' => $showing->deal_id,
-                'agent_id' => auth()->id(),
-                'type' => 'note',
-                'subject' => __('Viewing :status', ['status' => \App\Models\Showing::statusLabel($showing->status)]),
-                'body' => __('Showing status changed from :from to :to', [
+            app(ScheduleActivityService::class)->log(
+                $showing->lead,
+                'viewing',
+                __('Viewing :status', ['status' => \App\Models\Showing::statusLabel($showing->status)]),
+                __('Showing status changed from :from to :to', [
                     'from' => \App\Models\Showing::statusLabel($oldStatus),
                     'to' => \App\Models\Showing::statusLabel($showing->status),
                 ]),
-                'logged_at' => now(),
-            ]);
+                $showing,
+            );
         }
 
         $calendar->sync($showing, auth()->user());
@@ -236,6 +178,6 @@ class ShowingController extends Controller
         $calendar->removeEvent($showing);
         $showing->delete();
 
-        return redirect()->route('showings.index')->with('success', __('Viewing deleted successfully.'));
+        return redirect()->route('schedules.index')->with('success', __('Viewing deleted successfully.'));
     }
 }

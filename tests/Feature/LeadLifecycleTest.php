@@ -33,7 +33,7 @@ class LeadLifecycleTest extends TestCase
         $this->assertEquals('viewing_scheduled', $lead->fresh()->stage);
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Viewing scheduled',
         ]);
     }
@@ -81,7 +81,7 @@ class LeadLifecycleTest extends TestCase
         $this->assertEquals('viewing_done', $lead->fresh()->stage);
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Unit viewed',
         ]);
     }
@@ -103,7 +103,7 @@ class LeadLifecycleTest extends TestCase
         $this->assertEquals('offer_sent', $lead->fresh()->stage);
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Viewing scheduled',
         ]);
     }
@@ -121,11 +121,11 @@ class LeadLifecycleTest extends TestCase
 
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Viewing Scheduled',
         ]);
 
-        $viewing = Activity::where('lead_id', $lead->id)->where('type', 'meeting')->first();
+        $viewing = Activity::where('lead_id', $lead->id)->where('type', 'viewing')->first();
         $this->assertNotNull($viewing);
         $this->assertDatabaseHas('activities', ['id' => $viewing->id, 'logged_at' => $viewing->logged_at]);
     }
@@ -279,6 +279,6 @@ class LeadLifecycleTest extends TestCase
         $response->assertOk();
         $response->assertSee('Schedule Viewing');
         $response->assertSee(route('leads.showings.store', $lead));
-        $response->assertSee(route('leads.followups.index', $lead));
+        $response->assertSee(route('schedules.index'));
     }
 }

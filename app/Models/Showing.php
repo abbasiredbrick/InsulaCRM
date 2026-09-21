@@ -27,6 +27,7 @@ class Showing extends Model
         'property_id',
         'lead_id',
         'agent_id',
+        'created_by',
         'showing_date',
         'showing_time',
         'duration_minutes',
@@ -72,6 +73,22 @@ class Showing extends Model
     public function agent()
     {
         return $this->belongsTo(User::class, 'agent_id');
+    }
+
+    /**
+     * The agent who created the viewing.
+     */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * External calendar event links, one per involved user.
+     */
+    public function calendarEventLinks()
+    {
+        return $this->morphMany(CalendarEventLink::class, 'eventable');
     }
 
     public function deal()

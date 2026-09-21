@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\Meeting;
 use App\Services\Cloud\CloudCalendarService;
+use App\Services\ScheduleActivityService;
 use Illuminate\Http\Request;
 
 class MeetingController extends Controller
@@ -30,6 +31,7 @@ class MeetingController extends Controller
             'deal_id' => $request->input('deal_id'),
             'property_id' => null,
             'agent_id' => auth()->id(),
+            'created_by' => auth()->id(),
             'title' => $data['title'],
             'scheduled_at' => $data['scheduled_at'],
             'duration_minutes' => $data['duration_minutes'] ?? 60,
@@ -37,6 +39,17 @@ class MeetingController extends Controller
             'status' => 'scheduled',
             'notes' => $data['notes'] ?? null,
         ]);
+
+        app(ScheduleActivityService::class)->log(
+            $lead,
+            'meeting',
+            __('Meeting scheduled'),
+            __('Meeting :title scheduled for :at', [
+                'title' => $meeting->title,
+                'at' => $meeting->scheduled_at->format('M d, Y g:i A'),
+            ]),
+            $meeting,
+        );
 
         AuditLog::log('meeting.created', $meeting, ['lead_id' => $lead->id, 'scheduled_at' => $meeting->scheduled_at->toDateTimeString()]);
         $this->calendar->sync($meeting, auth()->user());
@@ -46,9 +59,7 @@ class MeetingController extends Controller
 
     public function update(Request $request, Meeting $meeting)
     {
-        if (auth()->user()->isAgent() && $meeting->agent_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeMeeting($meeting);
 
         $data = $request->validate([
             'title' => 'sometimes|string|max:255',
@@ -59,11 +70,25 @@ class MeetingController extends Controller
             'notes' => 'nullable|string|max:5000',
         ]);
 
+        $oldStatus = $meeting->status;
         unset($data['notes']); // kept via append_notes below to avoid wiping on toggle
         $meeting->update($data);
 
         if ($request->filled('notes')) {
             $meeting->update(['notes' => $request->notes]);
+        }
+
+        if ($meeting->wasChanged('status') && $meeting->lead_id) {
+            app(ScheduleActivityService::class)->log(
+                $meeting->lead,
+                'meeting',
+                __('Meeting :status', ['status' => Meeting::statusLabel($meeting->status)]),
+                __('Meeting status changed from :from to :to', [
+                    'from' => Meeting::statusLabel($oldStatus),
+                    'to' => Meeting::statusLabel($meeting->status),
+                ]),
+                $meeting,
+            );
         }
 
         AuditLog::log('meeting.updated', $meeting, $data);
@@ -78,9 +103,7 @@ class MeetingController extends Controller
 
     public function destroy(Meeting $meeting)
     {
-        if (auth()->user()->isAgent() && $meeting->agent_id !== auth()->id()) {
-            abort(403);
-        }
+        $this->authorizeMeeting($meeting);
 
         $this->calendar->removeEvent($meeting);
         $leadId = $meeting->lead_id;
@@ -93,5 +116,24 @@ class MeetingController extends Controller
         }
 
         return redirect()->route('leads.show', $leadId)->with('success', __('Meeting deleted.'));
+    }
+
+    protected function authorizeMeeting(Meeting $meeting): void
+    {
+        $user = auth()->user();
+
+        if ($user->isAdmin() || $user->isOwner()) {
+            return;
+        }
+
+        if ($meeting->agent_id === $user->id || $meeting->created_by === $user->id) {
+            return;
+        }
+
+        if ($meeting->lead_id && $meeting->lead?->agent_id === $user->id) {
+            return;
+        }
+
+        abort(403);
     }
 }

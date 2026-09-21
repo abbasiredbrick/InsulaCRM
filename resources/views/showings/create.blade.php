@@ -91,7 +91,7 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">{{ __('Schedule Viewing') }}</button>
-                <a href="{{ route('showings.index') }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
+                <a href="{{ route('schedules.index') }}" class="btn btn-outline-secondary">{{ __('Cancel') }}</a>
             </div>
         </form>
     </div>

@@ -180,9 +180,27 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/activities', [ActivityInboxController::class, 'index'])->name('activities.index');
     });
 
-    // ── Showings (real estate agent mode) ────────────────────────
+    // ── Showings + Scheduling Hub (real estate agent mode) ────────
     Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
-        Route::resource('showings', ShowingController::class);
+        // Scheduling Hub: viewings, meetings and tasks in one place
+        Route::get('/schedules', [\App\Http\Controllers\ScheduleHubController::class, 'index'])->name('schedules.index');
+        Route::get('/schedules/leads/search', [\App\Http\Controllers\ScheduleHubController::class, 'searchLeads'])->name('schedules.leads.search');
+        Route::post('/schedules/meetings', [\App\Http\Controllers\ScheduleHubController::class, 'storeMeeting'])->name('schedules.meetings.store');
+        Route::post('/schedules/tasks', [\App\Http\Controllers\ScheduleHubController::class, 'storeTask'])->name('schedules.tasks.store');
+        Route::patch('/schedules/showings/{showing}', [\App\Http\Controllers\ScheduleHubController::class, 'showingStatus'])->name('schedules.showing.status');
+        Route::patch('/schedules/tasks/{task}/status', [\App\Http\Controllers\ScheduleHubController::class, 'taskStatus'])->name('schedules.task.status');
+        Route::get('/schedules/edit/{type}/{id}', [\App\Http\Controllers\ScheduleHubController::class, 'edit'])->name('schedules.edit');
+
+        Route::post('/schedules/showings/{showing}/delete', [\App\Http\Controllers\ShowingController::class, 'destroy'])->name('schedules.showing.delete');
+        Route::post('/schedules/meetings/{meeting}/delete', [\App\Http\Controllers\MeetingController::class, 'destroy'])->name('schedules.meeting.delete');
+        Route::post('/schedules/tasks/{task}/delete', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('schedules.task.delete');
+
+        Route::post('/showings', [ShowingController::class, 'store'])->name('showings.store');
+        Route::get('/showings/create', [ShowingController::class, 'create'])->name('showings.create');
+        Route::get('/showings/{showing}', [ShowingController::class, 'show'])->name('showings.show');
+        Route::get('/showings/{showing}/edit', [ShowingController::class, 'edit'])->name('showings.edit');
+        Route::put('/showings/{showing}', [ShowingController::class, 'update'])->name('showings.update');
+        Route::delete('/showings/{showing}', [ShowingController::class, 'destroy'])->name('showings.destroy');
 
         // A2A commission-sharing contracts with external agents
         Route::get('/a2a', [\App\Http\Controllers\A2aContractController::class, 'index'])->name('a2a.index');
@@ -429,7 +447,6 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         // Inline viewing creation from the lead page (real estate mode)
         Route::middleware('mode:realestate')->group(function () {
             Route::post('/leads/{lead}/showings', [\App\Http\Controllers\ShowingController::class, 'storeForLead'])->name('leads.showings.store');
-            Route::get('/leads/{lead}/followups', [\App\Http\Controllers\FollowupController::class, 'index'])->name('leads.followups.index');
         });
 
         // Property for a lead (create/update from lead detail)

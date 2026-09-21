@@ -283,7 +283,7 @@ class TenantIsolationTest extends TestCase
 
         $this->actingAs($this->adminUser);
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(200);
         $response->assertSee($propertyA->address);
         $response->assertDontSee($propertyB->address);

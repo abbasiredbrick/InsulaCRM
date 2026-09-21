@@ -38,6 +38,22 @@ class ShowingPolicy
             return true;
         }
 
-        return $showing->agent_id === $user->id;
+        if ($showing->agent_id === $user->id || $showing->created_by === $user->id) {
+            return true;
+        }
+
+        if ($showing->lead_id && $showing->lead?->agent_id === $user->id) {
+            return true;
+        }
+
+        if ($user->isManager()) {
+            $teamIds = array_merge([$user->id], $user->teamUserIds());
+
+            return in_array($showing->agent_id, $teamIds, true)
+                || in_array($showing->created_by, $teamIds, true)
+                || ($showing->lead_id && in_array($showing->lead?->agent_id, $teamIds, true));
+        }
+
+        return false;
     }
 }

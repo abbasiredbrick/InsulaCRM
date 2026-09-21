@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Services\BusinessModeService;
 use Tests\TestCase;
 
 class RealEstateModeTest extends TestCase
@@ -33,7 +32,7 @@ class RealEstateModeTest extends TestCase
 
         $response = $this->get('/dashboard');
         $response->assertStatus(200);
-        $response->assertSee('Viewings');
+        $response->assertSee('Schedules');
         $response->assertSee('Open Houses');
         $response->assertSee('Listings');
     }
@@ -53,7 +52,7 @@ class RealEstateModeTest extends TestCase
     {
         $this->actingAsAdmin(['business_mode' => 'wholesale']);
 
-        $response = $this->get('/showings');
+        $response = $this->get('/showings/create');
         $response->assertStatus(404);
     }
 

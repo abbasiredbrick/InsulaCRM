@@ -35,12 +35,12 @@ class RealEstateRoleAccessTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_listing_agent_can_access_showings(): void
+    public function test_listing_agent_can_access_schedules(): void
     {
         $this->createTenantWithAdmin(['business_mode' => 'realestate']);
         $this->actingAsRole('listing_agent');
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(200);
     }
 
@@ -109,12 +109,12 @@ class RealEstateRoleAccessTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_buyers_agent_can_access_showings(): void
+    public function test_buyers_agent_can_access_schedules(): void
     {
         $this->createTenantWithAdmin(['business_mode' => 'realestate']);
         $this->actingAsRole('buyers_agent');
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(200);
     }
 
@@ -143,7 +143,7 @@ class RealEstateRoleAccessTest extends TestCase
         $this->createTenantWithAdmin(['business_mode' => 'wholesale']);
         $this->actingAsRole('acquisition_agent');
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(403);
     }
 
@@ -152,7 +152,7 @@ class RealEstateRoleAccessTest extends TestCase
         $this->createTenantWithAdmin(['business_mode' => 'realestate']);
         $this->actingAsRole('field_scout');
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(403);
     }
 
@@ -161,7 +161,7 @@ class RealEstateRoleAccessTest extends TestCase
         $this->createTenantWithAdmin(['business_mode' => 'realestate']);
         $this->actingAsRole('disposition_agent');
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(403);
     }
 }

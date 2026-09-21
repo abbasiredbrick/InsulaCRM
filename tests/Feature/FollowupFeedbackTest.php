@@ -17,7 +17,7 @@ class FollowupFeedbackTest extends TestCase
         return $this->actingAsAdmin(array_merge(['business_mode' => 'realestate'], $overrides));
     }
 
-    public function test_followups_page_shows_tabs_for_all_three(): void
+    public function test_schedules_hub_shows_tabs_for_all_three(): void
     {
         $this->reAdmin();
         $lead = $this->createLead(['deal_type' => 'rent']);
@@ -31,12 +31,13 @@ class FollowupFeedbackTest extends TestCase
             'due_date' => now()->addDay()->toDateString(),
         ]);
 
-        $response = $this->get(route('leads.followups.index', $lead));
+        $response = $this->get(route('schedules.index'));
 
         $response->assertOk();
         $response->assertSee('Viewings');
         $response->assertSee('Tasks');
         $response->assertSee('Meetings');
+        $response->assertSee('Call the landlord');
     }
 
     public function test_viewing_feedback_is_logged_on_lead_activity(): void
@@ -151,7 +152,7 @@ class FollowupFeedbackTest extends TestCase
         ]);
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Viewing scheduled',
         ]);
     }

@@ -18,16 +18,27 @@ class Activity extends Model
         'type',
         'subject',
         'body',
+        'subject_type',
+        'subject_id',
         'logged_at',
     ];
 
     protected $casts = [
         'logged_at' => 'datetime',
+        'subject_id' => 'integer',
     ];
 
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);
+    }
+
+    /**
+     * The scheduling entity (viewing / meeting / task) this activity links to.
+     */
+    public function subjectable()
+    {
+        return $this->morphTo('subject');
     }
 
     /**

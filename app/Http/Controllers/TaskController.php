@@ -6,11 +6,11 @@ use App\Http\Requests\TaskRequest;
 use App\Models\AuditLog;
 use App\Models\Lead;
 use App\Models\Task;
-use App\Models\TaskActivity;
 use App\Models\User;
 use App\Notifications\TaskActivityNotification;
 use App\Notifications\TaskAssigned;
 use App\Services\Cloud\CloudCalendarService;
+use App\Services\ScheduleActivityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 
@@ -50,6 +50,14 @@ class TaskController extends Controller
         AuditLog::log('task.created', $task);
         $this->calendar->sync($task, auth()->user());
 
+        app(ScheduleActivityService::class)->log(
+            $lead,
+            'task',
+            __('Task created'),
+            __('Task :title due :due', ['title' => $task->title, 'due' => $task->due_label]),
+            $task,
+        );
+
         // The assigned agent is emailed + in-app notified (skip when assigning to self).
         if ($assignee->id !== $ownerId) {
             Notification::send($assignee, new TaskAssigned($task, auth()->user()->tenant, auth()->user()));
@@ -71,6 +79,7 @@ class TaskController extends Controller
 
         $newAssignee = $this->resolveAssignee($request->input('assigned_to'), $request->input('assign_to_user'));
         $assigneeChanged = $newAssignee->id !== $task->agent_id;
+        $oldStatus = $task->status;
 
         $task->update([
             'agent_id' => $newAssignee->id,
@@ -78,9 +87,23 @@ class TaskController extends Controller
             'due_date' => $request->due_date,
             'due_time' => $request->input('due_time') ?: null,
             'reminder_minutes' => $request->input('reminder_minutes') ?? null,
+            'status' => $request->filled('status') ? $request->input('status') : $task->status,
         ]);
 
         $actorId = auth()->id();
+
+        if ($task->wasChanged('status') && $oldStatus !== $task->status && $task->lead_id) {
+            app(ScheduleActivityService::class)->log(
+                $task->lead,
+                'task',
+                __('Task :status', ['status' => Task::statusLabel($task->status)]),
+                __('Task status changed from :from to :to', [
+                    'from' => Task::statusLabel($oldStatus),
+                    'to' => Task::statusLabel($task->status),
+                ]),
+                $task,
+            );
+        }
 
         if ($assigneeChanged) {
             $task->activities()->create([
@@ -100,7 +123,7 @@ class TaskController extends Controller
             return response()->json(['success' => true, 'id' => $task->id]);
         }
 
-        return redirect()->route('leads.show', $task->lead_id)->with('success', __('Task updated successfully.'));
+        return redirect()->back()->with('success', __('Task updated successfully.'));
     }
 
     /**
@@ -134,7 +157,7 @@ class TaskController extends Controller
             ]);
         }
 
-        return redirect()->route('leads.show', $task->lead_id)->with('success', __('Activity logged.'));
+        return redirect()->back()->with('success', __('Activity logged.'));
     }
 
     /**
@@ -147,6 +170,19 @@ class TaskController extends Controller
 
         $task->update(['is_completed' => ! $task->is_completed]);
         $nowCompleted = $task->is_completed;
+
+        if ($task->lead_id) {
+            app(ScheduleActivityService::class)->log(
+                $task->lead,
+                'task',
+                $nowCompleted ? __('Task completed') : __('Task reopened'),
+                __('Task :title :state', [
+                    'title' => $task->title,
+                    'state' => $nowCompleted ? __('completed') : __('reopened'),
+                ]),
+                $task,
+            );
+        }
 
         $this->notifyOwner(
             $task,
@@ -168,7 +204,6 @@ class TaskController extends Controller
     {
         $this->authorizeTask($task);
 
-        $leadId = $task->lead_id;
         $this->calendar->removeEvent($task);
         $task->activities()->delete();
         $task->delete();
@@ -179,7 +214,7 @@ class TaskController extends Controller
             return response()->json(['success' => true]);
         }
 
-        return redirect()->route('leads.show', $leadId)->with('success', __('Task deleted.'));
+        return redirect()->back()->with('success', __('Task deleted.'));
     }
 
     /**

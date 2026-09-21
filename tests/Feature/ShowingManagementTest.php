@@ -12,12 +12,13 @@ class ShowingManagementTest extends TestCase
         return $this->actingAsAdmin(['business_mode' => 'realestate']);
     }
 
-    public function test_admin_can_view_showings_index(): void
+    public function test_admin_can_view_schedules_hub(): void
     {
         $this->reAdmin();
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(200);
+        $response->assertSee('Schedules');
     }
 
     public function test_admin_can_view_create_showing_form(): void
@@ -88,7 +89,7 @@ class ShowingManagementTest extends TestCase
 
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => 'Viewing scheduled',
         ]);
     }
@@ -152,7 +153,7 @@ class ShowingManagementTest extends TestCase
         ]);
 
         $response = $this->delete("/showings/{$showing->id}");
-        $response->assertRedirect('/showings');
+        $response->assertRedirect('/schedules');
         $this->assertDatabaseMissing('showings', ['id' => $showing->id]);
     }
 
@@ -181,7 +182,7 @@ class ShowingManagementTest extends TestCase
             'showing_time' => '10:00',
         ]);
 
-        $response = $this->get('/showings');
+        $response = $this->get('/schedules');
         $response->assertStatus(200);
     }
 
@@ -197,7 +198,7 @@ class ShowingManagementTest extends TestCase
     {
         $this->actingAsAdmin(['business_mode' => 'wholesale']);
 
-        $response = $this->get('/showings');
+        $response = $this->get('/showings/create');
         $response->assertStatus(404);
     }
 
@@ -224,7 +225,7 @@ class ShowingManagementTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $response = $this->get('/showings?status=completed');
+        $response = $this->get('/schedules?status=completed');
         $response->assertStatus(200);
     }
 }

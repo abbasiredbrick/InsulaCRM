@@ -51,9 +51,9 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="5" width="16" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="4" y1="11" x2="20" y2="11"/><line x1="11" y1="15" x2="12" y2="15"/><line x1="12" y1="15" x2="12" y2="18"/></svg>
                         {{ __('Schedule Viewing') }}
                     </a>
-                    <a href="{{ route('leads.followups.index', $lead) }}" class="btn btn-outline-blue btn-sm me-1">
+                    <a href="{{ route('schedules.index', ['lead' => $lead->id]) }}" class="btn btn-outline-blue btn-sm me-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z"/><path d="M9 17v-4"/><path d="M15 17v-2"/></svg>
-                        {{ __('Follow-ups') }}
+                        {{ __('Schedules') }}
                     </a>
                     <a href="{{ route('a2a.create', ['lead_id' => $lead->id]) }}" class="btn btn-outline-indigo btn-sm me-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11v-1a3 3 0 0 1 6 0v1"/><path d="M8 11h8a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2z"/><path d="M12 9l0 .01"/></svg>
@@ -335,7 +335,7 @@
             <div class="card-header">
                 <h3 class="card-title">{{ __('Viewings') }}</h3>
                 <div class="card-actions">
-                    <a href="{{ route('leads.followups.index', $lead) }}" class="btn btn-outline-blue btn-sm">{{ __('View & log feedback') }}</a>
+                    <a href="{{ route('schedules.index', ['lead' => $lead->id]) }}" class="btn btn-outline-blue btn-sm">{{ __('View & log feedback') }}</a>
                     <a href="#schedule-viewing-card" class="btn btn-outline-orange btn-sm">{{ __('+ Schedule Viewing') }}</a>
                 </div>
             </div>
@@ -526,6 +526,13 @@
                                     <div class="text-truncate">
                                         <strong>{{ __(ucwords(str_replace('_', ' ', $activity->type))) }}</strong>
                                         @if($activity->subject) - {{ $activity->subject }} @endif
+                                        @if($activity->subject_type === \App\Models\Showing::class && $activity->subject_id)
+                                        <a href="{{ route('showings.show', $activity->subject_id) }}" class="text-decoration-none ms-1 small">{{ __('Open viewing') }} &rarr;</a>
+                                        @elseif($activity->subject_type === \App\Models\Task::class && $activity->subject_id)
+                                        <a href="#task-{{ $activity->subject_id }}" class="text-decoration-none ms-1 small">{{ __('Open task') }} &rarr;</a>
+                                        @elseif($activity->subject_type === \App\Models\Meeting::class && $activity->subject_id)
+                                        <a href="#meeting-{{ $activity->subject_id }}" class="text-decoration-none ms-1 small">{{ __('Open meeting') }} &rarr;</a>
+                                        @endif
                                     </div>
                                     @if($activity->body)
                                     <div class="text-secondary" style="white-space:pre-line;font-size:13px;">{{ $activity->body }}</div>
@@ -790,7 +797,7 @@
             </div>
             <div class="list-group list-group-flush">
                 @forelse($lead->tasks->sortBy(fn($t) => $t->dueAt()) as $task)
-                <div class="list-group-item">
+                <div class="list-group-item" id="task-{{ $task->id }}">
                     <div class="d-flex align-items-center">
                         <div class="me-2">
                             <button class="btn btn-sm {{ $task->is_completed ? 'btn-success' : ($task->is_overdue ? 'btn-danger' : 'btn-outline-secondary') }} task-toggle"
@@ -948,7 +955,7 @@
             </div>
             <div class="list-group list-group-flush">
                 @forelse($lead->meetings->sortBy('scheduled_at') as $meeting)
-                <div class="list-group-item">
+                <div class="list-group-item" id="meeting-{{ $meeting->id }}">
                     <div class="d-flex align-items-center">
                         <div class="flex-fill">
                             <div class="{{ $meeting->status === 'completed' ? 'text-decoration-line-through text-secondary' : '' }}">

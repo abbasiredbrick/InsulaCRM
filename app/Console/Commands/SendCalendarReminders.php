@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\CalendarEventLink;
 use App\Models\Meeting;
 use App\Models\OpenHouse;
 use App\Models\Showing;
@@ -106,7 +107,7 @@ class SendCalendarReminders extends Command
         $records = $records->merge(
             Task::withoutGlobalScopes()
                 ->with(['lead'])
-                ->where('is_completed', false)
+                ->where('status', 'scheduled')
                 ->whereNull('reminder_sent_at')
                 ->whereBetween('due_date', [$from->format('Y-m-d'), $dayTo])
                 ->get()
@@ -146,7 +147,15 @@ class SendCalendarReminders extends Command
             return false;
         }
 
-        return ! blank($record->calendar_provider);
+        if (! blank($record->calendar_provider)) {
+            return true;
+        }
+
+        return CalendarEventLink::withoutGlobalScopes()
+            ->where('eventable_type', $record::class)
+            ->where('eventable_id', $record->getKey())
+            ->where('tenant_id', $record->tenant_id)
+            ->exists();
     }
 
     protected function parseTime(mixed $value): CarbonInterface

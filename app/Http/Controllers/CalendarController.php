@@ -32,7 +32,9 @@ class CalendarController extends Controller
             ->whereBetween('due_date', [$start, $end]);
 
         if (! $user->isAdmin()) {
-            $tasksQuery->where('agent_id', $user->id);
+            $tasksQuery->where(function ($q) use ($user) {
+                $q->where('agent_id', $user->id)->orWhere('created_by', $user->id);
+            });
         }
 
         $tasks = $tasksQuery->get()->map(fn ($task) => [
@@ -55,7 +57,9 @@ class CalendarController extends Controller
             ->whereDate('scheduled_at', '<=', $end);
 
         if (! $user->isAdmin()) {
-            $meetingsQuery->where('agent_id', $user->id);
+            $meetingsQuery->where(function ($q) use ($user) {
+                $q->where('agent_id', $user->id)->orWhere('created_by', $user->id);
+            });
         }
 
         $meetingEvents = $meetingsQuery->get()->map(fn ($m) => [
@@ -76,7 +80,9 @@ class CalendarController extends Controller
                 ->whereBetween('showing_date', [$start, $end]);
 
             if (! $user->isAdmin()) {
-                $showingsQuery->where('agent_id', $user->id);
+                $showingsQuery->where(function ($q) use ($user) {
+                    $q->where('agent_id', $user->id)->orWhere('created_by', $user->id);
+                });
             }
 
             $showingEvents = $showingsQuery->get()->map(fn ($s) => [

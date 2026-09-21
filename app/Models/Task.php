@@ -13,6 +13,12 @@ class Task extends Model
 {
     use HasFactory;
 
+    public const STATUSES = [
+        'scheduled' => 'Scheduled',
+        'completed' => 'Completed',
+        'cancelled' => 'Cancelled',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'lead_id',
@@ -22,6 +28,7 @@ class Task extends Model
         'due_date',
         'due_time',
         'is_completed',
+        'status',
         'calendar_provider',
         'calendar_event_id',
         'reminder_minutes',
@@ -30,13 +37,35 @@ class Task extends Model
 
     protected $casts = [
         'due_date' => 'date',
-        'is_completed' => 'boolean',
         'reminder_sent_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);
+    }
+
+    public function getStatusAttribute(): string
+    {
+        $status = $this->attributes['status'] ?? 'scheduled';
+
+        return $status === 'open' ? 'scheduled' : $status;
+    }
+
+    public function setIsCompletedAttribute($value): void
+    {
+        $this->attributes['status'] = $value ? 'completed' : 'scheduled';
+        $this->attributes['is_completed'] = (int) (bool) $value;
+    }
+
+    public function getIsCompletedAttribute(): bool
+    {
+        return $this->getStatusAttribute() === 'completed';
+    }
+
+    public static function statusLabel(string $status): string
+    {
+        return __(self::STATUSES[$status] ?? ucwords(str_replace('_', ' ', $status)));
     }
 
     /**
@@ -116,5 +145,13 @@ class Task extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(TaskActivity::class)->latest();
+    }
+
+    /**
+     * External calendar event links, one per involved user.
+     */
+    public function calendarEventLinks(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(CalendarEventLink::class, 'eventable');
     }
 }

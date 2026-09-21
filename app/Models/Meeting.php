@@ -22,6 +22,7 @@ class Meeting extends Model
         'deal_id',
         'property_id',
         'agent_id',
+        'created_by',
         'title',
         'scheduled_at',
         'duration_minutes',
@@ -66,6 +67,22 @@ class Meeting extends Model
     public function agent()
     {
         return $this->belongsTo(User::class, 'agent_id');
+    }
+
+    /**
+     * The agent who created the meeting.
+     */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * External calendar event links, one per involved user.
+     */
+    public function calendarEventLinks()
+    {
+        return $this->morphMany(CalendarEventLink::class, 'eventable');
     }
 
     public function getIsOverdueAttribute(): bool

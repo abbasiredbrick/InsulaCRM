@@ -20,6 +20,7 @@ class TaskRequest extends FormRequest
             'assigned_to' => 'nullable|integer',
             'assign_to_user' => 'nullable|integer',
             'reminder_minutes' => 'nullable|integer|min:1|max:10080',
+            'status' => 'sometimes|in:scheduled,completed,cancelled',
         ];
 
         if ($this->isMethod('post')) {

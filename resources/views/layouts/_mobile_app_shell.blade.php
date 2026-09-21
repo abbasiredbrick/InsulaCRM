@@ -3,7 +3,7 @@
     $currentMode = $businessMode ?? 'wholesale';
     $isRealEstate = $currentMode === 'realestate';
     $user = auth()->user();
-    $isSubPage = !request()->is('dashboard') && !request()->is('leads') && !request()->is('pipeline') && !request()->is('calendar') && !request()->is('inventory') && !request()->is('showings');
+    $isSubPage = !request()->is('dashboard') && !request()->is('leads') && !request()->is('pipeline') && !request()->is('calendar') && !request()->is('inventory') && !request()->is('schedules');
 
     // Top-bar "+": context-sensitive. On each list page it jumps straight to
     // that page's "create" action; on every other page it is hidden.
@@ -12,7 +12,7 @@
     if (request()->is('leads')) { $topAddHref = route('leads.create'); $topAddLabel = __('Add Lead'); }
     elseif (request()->is('buyers')) { $topAddHref = route('buyers.create'); $topAddLabel = __('Add Buyer'); }
     elseif (request()->is('inventory') || request()->is('listings')) { $topAddHref = route('inventory.create'); $topAddLabel = __('New Unit'); }
-    elseif (request()->is('showings')) { $topAddHref = route('showings.create'); $topAddLabel = __('Schedule Viewing'); }
+    elseif (request()->is('schedules')) { $topAddHref = route('showings.create'); $topAddLabel = __('Schedule Viewing'); }
     elseif (request()->is('open-houses')) { $topAddHref = route('open-houses.create'); $topAddLabel = __('New Open House'); }
     elseif (request()->is('leases')) { $topAddHref = route('leases.create'); $topAddLabel = __('New Lease'); }
     elseif (request()->is('properties')) { $topAddHref = null; $topAddLabel = null; }
@@ -115,7 +115,7 @@
         <!-- Tab 3: Center Slot — Viewings (real estate) / Calendar (wholesale).
              The + quick-add button always lives in the top bar, so no FAB here. -->
         @if($isRealEstate)
-            <a href="{{ route('showings.index') }}" class="mobile-nav-tab {{ request()->is('showings*') || request()->is('open-houses*') ? 'active' : '' }}" data-tab="viewings">
+            <a href="{{ route('schedules.index') }}" class="mobile-nav-tab {{ request()->is('schedules*') || request()->is('open-houses*') ? 'active' : '' }}" data-tab="viewings">
                 <span class="mobile-tab-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="22" height="22" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -123,7 +123,7 @@
                         <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/>
                     </svg>
                 </span>
-                <span class="mobile-tab-label">{{ __('Viewings') }}</span>
+                <span class="mobile-tab-label">{{ __('Schedules') }}</span>
             </a>
         @else
             <a href="{{ route('calendar.index') }}" class="mobile-nav-tab {{ request()->is('calendar*') ? 'active' : '' }}" data-tab="calendar">
@@ -278,9 +278,9 @@
             </a>
             @endif
             @if($isRealEstate)
-            <a href="{{ route('showings.index') }}" class="drawer-nav-item {{ request()->is('showings*') ? 'active' : '' }}">
+            <a href="{{ route('schedules.index') }}" class="drawer-nav-item {{ request()->is('schedules*') ? 'active' : '' }}">
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"/><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"/></svg></span>
-                <span class="drawer-item-text">{{ __('Viewings') }}</span>
+                <span class="drawer-item-text">{{ __('Schedules') }}</span>
             </a>
             <a href="{{ route('open-houses.index') }}" class="drawer-nav-item {{ request()->is('open-houses*') ? 'active' : '' }}">
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/></svg></span>

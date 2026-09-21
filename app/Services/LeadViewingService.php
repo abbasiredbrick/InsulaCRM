@@ -57,9 +57,9 @@ class LeadViewingService
     /**
      * Create a calendar-visible "viewing" activity for the lead.
      *
-     * Activities of type meeting are shown on the team calendar, so the manager
-     * sees that a viewing was requested/scheduled/completed even when no full
-     * Showing record exists.
+     * Activities of type viewing represent viewings on the lead timeline, so the
+     * manager sees that a viewing was requested/scheduled/completed even when no
+     * full Showing record exists.
      */
     public function logViewingActivity(Lead $lead, string $viewingStage, ?string $scheduledAt = null): Activity
     {
@@ -82,7 +82,7 @@ class LeadViewingService
             'tenant_id' => $lead->tenant_id,
             'lead_id' => $lead->id,
             'agent_id' => auth()->id(),
-            'type' => 'meeting',
+            'type' => 'viewing',
             'subject' => $subject,
             'body' => $body,
             'logged_at' => $scheduledAt ? \Carbon\Carbon::parse($scheduledAt) : now(),
