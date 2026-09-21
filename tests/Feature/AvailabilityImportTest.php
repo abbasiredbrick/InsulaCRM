@@ -583,6 +583,72 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(4000, (int) $unit->deposit_amount);
     }
 
+    public function test_legacy_relevate_source_rebuilds_mapping_when_header_csv_uploaded(): void
+    {
+        // Replicates the prod Relevate source before this fix: a legacy positional
+        // "colN" map (multi_space, no header). Because the headerless layout names
+        // buckets col0..col8, the rebuild guard used to compare the saved map keys
+        // against the row keys and "succeeded" on the CSV's padded col8..col25
+        // placeholder columns, so a properly-headed Relevate CSV was fed through the
+        // old positional map and never updated the CRM.
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Relevate',
+            'default_city' => 'Abu Dhabi',
+            'default_building' => 'Burj Al Shams',
+            'default_deposit_pct' => 5,
+            'default_deposit_min' => 5000,
+            'default_admin_fee' => 1050,
+            'default_tawtheeq_fee' => 150,
+            'parse_options' => ['delimiter' => 'multi_space', 'has_header' => false],
+            'column_map' => [
+                'col0' => 'unit_no',
+                'col1' => 'square_footage',
+                'col2' => 'features',
+                'col3' => 'amenities',
+                'col4' => 'rent',
+                'col5' => 'deposit',
+                'col6' => 'admin_fee',
+                'col7' => 'tawtheeq',
+                'col8' => 'community',
+            ],
+        ]);
+
+        // importDirect forces a non-tabular legacy delimiter to 'auto', so the
+        // header row gets promoted and rows carry the eight real Relevate labels.
+        $table = $this->parseRelevateCsv('auto', false);
+
+        $this->assertCount(7, $table['rows']);
+        $this->assertArrayHasKey('Unit No', $table['rows'][0]);
+        $this->assertArrayHasKey('Expected vacating date', $table['rows'][0]);
+
+        $result = (new AvailabilityIngestService)->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertTrue($result['mapping_rebuilt']);
+        $this->assertSame(7, $result['created']);
+        $this->assertSame(0, $result['skipped']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get()->keyBy('source_unit_ref');
+        $this->assertCount(7, $units);
+        $this->assertSame(0, $units->where('sub_community', 'Other')->count());
+
+        $u = $units['1901'];
+        $this->assertSame('Burj Al Shams', $u->sub_community);
+        $this->assertSame(1639, $u->square_footage); // sqft, not ×10.7639
+        $this->assertSame('no', $u->balcony);
+        $this->assertSame('Community view', $u->view);
+        $this->assertSame('listed', $u->availability);
+        $this->assertSame(125000, (int) $u->rent_price);
+        $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
+        $this->assertSame(1050, (int) $u->admin_fee);
+        $this->assertSame(150, (int) $u->tawtheeq_fee);
+
+        $this->assertSame('ready_to_list', $units['1703']->availability);
+        $this->assertSame('2026-09-14', $units['1703']->handover_date?->toDateString());
+        $this->assertSame(5000, (int) $units['1810']->deposit_amount); // floor
+    }
+
     public function test_units_missing_from_latest_sheet_become_leased(): void
     {
         $source = $this->createAmsSource();

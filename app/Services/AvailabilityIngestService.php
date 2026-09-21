@@ -297,10 +297,17 @@ class AvailabilityIngestService
         // If the saved column map shares NO columns with the parsed rows, the file
         // must be laid out differently (e.g. a legacy positional "colN" map fed a
         // proper header CSV). Rebuild the map automatically from the header names.
+        // Positional "colN" keys are ignored here: headerless files name every bucket
+        // "col%d", but a designed header CSV also pads trailing columns as col8…col25,
+        // so an empty overlap test would falsely "succeed" on the padding columns.
         $mappingRebuilt = false;
         if ($rows !== []) {
             $rowKeys = array_keys($rows[0]);
-            if (array_intersect(array_keys($columnMap), $rowKeys) === []) {
+            $savedMapKeys = array_filter(
+                array_keys($columnMap),
+                fn ($key) => ! preg_match('/^col\d+$/i', (string) $key)
+            );
+            if ($savedMapKeys === [] || array_intersect($savedMapKeys, $rowKeys) === []) {
                 $detected = $this->detectHeaderMap($rowKeys);
                 if ($detected !== []) {
                     $columnMap = $detected;
