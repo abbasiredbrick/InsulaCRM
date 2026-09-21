@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\Lead;
 use App\Models\User;
 use App\Notifications\LeadReassigned;
+use App\Notifications\ScheduleFeedbackNotification;
 use App\Notifications\TeamLeadActivity;
 use Illuminate\Support\Facades\Log;
 
@@ -103,6 +104,47 @@ class TeamNotifier
                 $coAgent->notify(new LeadReassigned($lead, null, $lead->agent, __('A colleague added you as a co-agent on this lead.')));
             } catch (\Throwable $e) {
                 Log::error("TeamNotifier co-agent failed: {$e->getMessage()}");
+            }
+        }
+    }
+
+    /**
+     * Notify the agent assigned to a viewing/task/meeting and the managers in
+     * that agent's reporting chain when feedback is logged on the schedule, so
+     * they can follow up with the client.
+     */
+    public function notifyScheduleFeedback(Activity $activity, object $entity, string $summary): void
+    {
+        if (! $activity->lead_id) {
+            return;
+        }
+
+        $lead = $activity->lead;
+
+        if (! $lead || ! $lead->tenant || ! $lead->tenant->wantsNotification('schedule_feedback')) {
+            return;
+        }
+
+        $agent = $entity->agent;
+        if (! $agent) {
+            return;
+        }
+
+        $recipients = [];
+
+        if ($agent->id !== $activity->agent_id) {
+            $recipients[$agent->id] = $agent;
+        }
+
+        foreach ($this->managersOf($agent, $activity->agent_id) as $manager) {
+            $recipients[$manager->id] = $manager;
+        }
+
+        foreach ($recipients as $recipient) {
+            try {
+                $recipient->notify(new ScheduleFeedbackNotification($activity, $lead, $summary));
+            } catch (\Throwable $e) {
+                Log::error("TeamNotifier schedule feedback failed: {$e->getMessage()}");
             }
         }
     }

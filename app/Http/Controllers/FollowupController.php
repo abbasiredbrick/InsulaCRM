@@ -12,6 +12,7 @@ use App\Models\Showing;
 use App\Models\Task;
 use App\Models\TaskActivity;
 use App\Services\MotivationScoreService;
+use App\Services\TeamNotifier;
 use Illuminate\Http\Request;
 
 /**
@@ -115,5 +116,7 @@ class FollowupController extends Controller
         app(MotivationScoreService::class)->recalculate($lead);
         event(new ActivityLogged($activity));
         Hooks::doAction('activity.logged', $activity);
+
+        app(TeamNotifier::class)->notifyScheduleFeedback($activity, $entity, "{$subject}: {$body}");
     }
 }

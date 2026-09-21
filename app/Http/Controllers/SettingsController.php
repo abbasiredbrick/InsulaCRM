@@ -1512,6 +1512,7 @@ class SettingsController extends Controller
             'sequence_email',
             'lease_expiry_reminder',
             'calendar_reminders',
+            'schedule_feedback',
         ];
 
         $preferences = [];

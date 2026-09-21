@@ -45,6 +45,10 @@
             'label' => __('Calendar / Schedule Reminders'),
             'description' => __("Email and in-app reminders before viewings, meetings, follow-ups and open houses when they are not synced to a Google/Microsoft calendar."),
         ],
+        'schedule_feedback' => [
+            'label' => __('Schedule Feedback'),
+            'description' => __('Notify the assigned agent and their managers when feedback is logged on a viewing, task or meeting.'),
+        ],
         'availability_conflict' => [
             'label' => __('Listed Unit Decisions'),
             'description' => __($businessMode === 'realestate' ? "Notify the agent and admins when a PM availability sheet shows a currently-listed unit as leased, so they can decide to keep it listed or unlist it." : 'Notify agents when a PM availability sheet shows a currently-listed unit as leased.'),

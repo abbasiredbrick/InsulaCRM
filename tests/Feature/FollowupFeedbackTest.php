@@ -6,13 +6,15 @@ use App\Models\Activity;
 use App\Models\Meeting;
 use App\Models\Showing;
 use App\Models\Task;
+use App\Notifications\ScheduleFeedbackNotification;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class FollowupFeedbackTest extends TestCase
 {
-    private function reAdmin(): self
+    private function reAdmin(array $overrides = []): self
     {
-        return $this->actingAsAdmin(['business_mode' => 'realestate']);
+        return $this->actingAsAdmin(array_merge(['business_mode' => 'realestate'], $overrides));
     }
 
     public function test_followups_page_shows_tabs_for_all_three(): void
@@ -187,5 +189,95 @@ class FollowupFeedbackTest extends TestCase
         ]);
 
         $this->assertSame(1, Activity::where('lead_id', $lead->id)->where('type', 'whatsapp')->count());
+    }
+
+    public function test_schedule_feedback_notifies_assigned_agent_and_managers(): void
+    {
+        $this->reAdmin();
+        Notification::fake([ScheduleFeedbackNotification::class]);
+
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+        $assignedAgent = $this->createUserWithRole('agent');
+        $assignedAgent->update(['reports_to' => $manager->id]);
+
+        $lead = $this->createLead(['deal_type' => 'rent']);
+        $property = $this->createProperty();
+
+        $showing = Showing::create([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $property->id,
+            'lead_id' => $lead->id,
+            'agent_id' => $assignedAgent->id,
+            'showing_date' => '2026-04-15',
+            'showing_time' => '14:00',
+            'status' => 'completed',
+        ]);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Client wants to sign next week.',
+        ])->assertRedirect();
+
+        Notification::assertSentTo($assignedAgent, ScheduleFeedbackNotification::class);
+        Notification::assertSentTo($manager, ScheduleFeedbackNotification::class);
+        Notification::assertNotSentTo($this->adminUser, ScheduleFeedbackNotification::class);
+    }
+
+    public function test_schedule_feedback_does_not_notify_the_logger(): void
+    {
+        $this->reAdmin();
+        Notification::fake([ScheduleFeedbackNotification::class]);
+
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'agent_id' => $manager->id]);
+        $property = $this->createProperty();
+
+        $showing = Showing::create([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $property->id,
+            'lead_id' => $lead->id,
+            'agent_id' => $manager->id,
+            'showing_date' => '2026-04-15',
+            'showing_time' => '14:00',
+            'status' => 'completed',
+        ]);
+
+        $this->actingAs($manager);
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Client is comparing options.',
+        ])->assertRedirect();
+
+        Notification::assertNotSentTo($manager, ScheduleFeedbackNotification::class);
+        Notification::assertSentTo($this->adminUser, ScheduleFeedbackNotification::class);
+    }
+
+    public function test_schedule_feedback_respects_tenant_preference(): void
+    {
+        $this->reAdmin(['notification_preferences' => ['schedule_feedback' => false]]);
+        Notification::fake([ScheduleFeedbackNotification::class]);
+
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+        $assignedAgent = $this->createUserWithRole('agent');
+        $assignedAgent->update(['reports_to' => $manager->id]);
+
+        $lead = $this->createLead(['deal_type' => 'rent']);
+
+        $task = Task::create([
+            'tenant_id' => $this->tenant->id,
+            'lead_id' => $lead->id,
+            'agent_id' => $assignedAgent->id,
+            'created_by' => $this->adminUser->id,
+            'title' => 'Send documents',
+            'due_date' => now()->addDay()->toDateString(),
+        ]);
+
+        $this->post(route('followups.task.feedback', $task), [
+            'feedback' => 'Documents sent.',
+        ])->assertRedirect();
+
+        Notification::assertNothingSent();
     }
 }
