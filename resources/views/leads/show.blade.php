@@ -321,115 +321,6 @@
             </div>
         </div>
 
-        @if(($businessMode ?? 'wholesale') === 'realestate')
-        <!-- Commission Panel -->
-        <div class="card mb-3" id="commission-panel">
-            <div class="card-header">
-                <h3 class="card-title">{{ __('Commission') }}</h3>
-                <div class="card-actions">
-                    @php $commissionService = app(\App\Services\CommissionCalculationService::class); @endphp
-                    <span class="badge bg-blue-lt me-1">{{ $commissionService->splitLabel($lead) }}</span>
-                </div>
-            </div>
-            <div class="card-body">
-                @if(session('commission_warnings'))
-                    <div class="alert alert-warning py-2">
-                        @foreach(session('commission_warnings') as $warning)
-                            <div class="small">{{ $warning }}</div>
-                        @endforeach
-                    </div>
-                @endif
-
-                @php $basis = $lead->commissionBasis(); $hasSnapshot = $lead->hasCommissionSnapshot(); @endphp
-
-                <div class="row g-3 align-items-end mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">{{ __('Gross commission') }}</label>
-                        @if($hasSnapshot)
-                            <div class="fw-bold h3 mb-0">{{ $basis !== null ? \App\Helpers\TenantFormatHelper::currency($basis) : '—' }}</div>
-                        @else
-                            <div class="input-group">
-                                <span class="input-group-text">{{ \App\Helpers\TenantFormatHelper::currencySymbol() }}</span>
-                                <input type="number" name="commission_amount" form="commission-amount-form" class="form-control" step="0.01" min="0" value="{{ $basis ?? '' }}" placeholder="{{ __('From closed deals or set manually') }}">
-                            </div>
-                            @can('shareAgents', $lead)
-                            <form id="commission-amount-form" method="POST" action="{{ route('leads.commissionAmount', $lead) }}" class="mt-2">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Save basis') }}</button>
-                            </form>
-                            @endcan
-                        @endif
-                    </div>
-                    @if(! $hasSnapshot && $basis !== null)
-                    <div class="col-md-4">
-                        <label class="form-label d-block">&nbsp;</label>
-                        @can('shareAgents', $lead)
-                        <form method="POST" action="{{ route('leads.commissionCalculate', $lead) }}" onsubmit="return confirm('{{ __('Split and freeze this commission for everyone on the lead?') }}')">
-                            @csrf
-                            <button type="submit" class="btn btn-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M9 7h6"/><path d="M8 9l6 6"/><path d="M16 9l-6 6"/></svg>
-                                {{ __('Calculate & snapshot split') }}
-                            </button>
-                        </form>
-                        @endcan
-                    </div>
-                    @endif
-                    <div class="col-md-4 text-md-end">
-                        @if($hasSnapshot)
-                            <span class="badge bg-green-lt">{{ __('Snapshot locked') }}</span>
-                        @else
-                            <span class="text-secondary small">{{ __('Snapshot freezes the split at close time.') }}</span>
-                        @endif
-                    </div>
-                </div>
-
-                @if($lead->commissions->isNotEmpty())
-                <div class="table-responsive">
-                    <table class="table table-sm table-vcenter">
-                        <thead>
-                            <tr><th>{{ __('Participant') }}</th><th>{{ __('Type') }}</th><th>{{ __('Share') }}</th><th class="text-end">{{ __('Amount') }}</th><th>{{ __('Funding') }}</th><th>{{ __('Status') }}</th></tr>
-                        </thead>
-                        <tbody>
-                            @foreach($lead->commissions as $cm)
-                            <tr>
-                                <td>
-                                    @if($cm->isCompany())
-                                        <strong>{{ $cm->participant_name ?: __('Company') }}</strong>
-                                    @else
-                                        {{ $cm->participant_name ?: ($cm->agent?->name ?: __('Agent') . ' #' . $cm->agent_id) }}
-                                    @endif
-                                </td>
-                                <td>
-                                    <span class="badge {{ $cm->participant_type === 'company' ? 'bg-secondary-lt' : ($cm->participant_type === 'external' ? 'bg-cyan-lt' : 'bg-azure-lt') }}">
-                                        {{ $cm->participant_type === 'company' ? __('Company') : ($cm->participant_type === 'external' ? __('External') : __('Agent')) }}
-                                    </span>
-                                </td>
-                                <td>{{ rtrim(rtrim((string) $cm->share_pct, '0'), '.') }}%</td>
-                                <td class="text-end fw-bold">{{ \App\Helpers\TenantFormatHelper::currency($cm->amount) }}</td>
-                                <td class="text-secondary small">{{ $cm->funding_label }}</td>
-                                <td>
-                                    <span class="badge {{ $cm->isPaid() ? 'bg-green-lt' : ($cm->status === 'void' ? 'bg-secondary-lt' : 'bg-yellow-lt') }}">{{ ucfirst($cm->status) }}</span>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                @else
-                    <p class="text-secondary mb-0">
-                        {{ __('No commission split yet.') }}
-                        @php $auto = $lead->closedDealsCommissionTotal(); @endphp
-                        @if($auto !== null)
-                            {{ __(':amount auto-pulled from the closed deal(s) — review it and snapshot.', ['amount' => \App\Helpers\TenantFormatHelper::currency($auto)]) }}
-                        @else
-                            {{ __('Set the gross commission above, then calculate the split.') }}
-                        @endif
-                    </p>
-                @endif
-            </div>
-        </div>
-        @endif
-
         <!-- Property Section -->
         <div id="property-details"></div>
         @if(($businessMode ?? 'wholesale') === 'realestate')
@@ -645,9 +536,6 @@
                                 </div>
                                 <!-- Edit mode (hidden by default) -->
                                 <div class="activity-edit" id="activity-edit-{{ $activity->id }}" style="display:none;">
-                                    <div class="mb-1">
-                                        <input type="text" class="form-control form-control-sm" id="activity-subject-{{ $activity->id }}" value="{{ $activity->subject }}" placeholder="{{ __('Subject (optional)') }}">
-                                    </div>
                                     <div class="mb-1">
                                         <textarea class="form-control form-control-sm" id="activity-body-{{ $activity->id }}" rows="2" placeholder="{{ __('Notes...') }}">{{ $activity->body }}</textarea>
                                     </div>
@@ -1354,7 +1242,6 @@ document.querySelectorAll('.activity-save-btn').forEach(function(btn) {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                subject: document.getElementById('activity-subject-' + id).value,
                 body: document.getElementById('activity-body-' + id).value,
             })
         }).then(function(r) { return r.json(); }).then(function(data) {

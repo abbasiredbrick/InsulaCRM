@@ -199,10 +199,12 @@ class ActivityController extends Controller
             'body' => 'nullable|string',
         ]);
 
-        $activity->update([
-            'subject' => $request->subject,
-            'body' => $request->body,
-        ]);
+        $data = ['body' => $request->body];
+        if ($request->has('subject')) {
+            $data['subject'] = $request->subject;
+        }
+
+        $activity->update($data);
 
         AuditLog::log('activity.updated', $activity);
 
