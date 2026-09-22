@@ -42,6 +42,7 @@ use App\Http\Controllers\ListingDashboardController;
 use App\Http\Controllers\ListingsController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OfferLetterController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OpenHouseController;
 use App\Http\Controllers\PdfExportController;
@@ -217,6 +218,10 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::patch('/a2a/{contract}/void', [\App\Http\Controllers\A2aContractController::class, 'void'])->name('a2a.void');
         Route::post('/a2a/{contract}/attach', [\App\Http\Controllers\A2aContractController::class, 'attachToLead'])->name('a2a.attach');
 
+        // Unified Documents & Agreements hub (consolidates A2A, offer letters,
+        // generated documents and the admin template library)
+        Route::get('/documents-hub', [\App\Http\Controllers\DocumentsHubController::class, 'index'])->name('documents.hub');
+
         // Feedback on viewings/tasks/meetings logged into the lead activity
         Route::post('/followups/viewings/{showing}/feedback', [\App\Http\Controllers\FollowupController::class, 'viewingFeedback'])->name('followups.viewing.feedback');
         Route::post('/followups/tasks/{task}/feedback', [\App\Http\Controllers\FollowupController::class, 'taskFeedback'])->name('followups.task.feedback');
@@ -252,6 +257,22 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/coldcalls/{marketContact}/convert-property', [MarketController::class, 'convertToProperty'])->name('market.convert-property');
         Route::post('/coldcalls/{marketContact}/convert-lead', [MarketController::class, 'convertToLead'])->name('market.convert-lead');
         Route::delete('/coldcalls/{marketContact}', [MarketController::class, 'destroy'])->name('market.destroy');
+    });
+
+    // ── Recycled Leads (previous portal leads, real estate mode) ─
+    // Pool of contacts to re-engage by cold call / WhatsApp. Imported from
+    // Bayut/Dubizzle/PropertyFinder exports or auto-recycled from leads stuck
+    // 60+ days in lost/dead/nurture. Regeneration revives them as active leads.
+    Route::middleware(['role:cold_call_agent,admin', 'mode:realestate'])->group(function () {
+        Route::get('/recycled', [\App\Http\Controllers\RecycledLeadController::class, 'index'])->name('recycled.index');
+        Route::get('/recycled/import', [\App\Http\Controllers\RecycledLeadController::class, 'create'])->name('recycled.create');
+        Route::post('/recycled/import', [\App\Http\Controllers\RecycledLeadController::class, 'import'])->name('recycled.import');
+        Route::post('/recycled/run-recycle', [\App\Http\Controllers\RecycledLeadController::class, 'runRecycle'])->name('recycled.runRecycle');
+        Route::get('/recycled/{recycledLead}', [\App\Http\Controllers\RecycledLeadController::class, 'show'])->name('recycled.show');
+        Route::post('/recycled/{recycledLead}/status', [\App\Http\Controllers\RecycledLeadController::class, 'updateStatus'])->name('recycled.status');
+        Route::post('/recycled/{recycledLead}/assign', [\App\Http\Controllers\RecycledLeadController::class, 'assign'])->name('recycled.assign');
+        Route::post('/recycled/{recycledLead}/regenerate', [\App\Http\Controllers\RecycledLeadController::class, 'regenerate'])->name('recycled.regenerate');
+        Route::delete('/recycled/{recycledLead}', [\App\Http\Controllers\RecycledLeadController::class, 'destroy'])->name('recycled.destroy');
     });
 
     // ── Listings (real estate agent mode) ───────────────────────────
@@ -488,6 +509,15 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/pipeline/{deal}/offers', [DealController::class, 'storeOffer'])->name('deals.storeOffer');
         Route::patch('/offers/{offer}', [DealController::class, 'updateOffer'])->name('deals.updateOffer');
         Route::delete('/offers/{offer}', [DealController::class, 'destroyOffer'])->name('deals.destroyOffer');
+
+        // Offer Letters (real estate mode)
+        Route::get('/pipeline/{deal}/offer-letters/create', [OfferLetterController::class, 'create'])->name('deal.offers.create');
+        Route::post('/pipeline/{deal}/offer-letters', [OfferLetterController::class, 'store'])->name('deal.offers.store');
+        Route::get('/offer-letters/{offerLetter}/print', [OfferLetterController::class, 'print'])->name('deal.offers.print');
+        Route::get('/offer-letters/{offerLetter}/download-signed', [OfferLetterController::class, 'downloadSigned'])->name('deal.offers.downloadSigned');
+        Route::post('/offer-letters/{offerLetter}/upload-signed', [OfferLetterController::class, 'uploadSigned'])->name('deal.offers.uploadSigned');
+        Route::post('/offer-letters/{offerLetter}/approve', [OfferLetterController::class, 'approve'])->name('deal.offers.approve');
+        Route::patch('/offer-letters/{offerLetter}/status', [OfferLetterController::class, 'updateStatus'])->name('deal.offers.status');
 
         // Activities on deals
         Route::post('/pipeline/{deal}/activities', [ActivityController::class, 'storeDealActivity'])->name('deals.activities.store');

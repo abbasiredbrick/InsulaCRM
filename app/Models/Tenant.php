@@ -243,6 +243,24 @@ class Tenant extends Model
         ], $saved);
     }
 
+    /**
+     * Standard brokerage commission rates (percentages).
+     *
+     * residential_lease: % of the annual lease value.
+     * commercial_lease: % of the annual lease value.
+     * sales: % of the sales value.
+     * vat: VAT percentage applied on top of the commission.
+     *
+     * @return array{residential_lease: int|float|string, commercial_lease: int|float|string, sales: int|float|string, vat: int|float|string}
+     */
+    public function commissionRateSettings(): array
+    {
+        return array_merge(
+            \App\Services\DealCommissionService::RATE_DEFAULTS,
+            $this->custom_options['commission_rates'] ?? []
+        );
+    }
+
     public function isRealEstate(): bool
     {
         return $this->business_mode === 'realestate';

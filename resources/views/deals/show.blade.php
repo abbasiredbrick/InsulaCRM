@@ -344,6 +344,7 @@
         @if(($businessMode ?? 'wholesale') === 'realestate')
             @include('deals._transaction_checklist', ['deal' => $deal])
             @include('deals._offers', ['deal' => $deal])
+            @include('deals._offer_letters', ['deal' => $deal])
         @endif
     </div>
 
@@ -585,7 +586,11 @@ document.getElementById('stage-form').addEventListener('submit', function(e) {
         },
         body: JSON.stringify({ stage: stage })
     }).then(r => r.json()).then(data => {
-        if (data.success) location.reload();
+        if (data.success) {
+            location.reload();
+        } else if (data.message) {
+            alert(data.message);
+        }
     });
 });
 

@@ -294,6 +294,12 @@
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M3 21l18 0"/><path d="M5 21v-14l8 -4v18"/><path d="M19 21v-10l-6 -4"/></svg></span>
                 <span class="drawer-item-text">{{ __('Inventory') }}</span>
             </a>
+            @if($user->isAdmin() || $user->isAgent() || $user->isListingAgent() || $user->isBuyersAgent())
+            <a href="{{ route('documents.hub') }}" class="drawer-nav-item {{ request()->is('documents-hub*') ? 'active' : '' }}">
+                <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></span>
+                <span class="drawer-item-text">{{ __('Documents & Agreements') }}</span>
+            </a>
+            @endif
             @else
             <a href="{{ route('pipeline') }}" class="drawer-nav-item {{ request()->is('pipeline*') ? 'active' : '' }}">
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><rect x="4" y="4" width="6" height="16" rx="1"/><rect x="14" y="4" width="6" height="10" rx="1"/></svg></span>
@@ -302,6 +308,12 @@
             <a href="{{ route('buyers.index') }}" class="drawer-nav-item {{ request()->is('buyers*') ? 'active' : '' }}">
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M3 21l18 0"/><path d="M9 8h1"/><path d="M9 12h1"/><path d="M9 16h1"/><path d="M14 8h1"/><path d="M14 12h1"/><path d="M14 16h1"/><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16"/></svg></span>
                 <span class="drawer-item-text">{{ __('Cash Buyers') }}</span>
+            </a>
+            @endif
+            @if($isRealEstate && ($user->isAdmin() || $user->isColdCallAgent()))
+            <a href="{{ route('recycled.index') }}" class="drawer-nav-item {{ request()->is('recycled*') ? 'active' : '' }}">
+                <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h10v6a3 3 0 0 1 -3 3h-4a3 3 0 0 1 -3 -3z"/><path d="M9 3v4"/><path d="M15 3v4"/><path d="M12 20v2"/><path d="M12 20a1 1 0 0 1 -1 1h-1a1 1 0 0 1 -1 -1"/></svg></span>
+                <span class="drawer-item-text">{{ __('Recycled Leads') }}</span>
             </a>
             @endif
             <a href="{{ route('calendar.index') }}" class="drawer-nav-item {{ request()->is('calendar*') ? 'active' : '' }}">

@@ -104,6 +104,16 @@ class DealController extends Controller
         ]);
 
         $oldStage = $deal->stage;
+
+        // Real estate mode: a signed offer letter must exist before a deal can
+        // be closed as Won.
+        if ($request->stage === 'closed_won' && $oldStage !== 'closed_won') {
+            $deal->loadMissing('lead');
+            if ($gateError = app(\App\Services\TransactionCloseService::class)->gateError($deal->lead)) {
+                return response()->json(['success' => false, 'message' => $gateError], 422);
+            }
+        }
+
         $updateData = [
             'stage' => $request->stage,
             'stage_changed_at' => now(),
@@ -130,9 +140,14 @@ class DealController extends Controller
         AuditLog::log('deal.stage_changed', $deal, ['stage' => $oldStage], ['stage' => $request->stage]);
         Hooks::doAction('deal.stage_changed', $deal, $oldStage);
 
-        // Convert the deal's lead into a Client (Buyer) when the deal is won
+        // Convert the deal's lead into a Client (Buyer) when the deal is won,
+        // sync the lead status, and apply the standard commission + split.
         if ($request->stage === 'closed_won' && $oldStage !== 'closed_won') {
             app(\App\Services\LeadToClientService::class)->convertFromWonDeal($deal);
+            $deal->loadMissing('lead');
+            if ($deal->lead) {
+                app(\App\Services\TransactionCloseService::class)->closeAsWon($deal->lead, $deal, auth()->user());
+            }
         }
 
         \App\Services\WebhookService::dispatch('deal.stage_changed', [
@@ -211,7 +226,7 @@ class DealController extends Controller
         $deal->load(['lead.property', 'agent', 'documents', 'buyerMatches.buyer', 'activities.agent']);
 
         if (\App\Services\BusinessModeService::isRealEstate()) {
-            $deal->load(['offers', 'checklistItems']);
+            $deal->load(['offers', 'checklistItems', 'offerLetters.discountApprover']);
         }
 
         if (request()->ajax()) {

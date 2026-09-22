@@ -66,6 +66,8 @@ class Lead extends Model
         'deal_type',
         'stage',
         'stage_changed_at',
+        'status_changed_at',
+        'recycled_at',
         'expected_move_in_date',
         'motivation_score',
         'commission_amount',
@@ -85,6 +87,8 @@ class Lead extends Model
             'commission_amount' => 'decimal:2',
             'custom_fields' => 'array',
             'stage_changed_at' => 'datetime',
+            'status_changed_at' => 'datetime',
+            'recycled_at' => 'datetime',
             'expected_move_in_date' => 'date',
         ];
     }
@@ -103,6 +107,10 @@ class Lead extends Model
                 $lead->stage_changed_at = now();
             }
 
+            if ($lead->status && ! $lead->status_changed_at) {
+                $lead->status_changed_at = now();
+            }
+
             if (blank($lead->reference)) {
                 $lead->reference = app(\App\Services\LeadReferenceService::class)->generate($lead);
             }
@@ -112,6 +120,11 @@ class Lead extends Model
         static::updating(function (Lead $lead) {
             if ($lead->isDirty('stage') && $lead->stage && ! $lead->stage_changed_at) {
                 $lead->stage_changed_at = now();
+            }
+
+            // Keep status_changed_at in sync whenever the status changes.
+            if ($lead->isDirty('status') && $lead->status) {
+                $lead->status_changed_at = now();
             }
 
             // A reassignment changes the owning agent, so the lead reference
@@ -226,11 +239,11 @@ class Lead extends Model
                 if ($dialingCode !== null) {
                     if (str_starts_with($digits, '0')) {
                         // National trunk prefix: replace it with the country code.
-                        $digits = $dialingCode . ltrim(substr($digits, 1), '0');
+                        $digits = $dialingCode.ltrim(substr($digits, 1), '0');
                     } elseif (! str_starts_with($digits, $dialingCode)) {
                         // A national number with no trunk prefix, as used in the
                         // NANP. Anything already carrying the code is left alone.
-                        $digits = $dialingCode . $digits;
+                        $digits = $dialingCode.$digits;
                     }
                 }
             }
@@ -365,6 +378,28 @@ class Lead extends Model
     public function deals()
     {
         return $this->hasMany(Deal::class);
+    }
+
+    public function offerLetters()
+    {
+        return $this->hasManyThrough(OfferLetter::class, Deal::class, 'lead_id', 'deal_id', 'id', 'id');
+    }
+
+    /**
+     * Whether a signed offer letter exists for any of this lead's deals. A
+     * signed (and uploaded) offer is required before the lead can be Won.
+     */
+    public function hasSignedOffer(): bool
+    {
+        return $this->offerLetters()->where('status', 'signed')->exists();
+    }
+
+    /**
+     * The most recent signed offer letter across the lead's deals, if any.
+     */
+    public function signedOffer(): ?\App\Models\OfferLetter
+    {
+        return $this->offerLetters()->where('status', 'signed')->latest('signed_at')->first();
     }
 
     public function lists()

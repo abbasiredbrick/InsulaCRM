@@ -139,7 +139,7 @@ class Deal extends Model
         static::addGlobalScope(new TenantScope);
 
         static::creating(function (Deal $deal) {
-            if (!$deal->stage_changed_at) {
+            if (! $deal->stage_changed_at) {
                 $deal->stage_changed_at = now();
             }
         });
@@ -200,17 +200,29 @@ class Deal extends Model
         return $this->hasMany(DealOffer::class);
     }
 
+    public function offerLetters()
+    {
+        return $this->hasMany(OfferLetter::class)->orderByDesc('created_at');
+    }
+
+    public function property()
+    {
+        return $this->hasOneThrough(Property::class, Lead::class, 'id', 'lead_id', 'lead_id', 'id');
+    }
+
     public function getDueDiligenceDaysRemainingAttribute(): ?int
     {
         if ($this->due_diligence_end_date) {
             return (int) now()->startOfDay()->diffInDays($this->due_diligence_end_date, false);
         }
+
         return null;
     }
 
     public function getIsDueDiligenceUrgentAttribute(): bool
     {
         $days = $this->due_diligence_days_remaining;
+
         return $days !== null && $days <= 2 && $days >= 0;
     }
 

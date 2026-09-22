@@ -120,20 +120,26 @@ class LeadSearchService
     {
         $ids = $this->visibleAgentIds($user);
 
-        if ($ids === null) {
-            return $query;
+        if ($ids !== null) {
+            $includeUnassigned = (bool) ($options['includeUnassigned'] ?? false);
+
+            $query->where(function (Builder $q) use ($user, $ids, $includeUnassigned): void {
+                $q->whereIn('agent_id', $ids)
+                    ->orWhereHas('leadAgents', fn (Builder $lq) => $lq->whereIn('agent_id', $ids)->where('status', LeadAgent::STATUS_ACTIVE));
+
+                if ($user->isManager() || $includeUnassigned) {
+                    $q->orWhereNull('agent_id');
+                }
+            });
         }
 
-        $includeUnassigned = (bool) ($options['includeUnassigned'] ?? false);
+        // Leads moved into the Recycled Leads pool are terminal records up for
+        // re-engagement; they stay out of the live pipeline (list, kanban,
+        // pickers, exports, global search) until regenerated, which clears
+        // recycled_at.
+        $query->whereNull('recycled_at');
 
-        return $query->where(function (Builder $q) use ($user, $ids, $includeUnassigned): void {
-            $q->whereIn('agent_id', $ids)
-                ->orWhereHas('leadAgents', fn (Builder $lq) => $lq->whereIn('agent_id', $ids)->where('status', LeadAgent::STATUS_ACTIVE));
-
-            if ($user->isManager() || $includeUnassigned) {
-                $q->orWhereNull('agent_id');
-            }
-        });
+        return $query;
     }
 
     /**

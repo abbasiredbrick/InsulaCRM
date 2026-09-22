@@ -1,0 +1,199 @@
+{{--
+    Printable offer letter (A4). Mirrors the reference letter: tenant as the
+    offering party, final value, fees, agency commission with VAT, documents
+    required, validity and signature blocks.
+
+    Variables: $offer, $deal, $lead, $property, $tenant
+--}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ __('Offer Letter') }} {{ $offer->offer_no }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: #1a1a1a;
+            background: #f1f3f5;
+        }
+        .sheet {
+            max-width: 210mm;
+            min-height: 296mm;
+            margin: 16px auto;
+            background: #fff;
+            padding: 18mm 16mm;
+            border: 1px solid #dee2e6;
+        }
+        .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0b3954; padding-bottom: 10px; margin-bottom: 14px; }
+        .head .offering { }
+        .head .offering h1 { font-size: 20px; color: #0b3954; letter-spacing: 0.4px; }
+        .head .offering p { color: #495057; font-size: 11px; }
+        .head .meta { text-align: right; font-size: 11px; color: #495057; }
+        .head .meta strong { display: block; font-size: 13px; color: #0b3954; }
+        h2.subject { font-size: 14.5px; color: #0b3954; margin-bottom: 10px; }
+        .kicker { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px; color: #6c757d; margin: 14px 0 4px; }
+        table.terms { width: 100%; border-collapse: collapse; margin: 4px 0 6px; }
+        table.terms td { border-bottom: 1px dotted #ced4da; padding: 4.5px 4px; vertical-align: top; }
+        table.terms td.k { width: 42%; color: #343a40; font-weight: 600; }
+        table.terms td.v { text-align: right; }
+        table.payments { width: 100%; border-collapse: collapse; margin: 8px 0; }
+        table.payments th { background: #0b3954; color: #fff; padding: 6px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+        table.payments td { border-bottom: 1px solid #dee2e6; padding: 7px 8px; }
+        table.payments td.amt { text-align: right; white-space: nowrap; font-weight: 600; }
+        table.payments td.payee { text-align: right; color: #495057; width: 30%; }
+        .words { font-style: italic; color: #495057; font-size: 11.5px; margin-top: 2px; }
+        .notice { background: #fff8e1; border: 1px solid #f0d67b; border-radius: 4px; padding: 8px 10px; font-size: 11.5px; margin-top: 12px; }
+        .docs { margin: 8px 0 0 2px; }
+        .docs li { margin-left: 18px; }
+        .signatures { display: flex; gap: 40px; margin-top: 34px; }
+        .signatures .sig { flex: 1; border-top: 1px solid #343a40; padding-top: 6px; font-size: 11px; }
+        .footer { margin-top: 26px; font-size: 10px; color: #868e96; border-top: 1px solid #dee2e6; padding-top: 8px; text-align: center; }
+        @media print {
+            body { background: #fff; }
+            .sheet { margin: 0; border: none; padding: 12mm; max-width: none; min-height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="head">
+            <div class="offering">
+                <h1>{{ $tenant->name }}</h1>
+                @if($tenant->address)<p>{{ $tenant->address }}</p>@endif
+                <p>{{ trim(collect([$tenant->phone, $tenant->email, $tenant->website])->reject(fn ($v) => blank($v))->implode('  •  ')) }}</p>
+            </div>
+            <div class="meta">
+                <strong>{{ __('Offer No.') }} {{ $offer->offer_no }}</strong>
+                <div>{{ __('Date') }}: <span id="offer-date">{{ optional($offer->issued_at)->format('F j, Y') ?: now()->format('F j, Y') }}</span></div>
+                <div>{{ $deal ? \App\Models\Deal::stageLabel($deal->stage) : '' }}</div>
+            </div>
+        </div>
+
+        <h2 class="subject">{{ $property?->address ?? $deal?->title }}</h2>
+
+        <div class="kicker">{{ __('Tenancy / Sale Terms') }}</div>
+        @php $dealName = ($property?->display_name ?? null) ?: ($deal?->title ?? '-'); @endphp
+        <table class="terms">
+            <tr><td class="k">{{ __('Property Details') }}</td><td class="v">{{ $dealName ?: ($deal?->title ?? '-') }}</td></tr>
+            @if($property?->unit_no)
+            <tr><td class="k">{{ __('Unit No.') }}</td><td class="v">{{ $property->unit_no }}</td></tr>
+            @endif
+            @if($property?->owner_name)
+            <tr><td class="k">{{ __('Owner / Landlord') }}</td><td class="v">{{ $property->owner_name }}</td></tr>
+            @endif
+            @if($lead)
+            <tr><td class="k">{{ __('Occupant Name') }}</td><td class="v">{{ $lead->full_name }}@if($lead->custom_fields['nationality'] ?? null) ({{ $lead->custom_fields['nationality'] }})@endif</td></tr>
+            @endif
+            @if($deal?->dealType() === 'rent')
+            <tr><td class="k">{{ __('Tenure of Tenancy') }}</td>
+                <td class="v">
+                    @if($offer->contract_start_date && $offer->contract_end_date)
+                        {{ $offer->contract_start_date->format('M d, Y') }} {{ __('to') }} {{ $offer->contract_end_date->format('M d, Y') }}
+                        (1 {{ __('Year') }})
+                    @else{{ __('One (1) Year') }}@endif
+                </td>
+            </tr>
+            @endif
+        </table>
+
+        <div class="kicker">{{ __('Payments') }}</div>
+        @php
+            $words = app(\App\Services\OfferLetterService::class);
+            $cur = strtoupper($tenant->currency ?? 'AED');
+        @endphp
+        <table class="payments">
+            <thead>
+                <tr><th>{{ __('Item') }}</th><th class="amt" style="text-align:right;">{{ __('Amount') }}</th><th style="text-align:right;">{{ __('Payable To') }}</th></tr>
+            </thead>
+            <tbody>
+                @if($deal?->dealType() === 'rent')
+                <tr>
+                    <td>{{ __('Rental Amount') }} — {{ $offer->payment_period }}<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div></td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->approved_amount) }}</td>
+                    <td class="payee">{{ $property?->owner_name ?? __('Landlord') }}</td>
+                </tr>
+                @else
+                <tr>
+                    <td>{{ __('Sales Amount') }}<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div></td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->approved_amount) }}</td>
+                    <td class="payee">{{ $property?->owner_name ?? __('Seller') }}</td>
+                </tr>
+                @endif
+                @if($offer->tawtheeq_fee !== null)
+                <tr>
+                    <td>{{ __('Tawtheeq Fee') }}</td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->tawtheeq_fee) }}</td>
+                    <td class="payee">{{ $tenant->name }}</td>
+                </tr>
+                @endif
+                @if($offer->admin_fee !== null)
+                <tr>
+                    <td>{{ __('Admin Fee + VAT') }}</td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->admin_fee) }}</td>
+                    <td class="payee">{{ $tenant->name }}</td>
+                </tr>
+                @endif
+                <tr>
+                    <td>{{ __('Security Deposit') }}@if($deal?->dealType() === 'rent' && $offer->approved_amount > 0) (5% {{ __('of annual rent') }})@endif<div class="words">{{ $words->amountInWords($offer->security_deposit, $cur) }} {{ __('Only') }}</div></td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->security_deposit) }}</td>
+                    <td class="payee">{{ $tenant->name }}</td>
+                </tr>
+                <tr>
+                    <td>{{ __('Commission @') }} {{ rtrim(rtrim(number_format((float) $offer->commission_rate_pct, 2, '.', ''), '0'), '.') }}% + VAT<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->commission_total, $cur) }} {{ __('Only') }}</div></td>
+                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->commission_total) }}</td>
+                    <td class="payee">{{ $tenant->name }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        @if($offer->discount_amount > 0)
+        <div class="notice">{{ __('A discount of :amount (from :original) has been granted on this offer.', [
+            'amount' => \App\Helpers\TenantFormatHelper::currency($offer->discount_amount),
+            'original' => \App\Helpers\TenantFormatHelper::currency($offer->original_amount),
+        ]) }} @if(! $offer->discount_approved_by) {{ __('Pending approval.') }} @endif</div>
+        @endif
+
+        <div class="notice">
+            <strong>{{ __('Non-Refundable:') }}</strong>
+            {{ __('The deposit and commission are strictly non-refundable and shall be forfeited in the event the occupant fails to proceed with the tenancy / purchase after signing this offer letter and once the contract is initiated with the relevant authorities (ADREC / RERA).') }}
+        </div>
+
+        <div class="kicker">{{ __('Documents Required') }}</div>
+        <ul class="docs">
+            @php $docs = $offer->documents_required ? explode("\n", $offer->documents_required) : [__('Passport'), __('Residency Visa & Emirates ID Copy')]; @endphp
+            @forelse($docs as $doc)
+                <li>{{ trim($doc) }}</li>
+            @empty
+                <li>{{ __('Passport') }}</li>
+                <li>{{ __('Residency Visa & Emirates ID Copy') }}</li>
+            @endforelse
+        </ul>
+
+        <div class="kicker">{{ __('Offer Validity') }}</div>
+        <p>{{ __('This offer is valid until') }} <strong>{{ optional($offer->valid_until)->format('F j, Y') ?: __('not specified') }}</strong> {{ __('and is subject to the terms above.') }}</p>
+
+        @if($offer->notes)
+        <div class="kicker">{{ __('Notes') }}</div>
+        <p>{{ $offer->notes }}</p>
+        @endif
+
+        <div class="signatures">
+            <div class="sig">
+                <div style="font-weight:700;">{{ __('For') }} {{ $tenant->name }}</div>
+                <div>{{ __('Managing Director') }}</div>
+                <div style="margin-top:14px;color:#495057;">{{ __('Name / Signature / Date') }}</div>
+            </div>
+            <div class="sig">
+                <div style="font-weight:700;">{{ $lead?->full_name ?? __('Occupant') }}</div>
+                <div>{{ __('Tenant / Purchaser') }}</div>
+                <div style="margin-top:14px;color:#495057;">{{ __('Name / Signature / Date') }}</div>
+            </div>
+        </div>
+
+        <div class="footer">{{ $tenant->name }} — {{ __('Offer No.') }} {{ $offer->offer_no }}</div>
+    </div>
+</body>
+</html>

@@ -135,12 +135,12 @@
                                 <span class="nav-link-title">{{ __('My Commissions') }}</span>
                             </a>
                         </li>
-                        <li class="nav-item {{ request()->is('a2a*') ? 'active' : '' }}">
-                            <a class="nav-link" href="{{ route('a2a.index') }}">
+                        <li class="nav-item {{ request()->is('documents-hub*') || request()->is('a2a*') || request()->is('offer-letters*') || request()->is('document-templates*') ? 'active' : '' }}">
+                            <a class="nav-link" href="{{ route('documents.hub') }}">
                                 <span class="nav-link-icon">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
                                 </span>
-                                <span class="nav-link-title">{{ __('A2A Contracts') }}</span>
+                                <span class="nav-link-title">{{ __('Documents & Agreements') }}</span>
                             </a>
                         </li>
                         @endif
@@ -259,7 +259,7 @@
 
                         @if(auth()->user()->isAdmin() || auth()->user()->isColdCallAgent())
                         {{-- ── MARKETING ───────────────────────────── --}}
-                        @php $marketingActive = request()->is('coldcalls*') || request()->is('sequences*') || request()->is('lists*') || request()->is('campaigns*') || request()->is('workflows*') || request()->is('goals*') || request()->is('tags*') || request()->is('document-templates*'); @endphp
+                        @php $marketingActive = request()->is('coldcalls*') || request()->is('recycled*') || request()->is('sequences*') || request()->is('lists*') || request()->is('campaigns*') || request()->is('workflows*') || request()->is('goals*') || request()->is('tags*') || request()->is('document-templates*'); @endphp
                         <li class="nav-item dropdown {{ $marketingActive ? 'active' : '' }}">
                             <a class="nav-link dropdown-toggle" href="#sidebar-marketing" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ $marketingActive ? 'true' : 'false' }}">
                                 <span class="nav-link-icon">
@@ -270,6 +270,9 @@
                             <div class="dropdown-menu {{ $marketingActive ? 'show' : '' }}">
 
                                 <a class="dropdown-item {{ request()->is('coldcalls*') ? 'active' : '' }}" href="{{ route('market.index') }}">{{ __('Cold Calls') }}</a>
+                                @if($businessMode === 'realestate')
+                                <a class="dropdown-item {{ request()->is('recycled*') ? 'active' : '' }}" href="{{ route('recycled.index') }}">{{ __('Recycled Leads') }}</a>
+                                @endif
                                 @if(auth()->user()->isAdmin())
                                 <a class="dropdown-item {{ request()->is('sequences*') ? 'active' : '' }}" href="{{ route('sequences.index') }}">{{ __('Sequences') }}</a>
                                 <a class="dropdown-item {{ request()->is('lists*') ? 'active' : '' }}" href="{{ route('lists.index') }}">{{ __('Lists') }}</a>
@@ -277,7 +280,9 @@
                                 <a class="dropdown-item {{ request()->is('workflows*') ? 'active' : '' }}" href="{{ route('workflows.index') }}">{{ __('Workflows') }}</a>
                                 <a class="dropdown-item {{ request()->is('goals*') ? 'active' : '' }}" href="{{ route('goals.index') }}">{{ __('Goals') }}</a>
                                 <a class="dropdown-item {{ request()->is('tags*') ? 'active' : '' }}" href="{{ route('tags.index') }}">{{ __('Tags') }}</a>
+                                @if(($businessMode ?? 'wholesale') !== 'realestate')
                                 <a class="dropdown-item {{ request()->is('document-templates*') ? 'active' : '' }}" href="{{ route('document-templates.index') }}">{{ __('Documents') }}</a>
+                                @endif
                                 @endif
                             </div>
                         </li>

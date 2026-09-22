@@ -468,6 +468,16 @@ class LeadController extends Controller
             $data['custom_fields'] = array_filter($data['custom_fields'], fn ($v) => $v !== null && $v !== '');
         }
 
+        // Real estate mode: a signed offer letter must exist before the lead
+        // can be closed as Won (lead status or the sales 'closed' stage).
+        $wantsWon = ($data['status'] ?? null) === 'closed_won' && $oldStatus !== 'closed_won'
+            || ($lead->dealType() === 'sale' && ($data['stage'] ?? null) === 'closed' && $lead->stage !== 'closed');
+        if ($wantsWon && app(\App\Services\BusinessModeService::isRealEstate())) {
+            if ($gateError = app(\App\Services\TransactionCloseService::class)->gateError($lead)) {
+                return back()->with('error', $gateError);
+            }
+        }
+
         $lead->update($data);
 
         // Reassigning an agent via the edit form also informs everyone involved.
@@ -496,6 +506,14 @@ class LeadController extends Controller
         }
 
         app(MotivationScoreService::class)->recalculate($lead);
+        $lead->refresh();
+
+
+        // Closing won syncs the linked pipeline deals and applies the standard
+        // commission + company/agent split.
+        if ($lead->status === 'closed_won' && $oldStatus !== 'closed_won') {
+            app(\App\Services\TransactionCloseService::class)->closeAsWon($lead, null, auth()->user());
+        }
 
         $this->syncLinkedUnits($request, $lead);
 
@@ -603,6 +621,15 @@ class LeadController extends Controller
         $request->validate(['status' => "required|in:{$validStatuses}"]);
 
         $oldStatus = $lead->status;
+
+        // Real estate mode: a signed offer letter must exist before the lead
+        // can be closed as Won.
+        if ($request->status === 'closed_won' && $oldStatus !== 'closed_won') {
+            if ($gateError = app(\App\Services\TransactionCloseService::class)->gateError($lead)) {
+                return response()->json(['success' => false, 'message' => $gateError], 422);
+            }
+        }
+
         $lead->update(['status' => $request->status]);
 
         if ($oldStatus !== $lead->status) {
@@ -612,6 +639,12 @@ class LeadController extends Controller
             // Marking a lead lost/dead alerts management for cross-checking.
             if (\App\Services\LostLeadNotifier::isLostStatus($lead->status)) {
                 \App\Services\LostLeadNotifier::notify($lead, $lead->status, $oldStatus);
+            }
+
+            // Closing won syncs the linked pipeline deals and applies the
+            // standard commission + company/agent split.
+            if ($lead->status === 'closed_won' && $oldStatus !== 'closed_won') {
+                app(\App\Services\TransactionCloseService::class)->closeAsWon($lead, null, auth()->user());
             }
         }
 
