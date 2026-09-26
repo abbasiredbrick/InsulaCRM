@@ -29,6 +29,7 @@
             <div class="card-header">
                 <h3 class="card-title">{{ __('Contact') }}</h3>
                 <div class="card-actions">
+                    @if($recycled->category)<span class="badge bg-primary-lt">{{ __($recycled->category_label) }}</span>@endif
                     <span class="badge bg-primary-lt">{{ $recycled->portal_label }}</span>
                     <span class="badge bg-secondary-lt">{{ __($sources[$recycled->source] ?? $recycled->source) }}</span>
                 </div>
@@ -38,7 +39,6 @@
                     <span class="avatar avatar-lg me-3 bg-primary-lt">{{ strtoupper(substr($recycled->full_name ?: '?', 0, 1)) }}</span>
                     <div>
                         <h3 class="mb-0">{{ $recycled->full_name ?: '—' }}</h3>
-                        @if($recycled->reference)<div class="text-muted small">{{ __('Portal reference') }}: {{ $recycled->reference }}</div>@endif
                     </div>
                 </div>
 
@@ -54,7 +54,30 @@
                         <span class="text-muted">—</span>
                     @endif
                 </div>
-                <div class="mb-3 text-muted"><i class="bi bi-envelope me-1"></i>{{ $recycled->email ?: '—' }}</div>
+                <div class="mb-3 text-muted">
+                    @if($recycled->email)
+                        <a href="mailto:{{ $recycled->email }}" class="text-reset"><i class="bi bi-envelope me-1"></i>{{ $recycled->email }}</a>
+                    @else
+                        <span class="text-muted">—</span>
+                    @endif
+                </div>
+
+                @if($recycled->whatsapp_username)
+                    <div class="mb-3 text-muted">
+                        <i class="bi bi-at me-1"></i>{{ $recycled->whatsapp_username }}
+                        <span class="text-muted small">({{ __('WhatsApp username') }})</span>
+                    </div>
+                @endif
+
+                @if($recycled->call_recording_url)
+                    <div class="mb-3">
+                        <div class="form-label">{{ __('Call recording') }}</div>
+                        <audio controls preload="none" src="{{ $recycled->call_recording_url }}" class="w-100">
+                            {{ __('Your browser cannot play this recording.') }}
+                        </audio>
+                        <div class="form-hint">{{ __('Hosted by the portal — the link stops working once their access expires.') }}</div>
+                    </div>
+                @endif
 
                 @if($recycled->status === 'already_active' && $recycled->linkedLead)
                     <div class="alert alert-cyan mb-0">

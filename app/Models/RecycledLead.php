@@ -17,6 +17,7 @@ class RecycledLead extends Model
      */
     public const SOURCES = [
         'csv_import' => 'Previous Portals Import',
+        'api_import' => 'Portal API Import',
         'auto_recycle' => 'Auto-Recycled from Leads',
     ];
 
@@ -28,6 +29,17 @@ class RecycledLead extends Model
         'bayut' => 'Bayut',
         'dubizzle' => 'Dubizzle',
         'property_finder' => 'PropertyFinder',
+    ];
+
+    /**
+     * How a portal lead first contacted us — Bayut report exports ship one
+     * log per channel, so this is the channel the row came in on.
+     */
+    public const CATEGORIES = [
+        'whatsapp' => 'WhatsApp',
+        'sms' => 'SMS',
+        'phone' => 'Phone',
+        'email' => 'Email',
     ];
 
     /**
@@ -100,11 +112,15 @@ class RecycledLead extends Model
         'tenant_id',
         'source',
         'portal',
+        'category',
         'reference',
         'first_name',
         'last_name',
         'phone',
+        'normalized_phone',
+        'whatsapp_username',
         'email',
+        'normalized_email',
         'original_deal_type',
         'purchased_project',
         'unit_no',
@@ -112,6 +128,7 @@ class RecycledLead extends Model
         'expected_handover_date',
         'status',
         'call_notes',
+        'call_recording_url',
         'last_contacted_at',
         'next_call_at',
         'assignee_id',
@@ -123,6 +140,13 @@ class RecycledLead extends Model
         'raw_data',
         'notes',
         'recycled_at',
+        'lead_date',
+        'needs_review',
+        'review_reason',
+        'email_verification_status',
+        'email_verified_at',
+        'email_verification_checked_at',
+        'email_verification_message',
     ];
 
     protected function casts(): array
@@ -130,9 +154,12 @@ class RecycledLead extends Model
         return [
             'gross_price' => 'decimal:2',
             'expected_handover_date' => 'date',
+            'lead_date' => 'date',
             'last_contacted_at' => 'datetime',
             'next_call_at' => 'datetime',
             'recycled_at' => 'datetime',
+            'email_verified_at' => 'datetime',
+            'email_verification_checked_at' => 'datetime',
             'raw_data' => 'array',
         ];
     }
@@ -187,9 +214,14 @@ class RecycledLead extends Model
         return self::SOURCES[$this->source] ?? $this->source;
     }
 
+    public function getCategoryLabelAttribute(): string
+    {
+        return self::CATEGORIES[$this->category] ?? $this->category;
+    }
+
     public function getDealTypeLabelAttribute(): string
     {
-        return $this->original_deal_type === 'sale' ? 'Sales' : ($this->original_deal_type === 'rent' ? 'Leasing' : '—');
+        return $this->original_deal_type === 'sale' ? 'Sales' : ($this->original_deal_type === 'rent' ? 'Rent' : '—');
     }
 
     /**
