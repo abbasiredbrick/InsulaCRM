@@ -141,6 +141,7 @@ class RecycledLead extends Model
         'notes',
         'recycled_at',
         'lead_date',
+        'alternate_deal_type',
         'needs_review',
         'review_reason',
         'email_verification_status',
@@ -221,7 +222,38 @@ class RecycledLead extends Model
 
     public function getDealTypeLabelAttribute(): string
     {
-        return $this->original_deal_type === 'sale' ? 'Sales' : ($this->original_deal_type === 'rent' ? 'Rent' : '—');
+        if ($this->original_deal_type === null) {
+            return $this->alternate_deal_type === null ? '—' : $this->dealTypeLabelFor($this->alternate_deal_type);
+        }
+
+        if ($this->alternate_deal_type === null || $this->alternate_deal_type === $this->original_deal_type) {
+            return $this->dealTypeLabelFor($this->original_deal_type);
+        }
+
+        // One contact, both intents: "Rent + Sale".
+        return $this->dealTypeLabelFor($this->original_deal_type).' + '.$this->dealTypeLabelFor($this->alternate_deal_type);
+    }
+
+    protected function dealTypeLabelFor(?string $type): string
+    {
+        return match ($type) {
+            'sale' => 'Sales',
+            'rent' => 'Rent',
+            default => '—',
+        };
+    }
+
+    /**
+     * Whether this contact enquired about both renting and buying — the pool
+     * shows one person, but regeneration must offer the intent that fits what
+     * they want now (and a live lead gains the other intent rather than a
+     * duplicate person).
+     */
+    public function hasBothIntents(): bool
+    {
+        return $this->original_deal_type !== null
+            && $this->alternate_deal_type !== null
+            && $this->alternate_deal_type !== $this->original_deal_type;
     }
 
     /**

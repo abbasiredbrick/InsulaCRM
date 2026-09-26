@@ -37,10 +37,6 @@ class RecycledLeadRegenerationService
             throw new RuntimeException('This contact was already regenerated.');
         }
 
-        if ($recycled->status === 'already_active') {
-            throw new RuntimeException('This contact is already an active lead — open the linked lead instead of regenerating.');
-        }
-
         if ($recycled->status === 'do_not_contact') {
             throw new RuntimeException('This contact asked not to be contacted.');
         }
@@ -64,6 +60,33 @@ class RecycledLeadRegenerationService
         }
 
         return DB::transaction(function () use ($recycled, $config, $agentId, $notes): Lead {
+            $activeLead = $this->activeLeadFor($recycled);
+
+            // The client is already with us as a live lead, and now wants the
+            // other thing (renting, then buying — or a buyer who wants to lease
+            // what they bought). The person is the same, so the new intent joins
+            // their existing lead instead of creating a second person in the
+            // pipeline.
+            if ($activeLead !== null) {
+                $this->addIntentToActiveLead($activeLead, $recycled, $config, $agentId, $notes);
+
+                $recycled->forceFill([
+                    'status' => 'regenerated',
+                    'regeneration_intent' => $config['key'],
+                    'assignee_id' => $agentId ?: $activeLead->agent_id,
+                    'regenerated_lead_id' => $activeLead->id,
+                    'last_contacted_at' => now(),
+                ])->save();
+
+                AuditLog::log('recycled.intent_added', $recycled, [
+                    'intent' => $config['key'],
+                    'lead_id' => $activeLead->id,
+                    'agent_id' => $agentId ?: $activeLead->agent_id,
+                ]);
+
+                return $activeLead->refresh();
+            }
+
             $lead = $recycled->original_lead_id !== null
                 ? $this->reviveOriginalLead($recycled, $config, $agentId, $notes)
                 : $this->createFreshLead($recycled, $config, $agentId, $notes);
@@ -91,6 +114,86 @@ class RecycledLeadRegenerationService
 
             return $lead;
         });
+    }
+
+    /**
+     * The live lead this contact already is, if any — either the one the import
+     * linked, or the original lead that was never actually recycled.
+     */
+    protected function activeLeadFor(RecycledLead $recycled): ?Lead
+    {
+        $linked = $recycled->linkedLead ?: $recycled->originalLead;
+
+        if ($linked && $linked->recycled_at === null) {
+            return $linked;
+        }
+
+        if (! $recycled->phone && ! $recycled->email) {
+            return null;
+        }
+
+        return Lead::where('tenant_id', $recycled->tenant_id)
+            ->whereNull('recycled_at')
+            ->where(function ($q) use ($recycled) {
+                if ($recycled->phone) {
+                    $q->where('phone', $recycled->phone);
+
+                    return;
+                }
+
+                $q->where('email', $recycled->email);
+            })
+            ->first();
+    }
+
+    /**
+     * Attach the chosen intent to a lead that is already live: one person, two
+     * intentions (renting now and buying later, or a buyer leasing their own
+     * unit), recorded on the lead with a dated activity so the history explains
+     * itself later.
+     */
+    protected function addIntentToActiveLead(Lead $lead, RecycledLead $recycled, array $config, ?int $agentId, ?string $notes): void
+    {
+        $custom = $lead->custom_fields ?? [];
+        $existing = $custom['additional_intents'] ?? [];
+        $existing[] = array_filter([
+            'intent' => $config['key'],
+            'label' => $config['label'],
+            'deal_type' => $config['deal_type'],
+            'contact_type' => $config['contact_type'],
+            'added_at' => now()->toDateTimeString(),
+            'added_by' => $agentId,
+            'source' => $recycled->portal_label,
+            'source_reference' => $recycled->reference,
+            'notes' => $notes,
+        ], fn ($value) => $value !== null);
+        $custom['additional_intents'] = $existing;
+        $lead->custom_fields = $custom;
+
+        // A second intent does not overwrite the lead's own type: the pipeline
+        // still tracks what this lead is about today, and the added intent
+        // records the new angle the agent should work.
+        $lead->notes = trim(($lead->notes ?? '')." \n Added intent from the Recycled Leads pool ({$config['label']}).".($notes ? " Notes: {$notes}" : ''));
+        $lead->save();
+
+        $switched = $lead->deal_type !== null && $lead->deal_type !== $config['deal_type'];
+
+        Activity::create([
+            'tenant_id' => $lead->tenant_id,
+            'lead_id' => $lead->id,
+            'agent_id' => $agentId ?: $lead->agent_id,
+            'type' => 'note',
+            'subject' => 'Intent added from the Recycled Leads pool',
+            'body' => trim(($switched
+                ? "Client also wants to {$this->intentNoun($config)} — the lead was created as a ".($lead->deal_type === 'rent' ? 'rental' : 'sales').' enquiry, so open the matching side and let the team know the requirement changed.'
+                : "Client also wants to {$this->intentNoun($config)}.").($notes ? " Notes: {$notes}" : '')),
+            'logged_at' => now(),
+        ]);
+    }
+
+    protected function intentNoun(array $config): string
+    {
+        return $config['deal_type'] === 'sale' ? 'buy' : 'rent';
     }
 
     /**

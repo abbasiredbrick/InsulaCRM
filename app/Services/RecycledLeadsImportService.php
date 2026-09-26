@@ -219,11 +219,51 @@ class RecycledLeadsImportService
                 $duplicates++;
 
                 $patch = [];
-                if ($existing->lead_date === null && $leadDate !== null) {
+
+                // 1) The contact's first enquiry date is the one that matters, so
+                // a later row carrying an EARLIER date corrects the record
+                // instead of the stored date staying "whatever the creating row
+                // happened to say".
+                if ($leadDate !== null && ($existing->lead_date === null || $leadDate < $existing->lead_date->toDateString())) {
                     $patch['lead_date'] = $leadDate;
                 }
                 if ($existing->original_deal_type === null && $dealType !== null) {
                     $patch['original_deal_type'] = $dealType;
+                }
+
+                // 2) Same person, both intents. Exports split one contact's
+                // rental and sale enquiries across rows, and a single type
+                // column silently dropped the second one. Keep the first type as
+                // the record's own and remember the other one, so the pool shows
+                // "Rent + Sale" and regeneration can pick either intent.
+                $storedType = $patch['original_deal_type'] ?? $existing->original_deal_type;
+                $storedAlternate = $existing->alternate_deal_type;
+                if ($dealType !== null) {
+                    if ($storedType === null && $storedAlternate !== null) {
+                        $patch['original_deal_type'] = $storedAlternate;
+                        $patch['alternate_deal_type'] = null;
+                    } elseif ($storedType !== null && $dealType !== $storedType && $storedAlternate === null) {
+                        $patch['alternate_deal_type'] = $dealType;
+                    }
+                }
+
+                // 3) A re-upload often holds a better copy of the contact than
+                // the row that created the record — the creating row was a
+                // truncated call entry. Fill what is missing and let a fuller
+                // name win, so the pool stops holding "Omar" for a contact
+                // whose export says "Omar Sherif".
+                $newFirstName = trim((string) ($row['first_name'] ?? ''));
+                $newLastName = trim((string) ($row['last_name'] ?? ''));
+                if ($this->nameIsRicher($existing->first_name, $existing->last_name, $newFirstName, $newLastName)) {
+                    if ($newFirstName !== '') {
+                        $patch['first_name'] = $newFirstName;
+                    }
+                    if ($newLastName !== '') {
+                        $patch['last_name'] = $newLastName;
+                    }
+                }
+                if ($email !== '' && $this->isPlaceholderValue($email) === false && $this->isPlaceholderValue($existing->email)) {
+                    $patch['email'] = $email;
                 }
 
                 // The "no purpose" flag only ever meant "nobody could tell rent
@@ -732,7 +772,12 @@ class RecycledLeadsImportService
             return null;
         }
 
+        // Segments are trimmed before matching: real exports carry padding
+        // around the type code ("NF-R -12251230" for a rental), and an
+        // untrimmed segment would read as unknown and flag a known intent.
         foreach (explode('-', $reference) as $segment) {
+            $segment = trim($segment);
+
             if ($segment === 'R') {
                 return 'rent';
             }
@@ -742,6 +787,41 @@ class RecycledLeadsImportService
         }
 
         return null;
+    }
+
+    /**
+     * Whether an imported name says strictly more than the stored one.
+     *
+     * The stored name wins unless it is missing/placeholder, or the imported
+     * name carries more of the person's name (a full first name, or the surname
+     * the creating row never captured). Judged on the combined name because a
+     * later row may split the parts differently.
+     */
+    protected function nameIsRicher(?string $currentFirst, ?string $currentLast, string $newFirst, string $newLast): bool
+    {
+        $current = trim(($currentFirst ?? '').' '.($currentLast ?? ''));
+        $incoming = trim($newFirst.' '.$newLast);
+
+        if ($incoming === '' || $this->isPlaceholderValue($incoming)) {
+            return false;
+        }
+
+        if ($this->isPlaceholderValue($current)) {
+            return true;
+        }
+
+        return mb_strlen($incoming) > mb_strlen($current);
+    }
+
+    /**
+     * Values that carry no contact information, so a real value from another
+     * row always replaces them.
+     */
+    protected function isPlaceholderValue(?string $value): bool
+    {
+        $normal = mb_strtolower(trim((string) $value));
+
+        return in_array($normal, ['', 'unknown', 'n/a', 'na', 'none', 'null', 'nil', '-', '--', 'no name', 'no email'], true);
     }
 
     /**
@@ -995,10 +1075,16 @@ class RecycledLeadsImportService
         return RecycledLead::where('tenant_id', $tenantId)
             ->where(function ($q) use ($phone, $email, $whatsappUsername) {
                 if ($phone !== '') {
-                    $q->orWhere(function ($q2) use ($phone) {
-                        $q2->whereNotNull('phone')->whereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, "+", ""), ".", ""), " ", ""), "-", ""), "(", "") = ?', [preg_replace('/\D+/', '', $phone)]);
-                    });
+                    // The number is the identity when the row carries one: a
+                    // different number is a different lead even when the email
+                    // matches (people carry old and new numbers through
+                    // exports). Email/username only identify a contact that
+                    // arrives with no number to call at all.
+                    $q->whereNotNull('phone')->whereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, "+", ""), ".", ""), " ", ""), "-", ""), "(", "") = ?', [preg_replace('/\D+/', '', $phone)]);
+
+                    return;
                 }
+
                 if ($email !== '') {
                     $q->orWhere('email', $email);
                 }
@@ -1020,10 +1106,11 @@ class RecycledLeadsImportService
             ->where(function ($q) use ($phone, $email) {
                 if ($phone !== '') {
                     $q->where('phone', $phone);
+
+                    return;
                 }
-                if ($email !== '') {
-                    $q->orWhere('email', $email);
-                }
+
+                $q->where('email', $email);
             })
             ->first();
     }

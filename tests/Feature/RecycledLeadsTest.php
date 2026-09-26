@@ -1067,4 +1067,252 @@ class RecycledLeadsTest extends TestCase
         $this->assertSame($this->adminUser->id, $first->fresh()->assignee_id);
         $this->assertSame($this->adminUser->id, $second->fresh()->assignee_id);
     }
+
+    // ── Contact-data reconciliation ─────────────────────────────
+
+    public function test_a_re_upload_upgrades_a_truncated_name_and_fills_a_missing_email(): void
+    {
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Omar,+971551111201,,2025-04-30 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $second = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Omar Sherif,+971551111201,omar@example.com,2025-05-02 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $second);
+        $counts = app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $this->assertSame(1, $counts['duplicates']);
+        $this->assertSame(0, $counts['imported']);
+
+        $lead = RecycledLead::where('phone', '+971551111201')->firstOrFail();
+        $this->assertSame('Omar', $lead->first_name);
+        $this->assertSame('Sherif', $lead->last_name);
+        $this->assertSame('omar@example.com', $lead->email);
+    }
+
+    public function test_a_re_upload_never_replaces_a_good_name_with_a_shorter_one(): void
+    {
+        RecycledLead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+971551111202',
+            'first_name' => 'Mohammed',
+            'last_name' => 'Al Sabahi',
+        ]);
+
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Mohd,+971551111202,,2025-05-02 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $lead = RecycledLead::where('phone', '+971551111202')->firstOrFail();
+        $this->assertSame('Mohammed', $lead->first_name);
+        $this->assertSame('Al Sabahi', $lead->last_name);
+    }
+
+    public function test_a_different_number_stays_a_separate_lead_even_on_the_same_email(): void
+    {
+        RecycledLead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+61411799745',
+            'email' => 'daniel@example.com',
+            'first_name' => 'Daniel',
+            'last_name' => null,
+        ]);
+
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Daniel Pires,+971585579895,daniel@example.com,2025-05-02 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        $counts = app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $this->assertSame(1, $counts['imported']);
+        $this->assertSame(0, $counts['duplicates']);
+        $this->assertSame(2, RecycledLead::where('email', 'daniel@example.com')->count());
+        $this->assertNull(RecycledLead::where('phone', '+61411799745')->firstOrFail()->last_name);
+        $this->assertSame('Pires', RecycledLead::where('phone', '+971585579895')->firstOrFail()->last_name);
+    }
+
+    public function test_the_same_contact_without_a_number_still_dedupes_on_email(): void
+    {
+        RecycledLead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+971551111203',
+            'email' => 'nora@example.com',
+        ]);
+
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Nora,,nora@example.com,2025-05-02 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        $counts = app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $this->assertSame(1, $counts['duplicates']);
+        $this->assertSame(1, RecycledLead::count());
+    }
+
+    public function test_lead_date_tracks_the_earliest_enquiry_not_the_creating_row(): void
+    {
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Reema,+971551111204,,2025-06-10 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $earlier = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Reema,+971551111204,,2025-05-01 09:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $earlier);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $this->assertSame('2025-05-01', RecycledLead::where('phone', '+971551111204')->firstOrFail()->lead_date->toDateString());
+    }
+
+    public function test_a_later_row_with_a_later_date_never_moves_the_date_forward(): void
+    {
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Reema,+971551111205,,2025-05-01 09:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $later = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,created_at',
+            'whatsapp,Reema,+971551111205,,2025-06-10 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $later);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $this->assertSame('2025-05-01', RecycledLead::where('phone', '+971551111205')->firstOrFail()->lead_date->toDateString());
+    }
+
+    public function test_a_contact_who_enquired_about_both_is_tagged_both(): void
+    {
+        $this->tenant->update([
+            'name' => 'Pristine Properties',
+            'website' => 'https://pristineproperties.ae',
+        ]);
+
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,listing_reference,created_at',
+            'whatsapp,Yara,+971551111206,,AD-R-11313326,2025-04-30 10:00:00 +0000 UTC',
+            'whatsapp,Yara,+971551111206,,MK-S-13688726,2025-05-04 10:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $lead = RecycledLead::where('phone', '+971551111206')->firstOrFail();
+        $this->assertSame('rent', $lead->original_deal_type);
+        $this->assertSame('sale', $lead->alternate_deal_type);
+        $this->assertTrue($lead->hasBothIntents());
+        $this->assertSame('Rent + Sales', $lead->deal_type_label);
+    }
+
+    public function test_a_padded_reference_segment_still_resolves_the_type(): void
+    {
+        $this->tenant->update([
+            'name' => 'Pristine Properties',
+            'website' => 'https://pristineproperties.ae',
+        ]);
+
+        $csv = implode("\n", [
+            'channel,sender_name,sender_phone,sender_email,listing_reference,created_at',
+            'whatsapp,Padded Rent,+971551111207,,NF-R -12251230,2025-04-30 10:00:00 +0000 UTC',
+            'whatsapp,Padded Sale,+971551111208,,NF-S -12251231,2025-04-30 11:00:00 +0000 UTC',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rcl').'.csv';
+        file_put_contents($path, $csv);
+        app(RecycledLeadsImportService::class)->import($path, 'csv', $this->tenant->id, $this->adminUser->id, 'property_finder');
+        unlink($path);
+
+        $rent = RecycledLead::where('phone', '+971551111207')->firstOrFail();
+        $this->assertSame('rent', $rent->original_deal_type);
+        $this->assertSame('0', (string) $rent->needs_review);
+        $this->assertSame('sale', RecycledLead::where('phone', '+971551111208')->firstOrFail()->original_deal_type);
+    }
+
+    public function test_regenerating_an_active_contact_adds_the_intent_to_the_same_lead(): void
+    {
+        $lead = Lead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+971551111209',
+            'deal_type' => 'rent',
+            'status' => 'new',
+        ]);
+
+        $recycled = RecycledLead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+971551111209',
+            'status' => 'already_active',
+            'linked_lead_id' => $lead->id,
+            'original_deal_type' => 'rent',
+            'alternate_deal_type' => 'sale',
+        ]);
+
+        $result = app(RecycledLeadRegenerationService::class)->regenerate(
+            $recycled,
+            'renter_to_buyer',
+            $this->adminUser->id,
+            'Wants to upgrade to a bigger place.',
+        );
+
+        $this->assertSame($lead->id, $result->id);
+        $this->assertSame(1, Lead::where('phone', '+971551111209')->count());
+        $this->assertSame('regenerated', $recycled->fresh()->status);
+        $this->assertSame('renter_to_buyer', $recycled->fresh()->regeneration_intent);
+
+        $intents = $result->fresh()->custom_fields['additional_intents'] ?? [];
+        $this->assertCount(1, $intents);
+        $this->assertSame('renter_to_buyer', $intents[0]['intent']);
+        $this->assertSame('sale', $intents[0]['deal_type']);
+        $this->assertSame('rent', $result->fresh()->deal_type);
+    }
+
+    public function test_regenerating_a_pending_contact_with_both_intents_creates_one_lead_from_the_chosen_intent(): void
+    {
+        $recycled = RecycledLead::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'phone' => '+971551111210',
+            'status' => 'pending',
+            'original_deal_type' => 'rent',
+            'alternate_deal_type' => 'sale',
+        ]);
+
+        $lead = app(RecycledLeadRegenerationService::class)->regenerate($recycled, 'renter_to_buyer', $this->adminUser->id);
+
+        $this->assertSame('sale', $lead->deal_type);
+        $this->assertSame('renter_to_buyer', $lead->custom_fields['recycling_intent'] ?? null);
+        $this->assertArrayNotHasKey('additional_intents', $lead->custom_fields ?? []);
+    }
 }

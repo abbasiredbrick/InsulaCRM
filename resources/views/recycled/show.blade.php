@@ -199,13 +199,27 @@
                 </div>
             </div>
             <div class="card-body">
-                @if(in_array($recycled->status, ['regenerated', 'already_active'], true))
+                @if($recycled->status === 'regenerated')
                     <div class="alert alert-warning mb-0">
-                        {{ $recycled->status === 'regenerated' ? __('This contact was already regenerated.') : __('This contact is already an active lead — open the linked lead instead.') }}
+                        {{ __('This contact was already regenerated.') }}
                     </div>
                 @elseif($recycled->status === 'do_not_contact')
                     <div class="alert alert-warning mb-0">{{ __('This contact asked not to be contacted.') }}</div>
                 @else
+                    @if($recycled->status === 'already_active' && $recycled->linkedLead)
+                        <div class="alert alert-info mb-3">
+                            {{ __('This contact is already an active lead.') }}
+                            <a href="{{ route('leads.show', $recycled->linkedLead) }}">{{ __('Open the linked lead') }}</a>.
+                            {{ __('If they now want the other side — to buy instead of rent, or to rent what they bought — pick that intent below and it is added to the existing lead instead of creating a second one.') }}
+                        </div>
+                    @endif
+                    @if($recycled->hasBothIntents())
+                        <div class="alert alert-light border mb-3">
+                            {{ __('This contact enquired about both a rental and a purchase.') }}
+                            <strong>{{ __('Choose the intent that matches what they want now') }}</strong>
+                            {{ __('— the other one stays on the record for later.') }}
+                        </div>
+                    @endif
                     <form method="POST" action="{{ route('recycled.regenerate', $recycled) }}">
                         @csrf
                         <div class="row g-2">

@@ -33,6 +33,10 @@ class RecycledLeadController extends Controller
             $query->where('portal', $request->portal);
         }
 
+        if ($request->filled('category')) {
+            $query->where('category', $request->category);
+        }
+
         if ($request->filled('source')) {
             $query->where('source', $request->source);
         }
@@ -45,12 +49,11 @@ class RecycledLeadController extends Controller
             $query->where('original_deal_type', $request->deal_type);
         }
 
-        if ($request->filled('handover') && $request->handover === '1') {
-            $query->whereNotNull('expected_handover_date')
-                ->whereNotIn('status', ['regenerated', 'already_active']);
-        }
+        $search->applyLeadDateRange($query, $request->query('date_from'), $request->query('date_to'));
 
-        $recycled = $query->latest('created_at')->paginate(25);
+        $perPage = in_array((int) $request->query('per_page', 25), [10, 25, 50, 100], true) ? (int) $request->query('per_page') : 25;
+
+        $recycled = $query->latest('created_at')->paginate($perPage);
 
         $base = fn ($w = []) => RecycledLead::query()->where($w);
 
@@ -60,11 +63,6 @@ class RecycledLeadController extends Controller
             'call_back' => $base(['status' => 'call_back'])->count(),
             'regenerated' => $base(['status' => 'regenerated'])->count(),
             'already_active' => $base(['status' => 'already_active'])->count(),
-            'handover_soon' => RecycledLead::query()
-                ->whereNotNull('expected_handover_date')
-                ->whereNotIn('status', ['regenerated', 'already_active'])
-                ->where('expected_handover_date', '<=', now()->addMonths(3))
-                ->count(),
         ];
 
         return view('recycled.index', [
@@ -72,6 +70,7 @@ class RecycledLeadController extends Controller
             'counts' => $counts,
             'statuses' => RecycledLead::STATUSES,
             'portals' => RecycledLead::PORTALS,
+            'categories' => RecycledLead::CATEGORIES,
             'sources' => RecycledLead::SOURCES,
             'intents' => RecycledLead::INTENTS,
             'agents' => $this->assignableAgents(),
@@ -83,6 +82,7 @@ class RecycledLeadController extends Controller
         return view('recycled.create', [
             'agents' => $this->assignableAgents(),
             'portals' => RecycledLead::PORTALS,
+            'categories' => RecycledLead::CATEGORIES,
         ]);
     }
 
@@ -91,6 +91,7 @@ class RecycledLeadController extends Controller
         $data = $request->validate([
             'name' => 'nullable|string|max:255',
             'portal' => 'required|in:'.implode(',', array_keys(RecycledLead::PORTALS)),
+            'category' => 'nullable|in:'.implode(',', array_keys(RecycledLead::CATEGORIES)),
             'agent_id' => 'nullable|exists:users,id',
             'file' => 'required|file|mimes:xlsx,csv,txt|max:10240',
         ]);
@@ -108,6 +109,7 @@ class RecycledLeadController extends Controller
                 $data['portal'],
                 $data['agent_id'] ?? null,
                 $data['name'] ?? null,
+                $data['category'] ?? null,
             );
         } catch (RuntimeException $e) {
             Storage::disk('local')->delete($path);
@@ -117,20 +119,51 @@ class RecycledLeadController extends Controller
 
         Storage::disk('local')->delete($path);
 
-        AuditLog::log('recycled.imported', null, [
+        $audit = array_filter([
             'portal' => $data['portal'],
             'import_name' => $data['name'] ?? null,
             'imported' => $result['imported'],
             'already_active' => $result['already_active'],
             'duplicates' => $result['duplicates'],
+            'dropped_internal' => $result['dropped_internal'],
+            'dropped_agent' => $result['dropped_agent'],
+            'flagged_review' => $result['flagged_review'],
+            'flagged_no_purpose' => $result['flagged_no_purpose'],
             'skipped' => $result['skipped'],
+            'skipped_no_contact' => $result['skipped_no_contact'],
         ]);
 
-        return redirect()->route('recycled.index')->with(
-            'success',
-            "Import complete: {$result['imported']} added to the pool, {$result['already_active']} already-active (linked), "
-            ."{$result['duplicates']} duplicates skipped, {$result['skipped']} blank rows skipped."
-        );
+        AuditLog::log('recycled.imported', null, $audit);
+
+        $message = "Import complete: {$result['imported']} added to the pool, "
+            ."{$result['already_active']} already-active (linked), "
+            ."{$result['duplicates']} duplicates skipped.";
+
+        if ($result['dropped_internal'] > 0) {
+            $message .= " {$result['dropped_internal']} dropped as internal / test — the buyer is on your own team (office email domain or tenant number), so they are not a real portal contact.";
+        }
+
+        if ($result['dropped_agent'] > 0) {
+            $message .= " {$result['dropped_agent']} dropped — tagged from_agent, so the enquiry was created by your own agent rather than by a buyer.";
+        }
+
+        if ($result['flagged_review'] > 0) {
+            $message .= " {$result['flagged_review']} flagged for review — those rows use masked portal emails like whatsapp.971501567554@id.bayut.com (actually a WhatsApp number) or Apple private-relay addresses, so they were imported but marked for an agent to double-check before outreach.";
+        }
+
+        if ($result['flagged_no_purpose'] > 0) {
+            $message .= " {$result['flagged_no_purpose']} flagged — no Purpose column, so the lease/sale type could not be determined; the agent confirms it before regenerating.";
+        }
+
+        if ($result['skipped_no_contact'] > 0) {
+            $message .= " {$result['skipped_no_contact']} dropped — no phone / WhatsApp / email on the row, so there is no way to reach that lead.";
+        }
+
+        if ($result['skipped'] > $result['skipped_no_contact']) {
+            $message .= ' '.($result['skipped'] - $result['skipped_no_contact']).' blank rows skipped.';
+        }
+
+        return redirect()->route('recycled.index')->with('success', $message);
     }
 
     public function show(RecycledLead $recycledLead)
@@ -198,6 +231,24 @@ class RecycledLeadController extends Controller
         return back()->with('success', __('Assigned.'));
     }
 
+    public function bulkAssign(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer|exists:recycled_leads,id',
+            'agent_id' => 'required|exists:users,id',
+        ]);
+
+        $this->assertAssignableAgent($data['agent_id']);
+
+        $count = RecycledLead::whereKey($data['ids'])->where('tenant_id', auth()->user()->tenant_id)
+            ->update(['assignee_id' => $data['agent_id']]);
+
+        AuditLog::log('recycled.bulk_assigned', null, ['count' => $count, 'agent_id' => $data['agent_id']]);
+
+        return back()->with('success', "{$count}".($count === 1 ? ' record' : ' records').' assigned to agent.');
+    }
+
     public function regenerate(Request $request, RecycledLead $recycledLead)
     {
         $data = $request->validate([
@@ -206,6 +257,8 @@ class RecycledLeadController extends Controller
             'notes' => 'nullable|string',
             'handover_date' => 'nullable|date',
         ]);
+
+        $wasActiveLead = $recycledLead->status === 'already_active';
 
         try {
             $lead = app(RecycledLeadRegenerationService::class)->regenerate(
@@ -219,8 +272,11 @@ class RecycledLeadController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('leads.edit', $lead)
-            ->with('success', __('Lead regenerated and activated. Review the details and adjust anything that differs from the call.'));
+        $message = $wasActiveLead
+            ? __('Intent added to the existing lead — no second lead created. Review the details and adjust anything that differs from the call.')
+            : __('Lead regenerated and activated. Review the details and adjust anything that differs from the call.');
+
+        return redirect()->route('leads.edit', $lead)->with('success', $message);
     }
 
     /**
