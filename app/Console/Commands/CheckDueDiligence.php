@@ -13,12 +13,12 @@ class CheckDueDiligence extends Command
 {
     protected $signature = 'deals:check-due-diligence';
 
-    protected $description = 'Check deals approaching due diligence deadline and log warnings';
+    protected $description = 'Check deals approaching their due diligence / contingency / offer deadline and log warnings';
 
     public function handle(): int
     {
         $deals = Deal::withoutGlobalScopes()
-            ->where('stage', 'under_contract')
+            ->whereIn('stage', self::activeDeadlineStages())
             ->whereNotNull('due_diligence_end_date')
             ->where('due_diligence_end_date', '<=', now()->addDays(3))
             ->where('due_diligence_end_date', '>', now())
@@ -57,7 +57,7 @@ class CheckDueDiligence extends Command
 
         // Also flag expired due diligence
         $expired = Deal::withoutGlobalScopes()
-            ->where('stage', 'under_contract')
+            ->whereIn('stage', self::activeDeadlineStages())
             ->whereNotNull('due_diligence_end_date')
             ->where('due_diligence_end_date', '<', now())
             ->count();
@@ -69,5 +69,19 @@ class CheckDueDiligence extends Command
         $this->info('Checked '.$deals->count()." deals approaching deadline, {$expired} expired.");
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Stages where a deadline currently applies: sale/wholesale
+     * under_contract plus the rental offer-validity and payment/registration
+     * windows. Mirrors Deal::dueDiligenceApplies().
+     */
+    protected static function activeDeadlineStages(): array
+    {
+        return array_values(array_unique(array_merge(
+            ['under_contract'],
+            Deal::RENT_OFFER_VALIDITY_STAGES,
+            Deal::RENT_REGISTRATION_STAGES,
+        )));
     }
 }

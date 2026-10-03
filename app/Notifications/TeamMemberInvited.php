@@ -3,16 +3,16 @@
 namespace App\Notifications;
 
 use App\Models\Tenant;
+use App\Traits\DigestAwareNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Traits\DigestAwareNotification;
 
 class TeamMemberInvited extends Notification implements ShouldQueue
 {
-    use Queueable;
     use DigestAwareNotification;
+    use Queueable;
 
     public function __construct(
         protected Tenant $tenant,
@@ -37,7 +37,7 @@ class TeamMemberInvited extends Notification implements ShouldQueue
         $roleLabel = ucwords(str_replace('_', ' ', $this->roleName));
 
         return (new MailMessage)
-            ->subject("Welcome to {$tenantName} on ".config('app.name'))
+            ->subject('[Keystone] Welcome to the team')
             ->greeting("Hello {$notifiable->name},")
             ->line("You have been added as a team member on **{$tenantName}**.")
             ->line("**Role:** {$roleLabel}")

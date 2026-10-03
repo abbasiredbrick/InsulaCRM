@@ -272,8 +272,8 @@
                                     @endif
                                 </div>
                                 <div class="unit-stats">
-                                    @if($unit->bedrooms !== null)
-                                        <span><strong>{{ $unit->bedrooms === 0 ? __('Studio') : $unit->bedrooms }}</strong> {{ $unit->bedrooms === 0 ? '' : 'BR' }}</span>
+                                    @if($unit->bedroomLabel() !== '')
+                                        <span><strong>{{ $unit->bedroomLabel() }}</strong></span>
                                     @endif
                                     @if($unit->bathrooms)
                                         <span><strong>{{ $unit->bathrooms }}</strong> {{ __('Baths') }}</span>

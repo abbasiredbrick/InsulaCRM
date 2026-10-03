@@ -99,7 +99,7 @@
                     <dd class="col-sm-9">{{ __(\App\Models\Property::CATEGORIES[$property->property_category] ?? $property->property_category) }} • {{ __(\App\Models\Property::MARKET_CLASSES[$property->market_class] ?? $property->market_class) }}</dd>
 
                     <dt class="col-sm-3">{{ __('Beds / Baths') }}</dt>
-                    <dd class="col-sm-9">{{ $property->bedrooms ?? '—' }} {{ __('bd') }} / {{ $property->bathrooms ?? '—' }} {{ __('ba') }}</dd>
+                    <dd class="col-sm-9">{{ $property->bedroomLabel() !== '' ? $property->bedroomLabel() : '—' }} / {{ $property->bathrooms ?? '—' }} {{ __('ba') }}</dd>
 
                     <dt class="col-sm-3">{{ __('Size') }}</dt>
                     <dd class="col-sm-9">{{ $property->square_footage ? \App\Helpers\TenantFormatHelper::area($property->square_footage) : '—' }}</dd>
@@ -153,10 +153,10 @@
             <div class="card-body">
                 @if($property->marketing_title)<h5>{{ $property->marketing_title }}</h5>@endif
                 @if($property->marketing_description)
-                    <p style="white-space: pre-wrap;">{{ $property->marketing_description }}</p>
+                    <div style="white-space: pre-wrap;"><x-linkified :text="$property->marketing_description" :newlines="false" /></div>
                 @endif
                 @if($property->notes)
-                    <div class="alert alert-secondary mb-0">{{ $property->notes }}</div>
+                    <div class="alert alert-secondary mb-0"><x-linkified :text="$property->notes" /></div>
                 @endif
             </div>
         </div>

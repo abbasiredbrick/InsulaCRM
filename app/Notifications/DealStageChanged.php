@@ -4,16 +4,16 @@ namespace App\Notifications;
 
 use App\Models\Deal;
 use App\Models\Tenant;
+use App\Traits\DigestAwareNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Traits\DigestAwareNotification;
 
 class DealStageChanged extends Notification implements ShouldQueue
 {
-    use Queueable;
     use DigestAwareNotification;
+    use Queueable;
 
     public function __construct(
         protected Deal $deal,
@@ -41,15 +41,14 @@ class DealStageChanged extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $deal = $this->deal;
-        $tenantName = $this->tenant->name;
         $oldLabel = Deal::stageLabel($this->oldStage);
         $newLabel = Deal::stageLabel($deal->stage);
         $leadName = $deal->lead ? "{$deal->lead->first_name} {$deal->lead->last_name}" : 'Unknown';
 
         return (new MailMessage)
-            ->subject("[{$tenantName}] Deal stage changed: {$deal->title}")
+            ->subject("[Keystone] Deal stage changed: {$leadName} — {$deal->title}")
             ->greeting("Hello {$notifiable->name},")
-            ->line("A deal stage has been updated.")
+            ->line('A deal stage has been updated.')
             ->line("**Deal:** {$deal->title}")
             ->line("**Lead:** {$leadName}")
             ->line("**Stage:** {$oldLabel} → {$newLabel}")

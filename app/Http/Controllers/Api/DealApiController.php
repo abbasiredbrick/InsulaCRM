@@ -68,6 +68,10 @@ class DealApiController extends Controller
             'earnest_money' => 'nullable|numeric|min:0',
             'contract_date' => 'nullable|date',
             'closing_date' => 'nullable|date',
+            'offer_sent_date' => 'nullable|date',
+            'offer_signed_date' => 'nullable|date',
+            'offer_validity_days' => 'nullable|integer|min:3|max:7',
+            'registration_deadline_days' => 'nullable|integer|min:3|max:7',
             'notes' => 'nullable|string',
         ];
 
@@ -141,6 +145,10 @@ class DealApiController extends Controller
             'earnest_money' => 'nullable|numeric|min:0',
             'contract_date' => 'nullable|date',
             'closing_date' => 'nullable|date',
+            'offer_sent_date' => 'nullable|date',
+            'offer_signed_date' => 'nullable|date',
+            'offer_validity_days' => 'nullable|integer|min:3|max:7',
+            'registration_deadline_days' => 'nullable|integer|min:3|max:7',
             'notes' => 'nullable|string',
         ];
 

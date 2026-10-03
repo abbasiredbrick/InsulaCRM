@@ -39,7 +39,7 @@ class SequenceStepEmail extends Notification implements ShouldQueue
             $this->messageTemplate
         );
 
-        $subject = $this->subject ?: "[{$tenantName}] Message from {$agentName}";
+        $subject = $this->subject ?: "[Keystone] {$this->lead->full_name} — Message from {$agentName}";
 
         return (new MailMessage)
             ->subject($subject)

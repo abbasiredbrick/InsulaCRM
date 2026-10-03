@@ -60,7 +60,12 @@ class ClientShareTest extends TestCase
     public function test_verification_creates_a_new_lead_with_captured_filters(): void
     {
         $unit = $this->availableUnit();
-        $this->availableUnit(['unit_no' => '5001', 'availability' => 'leased', 'marketing_title' => 'Leased penthouse']);
+        // Distinct location: the list now labels units by size/intent/location,
+        // so a leased twin of the available unit would be indistinguishable.
+        $leased = $this->availableUnit([
+            'unit_no' => '5001', 'availability' => 'leased', 'marketing_title' => 'Leased penthouse',
+            'sub_community' => 'Leased Tower',
+        ]);
 
         $response = $this->post('/s/test-company/verify?bedrooms=1&max_rent=120000', [
             'first_name' => 'Sara',
@@ -97,8 +102,8 @@ class ClientShareTest extends TestCase
             ->get('/s/test-company?bedrooms=1');
 
         $inventory->assertOk()
-            ->assertSee('1BR Apartment for Rent in Al Rihan Heights')
-            ->assertDontSee('Leased penthouse')
+            ->assertSee($unit->unitLabel())
+            ->assertDontSee($leased->unitLabel())
             ->assertSee("Hi")
             ->assertSee('Sara');
     }
@@ -172,9 +177,14 @@ class ClientShareTest extends TestCase
 
     public function test_sale_and_unavailable_units_are_not_shared(): void
     {
-        $this->availableUnit(); // 1BR, available rent
-        $this->availableUnit(['intent' => 'sale', 'marketing_title' => 'For Sale Villa']);
-        $this->availableUnit(['availability' => 'leased', 'marketing_title' => 'Already Leased Unit', 'unit_no' => '3301']);
+        $rented = $this->availableUnit(); // 1BR, available rent
+        $sale = $this->availableUnit([
+            'intent' => 'sale', 'marketing_title' => 'For Sale Villa', 'sub_community' => 'Sale Tower',
+        ]);
+        $leased = $this->availableUnit([
+            'availability' => 'leased', 'marketing_title' => 'Already Leased Unit',
+            'unit_no' => '3301', 'sub_community' => 'Leased Tower',
+        ]);
 
         $verify = $this->post('/s/test-company/verify', [
             'first_name' => 'Sara',
@@ -186,8 +196,8 @@ class ClientShareTest extends TestCase
         $this->withCookie($cookie->getName(), $cookie->getValue())
             ->get('/s/test-company')
             ->assertOk()
-            ->assertSee('1BR Apartment for Rent in Al Rihan Heights')
-            ->assertDontSee('For Sale Villa')
-            ->assertDontSee('Already Leased Unit');
+            ->assertSee($rented->unitLabel())
+            ->assertDontSee($sale->unitLabel())
+            ->assertDontSee($leased->unitLabel());
     }
 }

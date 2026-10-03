@@ -15,8 +15,11 @@ class PortalIntegration extends Model
         'tenant_id',
         'portal',
         'is_active',
+        'use_sandbox',
         'api_token',
         'api_secret',
+        'sandbox_api_token',
+        'sandbox_api_secret',
         'base_url',
         'agent_reference',
         'public_profile_id',
@@ -36,8 +39,11 @@ class PortalIntegration extends Model
     {
         return [
             'is_active' => 'boolean',
+            'use_sandbox' => 'boolean',
             'api_token' => 'encrypted',
             'api_secret' => 'encrypted',
+            'sandbox_api_token' => 'encrypted',
+            'sandbox_api_secret' => 'encrypted',
             'webhook_secret' => 'encrypted',
             'leads_api_token' => 'encrypted',
             'leads_last_synced_at' => 'datetime',
@@ -71,6 +77,16 @@ class PortalIntegration extends Model
     public function maskedSecret(): ?string
     {
         return $this->mask($this->api_secret);
+    }
+
+    public function maskedSandboxToken(): ?string
+    {
+        return $this->mask($this->sandbox_api_token);
+    }
+
+    public function maskedSandboxSecret(): ?string
+    {
+        return $this->mask($this->sandbox_api_secret);
     }
 
     public function maskedWebhookSecret(): ?string

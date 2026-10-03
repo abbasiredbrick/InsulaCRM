@@ -388,6 +388,13 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="col-md-12">
+                        <label class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="receives_leads" value="1" id="invite-receives-leads" checked>
+                            <span class="form-check-label">{{ __('Receives new leads') }}</span>
+                        </label>
+                        <small class="form-hint">{{ __('Leave on to put them in the round-robin and AI distribution pool. Turn it off to stop new leads being assigned; leads already on their book are kept.') }}</small>
+                    </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">{{ __('Add') }}</button>
                     </div>
@@ -403,9 +410,9 @@
                 <h4 class="mb-3">{{ __('Team Members') }}</h4>
                 <div class="table-responsive">
                     <table class="table table-vcenter">
-                        <thead>
-                            <tr><th>{{ __('Name') }}</th><th>{{ __('Agent Code') }}</th><th>{{ __('Email') }}</th><th>{{ __('Role') }}</th><th>{{ __('Status') }}</th><th>{{ __('2FA') }}</th><th>{{ __('Actions') }}</th></tr>
-                        </thead>
+                            <thead>
+                                <tr><th>{{ __('Name') }}</th><th>{{ __('Agent Code') }}</th><th>{{ __('Email') }}</th><th>{{ __('Role') }}</th><th>{{ __('Status') }}</th><th>{{ __('New Leads') }}</th><th>{{ __('2FA') }}</th><th>{{ __('Actions') }}</th></tr>
+                            </thead>
                         <tbody>
                             @foreach($agents as $agent)
                             <tr>
@@ -424,6 +431,15 @@
                                     <span class="badge {{ $agent->is_active ? 'bg-green-lt' : 'bg-red-lt' }}">
                                         {{ $agent->is_active ? __('Active') : __('Inactive') }}
                                     </span>
+                                </td>
+                                <td>
+                                    @if (! $agent->is_active)
+                                        <span class="badge bg-secondary-lt">{{ __('N/A') }}</span>
+                                    @elseif ($agent->receives_leads)
+                                        <span class="badge bg-green-lt" title="{{ __('Included in the lead distribution pool') }}">{{ __('Receiving') }}</span>
+                                    @else
+                                        <span class="badge bg-orange-lt" title="{{ __('Excluded from the lead distribution pool') }}">{{ __('Not receiving') }}</span>
+                                    @endif
                                 </td>
                                 <td>
                                     @if($agent->two_factor_enabled)
@@ -474,6 +490,22 @@
                                                                 @endforeach
                                                             </select>
                                                             <small class="form-hint">{{ __('Lets them act in other areas, e.g. Cold Call Agent.') }}</small>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-check form-switch mb-0">
+                                                                <input class="form-check-input" type="checkbox" name="receives_leads" value="1" @checked($agent->receives_leads)>
+                                                                <span class="form-check-label">{{ __('Receives new leads') }}</span>
+                                                            </label>
+                                                            <small class="form-hint">
+                                                                {{ $agent->receives_leads
+                                                                    ? __('On — included in the round-robin and AI distribution pool, and portal leads for their own listings are routed to them.')
+                                                                    : __('Off — the distribution formula skips them and new portal leads are never routed to them. Leads already on their book are kept.') }}
+                                                            </small>
+                                                            @unless ($agent->receives_leads)
+                                                                <small class="form-hint text-danger">
+                                                                    {{ __('Portal leads for their listings will be routed to whoever is next in the distribution pool, or left unassigned for the team to claim.') }}
+                                                                </small>
+                                                            @endunless
                                                         </div>
                                                         <div>
                                                             <label class="form-label">{{ __('Manager') }}</label>
@@ -808,6 +840,37 @@
             @if(($businessMode ?? 'wholesale') === 'realestate')
             <div class="tab-pane" id="tab-commissions">
                 <p class="text-secondary mb-3">{{ __('Agents earn an agreed share of the commission on closed leads. Configure the default formula here, then give every member their own plan below.') }}</p>
+
+                <form action="{{ route('settings.updateCommissionRates') }}" method="POST" class="mb-4">
+                    @csrf
+                    <h4 class="mb-2">{{ __('Standard Commission Rates') }}</h4>
+                    <p class="text-secondary">{{ __('The agency commission is a percentage of the contract value. These rates prefill offer letters and are applied automatically when a transaction closes as Won.') }}</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">{{ __('Residential Lease (%)') }}</label>
+                            <input type="number" name="residential_lease" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionRates['residential_lease'] ?? '5' }}" required>
+                            <small class="form-hint">{{ __('% of the annual lease value') }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ __('Commercial Lease (%)') }}</label>
+                            <input type="number" name="commercial_lease" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionRates['commercial_lease'] ?? '10' }}" required>
+                            <small class="form-hint">{{ __('% of the annual lease value') }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ __('Sales (%)') }}</label>
+                            <input type="number" name="sales" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionRates['sales'] ?? '2' }}" required>
+                            <small class="form-hint">{{ __('% of the sales value') }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ __('VAT on Commission (%)') }}</label>
+                            <input type="number" name="vat" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionRates['vat'] ?? '5' }}" required>
+                            <small class="form-hint">{{ __('Charged on top of the commission') }}</small>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">{{ __('Save Rates') }}</button>
+                </form>
+
+                <hr class="my-4">
 
                 <form action="{{ route('settings.updateCommissionSettings') }}" method="POST" class="mb-4">
                     @csrf
@@ -1838,8 +1901,28 @@ Content-Type: application/json</code></pre>
                                 <td><strong>{{ __('Queue Driver') }}</strong></td>
                                 <td id="sys-queue">{{ __('Loading...') }}</td>
                             </tr>
+                            <tr>
+                                <td><strong>{{ __('Application Mode') }}</strong></td>
+                                <td>{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Real Estate Agent') : __('Wholesale') }}</td>
+                            </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
+                            <div>
+                                <h5 class="mb-1">{{ __('About Keystone') }}</h5>
+                                <p class="text-secondary mb-0">{{ __('You are running Keystone v' . config('app.version') . '. If pages or data look out of date, reset the app to clear the cached service worker and load the latest version.') }}</p>
+                            </div>
+                            <button type="button" class="btn btn-primary flex-shrink-0" onclick="window.hardResetApp();">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/><path d="M5 12l14 0"/></svg>
+                                {{ __('Reset to Latest Version') }}
+                            </button>
+                        </div>
+                        <div class="keystone-reset-status small text-muted mt-2"></div>
+                    </div>
                 </div>
 
                 <h4 class="mt-4 mb-3">{{ __('Updates') }}</h4>

@@ -3,10 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\PortalIntegration;
-use App\Services\Portals\BayutLeadsPullService;
+use App\Services\Portals\PortalLeadSyncService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
 
 class PullBayutLeads extends Command
 {
@@ -14,17 +12,17 @@ class PullBayutLeads extends Command
 
     protected $description = 'Pull leads from the Bayut / Dubizzle overall leads API for every configured integration';
 
-    public function handle(): int
+    public function handle(PortalLeadSyncService $sync): int
     {
-        $query = PortalIntegration::withoutGlobalScopes()
-            ->where('portal', 'bayut')
-            ->whereNotNull('leads_api_token');
+        $tenantId = $this->option('tenant');
 
-        if ($tenantId = $this->option('tenant')) {
-            $query->where('tenant_id', (int) $tenantId);
-        }
-
-        $integrations = $query->get();
+        // Bayut pulls with leads_api_token, not the main api_token pair - the
+        // service owns that distinction, along with is_active, the lock and the
+        // cursor rules, so this command cannot drift from the manual button.
+        $integrations = $sync->pullable()
+            ->filter(fn (PortalIntegration $i) => $i->portal === 'bayut')
+            ->when($tenantId, fn ($c) => $c->filter(fn ($i) => $i->tenant_id === (int) $tenantId))
+            ->values();
 
         if ($integrations->isEmpty()) {
             $this->info('No portal integrations with a leads API token.');
@@ -33,23 +31,22 @@ class PullBayutLeads extends Command
         }
 
         foreach ($integrations as $integration) {
-            try {
-                $service = new BayutLeadsPullService($integration);
-                $result = $service->pull($integration->leads_last_synced_at);
+            // force: the schedule is the primary trigger, so it always pulls.
+            $result = $sync->pull($integration, force: true);
 
-                $integration->refresh();
-                $integration->update([
-                    'leads_last_synced_at' => $result['error'] === null ? now() : $integration->leads_last_synced_at,
-                    'leads_last_error'     => $result['error'],
-                ]);
-
-                $this->info("[#{$integration->tenant_id}] Pulled Bayut leads: {$result['created']} new, {$result['ignored']} existing"
-                    . ($result['error'] !== null ? " — {$result['error']}" : ''));
-            } catch (\Throwable $e) {
-                Log::error('Bayut leads pull failed', ['integration_id' => $integration->id, 'error' => $e->getMessage()]);
-                $integration->update(['leads_last_error' => Str::limit($e->getMessage(), 500)]);
-                $this->error("[#{$integration->tenant_id}] Pull failed: {$e->getMessage()}");
+            if ($result['skipped']) {
+                continue;
             }
+
+            $line = "[#{$integration->tenant_id}] Pulled Bayut leads: {$result['created']} new, {$result['ignored']} existing";
+
+            if ($result['error'] !== null) {
+                $this->error($line.' — '.$result['error']);
+
+                continue;
+            }
+
+            $this->info($line);
         }
 
         return self::SUCCESS;

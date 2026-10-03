@@ -98,7 +98,7 @@
                 @if($showing->notes)
                 <div class="mt-3">
                     <h4 class="subheader">{{ __('Notes') }}</h4>
-                    <p>{{ $showing->notes }}</p>
+                    <x-linkified :text="$showing->notes" />
                 </div>
                 @endif
             </div>

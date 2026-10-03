@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\Deal;
 use App\Models\Buyer;
+use App\Models\Deal;
 use App\Models\Lead;
 use App\Models\Role;
 use App\Models\Tenant;
@@ -40,13 +40,13 @@ class InstallerService
         $envContent = File::get($envPath);
 
         foreach ($values as $key => $value) {
-            $pattern = '/^#?\s*' . preg_quote($key, '/') . '=.*/m';
-            $line = $key . '=' . $value;
+            $pattern = '/^#?\s*'.preg_quote($key, '/').'=.*/m';
+            $line = $key.'='.$value;
 
             if (preg_match($pattern, $envContent)) {
                 $envContent = preg_replace($pattern, $line, $envContent);
             } else {
-                $envContent .= PHP_EOL . $line;
+                $envContent .= PHP_EOL.$line;
             }
         }
 
@@ -141,6 +141,9 @@ class InstallerService
                 'name' => $payload['admin_name'],
                 'password' => Hash::make($payload['admin_password']),
                 'onboarding_completed' => false,
+                // Keep the owner out of the distribution pool from the start -
+                // see the note in RegisterController.
+                'receives_leads' => $adminRole->name !== 'owner',
             ]);
             $admin->save();
 
@@ -184,7 +187,7 @@ class InstallerService
             Log::warning('Storage symlink could not be created. File uploads may not display correctly. You can create it manually: php artisan storage:link');
         }
 
-        File::put(storage_path('installed.lock'), 'Installed on ' . now()->toDateTimeString());
+        File::put(storage_path('installed.lock'), 'Installed on '.now()->toDateTimeString());
         Artisan::call('config:clear');
 
         return [

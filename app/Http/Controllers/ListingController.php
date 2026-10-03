@@ -308,7 +308,9 @@ class ListingController extends Controller
                 }
             },
             'has_photos' => function () use ($query) {
-                $query->whereHas('media', function ($q) { $q->where('type', 'photo'); });
+                $query->whereHas('media', function ($q) {
+                    $q->where('type', 'photo');
+                });
             },
             'has_portal_live' => function () use ($query) {
                 $query->where(function ($q) {
@@ -347,7 +349,7 @@ class ListingController extends Controller
             'price' => "CASE WHEN intent IN ('rent','both') THEN rent_price ELSE COALESCE(list_price, asking_price) END",
             'availability' => 'availability',
             'leads' => 'leads_count',
-            'agent' => "(SELECT name FROM users WHERE users.id = properties.assigned_agent_id)",
+            'agent' => '(SELECT name FROM users WHERE users.id = properties.assigned_agent_id)',
         ];
 
         $column = $sortable[$sort] ?? 'updated_at';
@@ -547,7 +549,7 @@ class ListingController extends Controller
                 'detail' => trim(
                     implode(' • ', array_filter([
                         $unit->sub_community ?: $unit->community,
-                        $unit->bedrooms ? $unit->bedrooms.' '.__('BR') : null,
+                        $unit->bedroomLabel() !== '' ? $unit->bedroomLabel() : null,
                         $unit->square_footage ? \App\Helpers\TenantFormatHelper::area($unit->square_footage) : null,
                         $unit->unit_no ? __('Unit').' '.$unit->unit_no : null,
                     ]))
@@ -633,7 +635,7 @@ class ListingController extends Controller
             $listing->addChild('RentFrequency', $unit->rent_period === 'monthly' ? 'Monthly' : 'Annual');
             $listing->addChild('PropertyType', $this->portalCategory($unit));
             $listing->addChild('Featured', 'No');
-            $listing->addChild('Title_en', Str::limit($unit->display_name, 120));
+            $listing->addChild('Title_en', Str::limit($unit->listingTitle(), 120));
             $listing->addChild('Description_en', Str::limit((string) $unit->marketing_description, 4000));
             $listing->addChild('Price', $this->portalPrice($unit) !== null ? (string) (int) $this->portalPrice($unit) : '');
             $listing->addChild('Beds', (string) ($unit->bedrooms ?? 0));
@@ -929,7 +931,7 @@ class ListingController extends Controller
             'zip_code' => 'nullable|string|max:20',
             'intent' => 'required|in:rent,sale,both',
             'market_class' => 'required|in:ready,off_plan',
-            'property_category' => 'required|string|max:40',
+            'property_category' => 'required|string|in:'.implode(',', array_keys(\App\Models\Property::CATEGORIES)),
             'community' => 'nullable|string|max:120',
             'sub_community' => 'nullable|string|max:120',
             'developer_name' => 'nullable|string|max:150',
@@ -941,7 +943,7 @@ class ListingController extends Controller
             'building_no' => 'nullable|string|max:60',
             'unit_no' => 'nullable|string|max:60',
             'floor_no' => 'nullable|string|max:60',
-            'bedrooms' => 'nullable|integer|min:0',
+            'bedrooms' => 'nullable|integer|min:0|max:20',
             'bathrooms' => 'nullable|integer|min:0',
             'square_footage' => 'nullable|numeric|min:0',
             'parking' => 'nullable|integer|min:0',
@@ -956,6 +958,7 @@ class ListingController extends Controller
             'list_price' => 'nullable|numeric|min:0',
             'availability' => 'required|in:draft,ready_to_list,upcoming,listed,reserved,leased,sold,unlisted',
             'assigned_agent_id' => 'nullable|exists:users,id',
+            'assign_leads_to_owner' => 'nullable|boolean',
             'owner_name' => 'nullable|string|max:150',
             'owner_phone' => 'nullable|string|max:30',
             'owner_email' => 'nullable|email|max:190',
@@ -1253,7 +1256,7 @@ class ListingController extends Controller
                 $unit->intent === 'sale' ? 'SELL' : 'RENT',
                 $unit->rent_period === 'monthly' ? 'Monthly' : 'Annual',
                 $this->portalCategory($unit),
-                $unit->display_name,
+                $unit->listingTitle(),
                 (string) $unit->marketing_description,
                 $this->portalPrice($unit) !== null ? (string) (int) $this->portalPrice($unit) : '',
                 (string) ($unit->bedrooms ?? 0),

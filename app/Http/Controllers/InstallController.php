@@ -440,6 +440,9 @@ class InstallController extends Controller
                     'name' => $request->admin_name,
                     'password' => \Illuminate\Support\Facades\Hash::make($request->admin_password),
                     'onboarding_completed' => false,
+                    // Keep the owner out of the distribution pool from the start
+                    // - see the note in RegisterController.
+                    'receives_leads' => $adminRole->name !== 'owner',
                 ]);
                 $admin->save();
 

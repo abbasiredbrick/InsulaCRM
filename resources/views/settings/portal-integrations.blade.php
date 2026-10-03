@@ -92,9 +92,27 @@
                         <input type="password" name="api_secret" class="form-control monospace" placeholder="{{ $integration?->maskedSecret() ?? '• • • •' }}" autocomplete="new-password" value="">
                         @if($integration?->api_secret)<div class="form-hint">{{ __('Secret stored:') }} {{ $integration->maskedSecret() }}</div>@endif
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('Sandbox API key') }} <span class="text-muted">({{ __('optional') }})</span></label>
+                        <input type="text" name="sandbox_api_token" class="form-control monospace" placeholder="{{ $integration?->maskedSandboxToken() ?? '• • • •' }}" autocomplete="off" value="">
+                        @if($integration?->sandbox_api_token)<div class="form-hint">{{ __('Key stored:') }} {{ $integration->maskedSandboxToken() }}</div>@endif
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ __('Sandbox API secret') }} <span class="text-muted">({{ __('optional') }})</span></label>
+                        <input type="password" name="sandbox_api_secret" class="form-control monospace" placeholder="{{ $integration?->maskedSandboxSecret() ?? '• • • •' }}" autocomplete="new-password" value="">
+                        @if($integration?->sandbox_api_secret)<div class="form-hint">{{ __('Secret stored:') }} {{ $integration->maskedSandboxSecret() }}</div>@endif
+                    </div>
+                    <div class="col-12">
+                        <label class="form-check">
+                            <input type="checkbox" class="form-check-input" name="use_sandbox" value="1" {{ $integration?->use_sandbox ? 'checked' : '' }}>
+                            <span class="form-check-label">{{ __('Sandbox mode') }}</span>
+                        </label>
+                        <div class="form-hint">{{ __('When enabled, unit pushes go to the Property Finder sandbox (sandbox.atlas.propertyfinder.com) for testing instead of the live site. Leads always sync from the live API.') }}</div>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">{{ __('Base URL') }}</label>
-                        <input type="url" name="base_url" class="form-control monospace" value="{{ $integration?->base_url ?? \App\Services\Portals\PropertyFinderPortalService::DEFAULT_BASE_URL }}">
+                        <input type="text" class="form-control monospace" value="{{ \App\Services\Portals\PropertyFinderPortalService::PRODUCTION_BASE_URL }}" readonly disabled>
+                        <div class="form-hint">{{ __('Fixed by Property Finder. Live:') }} {{ \App\Services\Portals\PropertyFinderPortalService::PRODUCTION_BASE_URL }} {{ __('· Sandbox:') }} {{ \App\Services\Portals\PropertyFinderPortalService::SANDBOX_BASE_URL }}</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">{{ __('Public profile ID') }}</label>
@@ -129,12 +147,28 @@
             <div class="monospace">{{ $integration?->webhook_url ?? route('portal.webhooks.receive', 'propertyfinder', true) }}</div>
             <div class="form-hint">{{ __('Subscribe to lead webhook events in PF Enterprise so new enquiries land here instantly.') }}</div>
         </div>
+        @if($box['portal'] === 'propertyfinder' && $integration?->use_sandbox)
+        <div class="alert alert-warning mt-3 mb-0">
+            <div class="fw-bold small text-uppercase">{{ __('Sandbox mode is ON') }}</div>
+            <div class="form-hint">{{ __('New pushes are sent to the Property Finder sandbox for testing, not the live site. Turn it off to publish units live.') }}</div>
+        </div>
+        @endif
         @endif
 
-        @if($box['portal'] === 'bayut' && $integration?->leads_last_synced_at)
+        @if($integration?->leads_last_synced_at)
         <div class="alert alert-secondary mt-3 mb-0">
             <div class="fw-bold small text-uppercase">{{ __('Leads pull') }}</div>
             <div class="form-hint">{{ __('Last pulled:') }} {{ $integration->leads_last_synced_at->format('d M Y H:i') }}</div>
+            @if($active && ($leadsSyncStaleness[$integration->id]['state'] ?? null) === 'stale')
+                <div class="form-hint text-danger mt-1">
+                    {{ __('This is overdue — new leads are not arriving on their own. If it stays stale, the scheduled job is not running on the server; press Sync leads to pull now.') }}
+                </div>
+            @endif
+        </div>
+        @elseif($active && $integration?->api_token)
+        <div class="alert alert-warning mt-3 mb-0">
+            <div class="fw-bold small text-uppercase">{{ __('Leads pull') }}</div>
+            <div class="form-hint">{{ __('No leads have been pulled yet. Press Sync leads above to start the automatic sync.') }}</div>
         </div>
         @endif
 
@@ -153,7 +187,7 @@
         </div>
         @endif
 
-        @if($box['portal'] === 'bayut' && $integration?->leads_last_error)
+        @if($integration?->leads_last_error)
         <div class="alert alert-warning mt-3 mb-0">{{ $integration->leads_last_error }}</div>
         @endif
 

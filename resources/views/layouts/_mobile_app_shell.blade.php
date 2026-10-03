@@ -157,7 +157,7 @@
                 <span class="mobile-tab-label">{{ __('Inventory') }}</span>
             </a>
         @else
-            <a href="{{ route('pipeline') }}" class="mobile-nav-tab {{ request()->is('pipeline*') ? 'active' : '' }}" data-tab="pipeline">
+            <a href="{{ route('pipeline') }}" class="mobile-nav-tab {{ request()->is('pipeline*') || request()->is('deals*') ? 'active' : '' }}" data-tab="pipeline">
                 <span class="mobile-tab-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="22" height="22" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -301,7 +301,7 @@
             </a>
             @endif
             @else
-            <a href="{{ route('pipeline') }}" class="drawer-nav-item {{ request()->is('pipeline*') ? 'active' : '' }}">
+            <a href="{{ route('pipeline') }}" class="drawer-nav-item {{ request()->is('pipeline*') || request()->is('deals*') ? 'active' : '' }}">
                 <span class="drawer-item-icon"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><rect x="4" y="4" width="6" height="16" rx="1"/><rect x="14" y="4" width="6" height="10" rx="1"/></svg></span>
                 <span class="drawer-item-text">{{ __('Deals & Pipeline') }}</span>
             </a>

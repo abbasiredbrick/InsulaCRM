@@ -6,6 +6,7 @@ use App\Events\NewLeadAvailable;
 use App\Models\Lead;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -32,10 +33,7 @@ class LeadDistributionService
      */
     protected function roundRobin(Lead $lead, Tenant $tenant): ?User
     {
-        $agents = $tenant->users()
-            ->where('is_active', true)
-            ->orderBy('id')
-            ->get();
+        $agents = $this->rotation($tenant)->get();
 
         if ($agents->isEmpty()) {
             return null;
@@ -89,9 +87,8 @@ class LeadDistributionService
      */
     protected function aiSmart(Lead $lead, Tenant $tenant): ?User
     {
-        $agents = $tenant->users()
-            ->where('is_active', true)
-            ->whereHas('role', fn($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'acquisition_agent']))
+        $agents = $this->rotation($tenant)
+            ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'acquisition_agent']))
             ->get();
 
         if ($agents->isEmpty()) {
@@ -120,7 +117,7 @@ class LeadDistributionService
 
         try {
             $ai = new AiService($tenant);
-            if (!$ai->isAvailable()) {
+            if (! $ai->isAvailable()) {
                 return $this->roundRobin($lead, $tenant);
             }
 
@@ -128,6 +125,7 @@ class LeadDistributionService
             if ($chosenId) {
                 $lead->agent_id = $chosenId;
                 $lead->save();
+
                 return $agents->firstWhere('id', $chosenId);
             }
         } catch (\Throwable $e) {
@@ -136,5 +134,22 @@ class LeadDistributionService
 
         // Fallback to round robin if AI fails
         return $this->roundRobin($lead, $tenant);
+    }
+
+    /**
+     * The tenant's routing pool: active members who have not switched
+     * themselves out of incoming work. Ordered by id so the round-robin index
+     * stays stable between runs.
+     *
+     * Shared by every method here, and mirrored by the unclaimed-leads
+     * fallback command - a member who opted out must not slip back in through
+     * either path.
+     */
+    protected function rotation(Tenant $tenant): Builder
+    {
+        // getQuery() unwraps the relation: the tenant constraint set by
+        // Tenant::users() is already on it, but a Relation cannot be further
+        // constrained and then handed to isEmpty()/get() as one query.
+        return $tenant->users()->getQuery()->receivingLeads()->orderBy('id');
     }
 }

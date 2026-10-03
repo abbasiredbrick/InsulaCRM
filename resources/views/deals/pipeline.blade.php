@@ -5,26 +5,63 @@
 
 @push('styles')
 <style>
+    /* ── Summary strip ─────────────────────────────────── */
+    .pipeline-summary .card {
+        height: 100%;
+    }
+    .pipeline-summary .card .card-subtitle {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 0.7rem;
+    }
+    .pipeline-summary .value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+    .pipeline-summary .value small {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--tblr-muted);
+    }
+
     /* ── Filters ──────────────────────────────────────── */
     .pipeline-filters {
         display: flex;
-        gap: 12px;
-        margin-bottom: 16px;
+        gap: 10px;
+        margin-bottom: 14px;
         flex-wrap: wrap;
         align-items: center;
     }
     .pipeline-filters .form-control,
     .pipeline-filters .form-select {
-        max-width: 220px;
+        max-width: 200px;
+        width: 100%;
+    }
+    .pipeline-filters .search-wrap {
+        min-width: 200px;
     }
 
-    /* ── Stage rows (accordion) ───────────────────────── */
+    /* ── Horizontal kanban board ──────────────────────── */
+    .pipeline-board {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 14px;
+        min-height: 320px;
+    }
     .stage-row {
+        flex: 0 0 300px;
+        width: 300px;
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 210px);
         border: 1px solid var(--tblr-border-color);
-        border-radius: 8px;
-        margin-bottom: 8px;
+        border-radius: 10px;
         background: var(--tblr-bg-surface);
-        transition: background 0.15s, box-shadow 0.15s;
+        transition: background 0.15s, box-shadow 0.15s, opacity 0.15s;
     }
     .stage-row.drag-over {
         background: #e8f0fe;
@@ -33,76 +70,84 @@
     [data-bs-theme="dark"] .stage-row.drag-over {
         background: rgba(32, 107, 196, 0.18);
     }
+    /* Hidden empty columns (unless "show empty" is on) */
+    .stage-row.is-empty {
+        display: none;
+    }
+    .pipeline-board.show-all .stage-row.is-empty {
+        display: flex;
+        opacity: 0.55;
+    }
+
     .stage-header {
         display: flex;
         align-items: center;
-        padding: 12px 16px;
-        cursor: pointer;
-        user-select: none;
-        gap: 12px;
-    }
-    .stage-header:hover {
-        background: var(--tblr-bg-surface-secondary);
-        border-radius: 8px;
-    }
-    .stage-chevron {
-        transition: transform 0.2s;
-        color: var(--tblr-muted);
+        padding: 10px 12px;
+        gap: 8px;
+        cursor: grab;
         flex-shrink: 0;
-    }
-    .stage-row.expanded .stage-chevron {
-        transform: rotate(90deg);
+        border-bottom: 1px solid var(--tblr-border-color-transparent);
     }
     .stage-name {
         font-weight: 600;
-        font-size: 0.925rem;
+        font-size: 0.85rem;
+        line-height: 1.25;
         flex-shrink: 0;
     }
     .stage-stats {
         display: flex;
-        gap: 12px;
-        align-items: center;
+        flex-direction: column;
+        gap: 2px;
+        align-items: flex-end;
         margin-left: auto;
-        font-size: 0.8rem;
+        font-size: 0.72rem;
         color: var(--tblr-muted);
         flex-shrink: 0;
+        line-height: 1.2;
     }
     .stage-stats .badge {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
+    }
+    .stage-stats div[data-stat] {
+        white-space: nowrap;
     }
 
-    /* ── Expanded card grid ────────────────────────────── */
+    /* ── Card column (scroll area) ────────────────────── */
     .stage-cards {
-        display: none;
-        padding: 4px 16px 16px;
-    }
-    .stage-row.expanded .stage-cards {
-        display: block;
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        display: flex;
     }
     .stage-cards-grid {
+        width: 100%;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        grid-template-columns: 1fr;
         gap: 10px;
+        align-content: start;
+        min-height: 40px;
     }
     .stage-empty {
         grid-column: 1 / -1;
         text-align: center;
-        padding: 20px;
+        padding: 24px 8px;
         color: var(--tblr-muted);
-        font-size: 0.85rem;
+        font-size: 0.8rem;
+        border: 1px dashed var(--tblr-border-color);
+        border-radius: 8px;
     }
 
-    /* ── Deal cards ────────────────────────────────────── */
+    /* ── Deal cards ───────────────────────────────────── */
     .deal-card {
         background: var(--tblr-bg-surface-secondary);
         border: 1px solid var(--tblr-border-color);
-        border-radius: 6px;
+        border-radius: 8px;
         padding: 12px;
         position: relative;
         transition: box-shadow 0.2s, opacity 0.2s;
     }
     .deal-card:hover {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         background: var(--tblr-bg-surface);
     }
     .deal-card.dragging {
@@ -127,7 +172,7 @@
     }
     .deal-card-title {
         font-weight: 600;
-        font-size: 0.875rem;
+        font-size: 0.85rem;
         margin-bottom: 4px;
         padding-right: 20px;
     }
@@ -137,7 +182,7 @@
         line-height: 1.5;
     }
 
-    /* ── Slide-over ────────────────────────────────────── */
+    /* ── Slide-over ───────────────────────────────────── */
     .slide-over {
         position: fixed;
         top: 0;
@@ -145,7 +190,7 @@
         width: 450px;
         height: 100%;
         background: var(--tblr-bg-surface);
-        box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
         z-index: 1050;
         transition: right 0.3s;
         overflow-y: auto;
@@ -156,14 +201,14 @@
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        background: rgba(0,0,0,0.3);
+        background: rgba(0, 0, 0, 0.3);
         z-index: 1040;
         display: none;
     }
     .slide-over-backdrop.open { display: block; }
     .slide-over .badge { color: #fff; }
 
-    /* ── Toast ─────────────────────────────────────────── */
+    /* ── Toast ────────────────────────────────────────── */
     .toast-container {
         position: fixed;
         bottom: 20px;
@@ -175,7 +220,7 @@
         border-radius: 6px;
         color: #fff;
         font-size: 0.875rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         opacity: 0;
         transition: opacity 0.3s;
         margin-top: 8px;
@@ -184,7 +229,7 @@
     .pipeline-toast.success { background: #2fb344; }
     .pipeline-toast.error { background: #d63939; }
 
-    /* ── Quick Edit ────────────────────────────────────── */
+    /* ── Quick Edit ───────────────────────────────────── */
     .deal-card .quick-edit-btn {
         position: absolute;
         top: 4px;
@@ -257,9 +302,63 @@
 @endpush
 
 @section('content')
+
+{{-- Summary strip — upcoming business vs business generated --}}
+<div class="row g-3 mb-3 pipeline-summary">
+    <div class="col-6 col-md">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-subtitle text-secondary mb-1">{{ __('Active deals') }}</div>
+                <div class="value">{{ (int) $summary['open_count'] }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-subtitle text-secondary mb-1">{{ __('Pipeline value') }}</div>
+                <div class="value">{{ Fmt::currency($summary['pipeline_value'], 0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-subtitle text-secondary mb-1">{{ __('Weighted forecast') }}</div>
+                <div class="value text-indigo">{{ Fmt::currency($summary['forecast'], 0) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-subtitle text-secondary mb-1">{{ __('Business generated') }} <small>({{ __('this month') }})</small></div>
+                <div class="value text-success">{{ Fmt::currency($summary['generated'], 0) }}</div>
+                <div class="text-secondary" style="font-size:0.72rem;">
+                    {{ (int) $summary['won_count_month'] }} {{ Str::plural($modeTerms['deal_label'], $summary['won_count_month']) }} · {{ Fmt::currency($summary['generated_value_month'], 0) }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md">
+        <div class="card">
+            <div class="card-body">
+                <div class="card-subtitle text-secondary mb-1">{{ __('Won all-time') }}</div>
+                <div class="value">{{ Fmt::currency($summary['generated_alltime'], 0) }}</div>
+                <div class="text-secondary" style="font-size:0.72rem;">
+                    {{ (int) $summary['won_count'] }} {{ Str::plural($modeTerms['deal_label'], $summary['won_count']) }}
+                    @if($summary['win_rate'] !== null)
+                    · {{ __('win rate') }} {{ $summary['win_rate'] }}%
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Filters --}}
 <div class="pipeline-filters">
-    <div class="input-icon" style="max-width: 220px;">
+    <div class="input-icon search-wrap">
         <span class="input-icon-addon">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
         </span>
@@ -275,18 +374,39 @@
         @endforeach
     </select>
     @endif
-    <a href="{{ route('deals.export', request()->query()) }}" class="btn btn-outline-secondary btn-sm ms-auto">
+    <label for="pipeline-temp-filter" class="visually-hidden">{{ __('Filter by temperature') }}</label>
+    <select id="pipeline-temp-filter" class="form-select">
+        <option value="">{{ __('All temperatures') }}</option>
+        @foreach(['hot' => 'Hot', 'warm' => 'Warm', 'cold' => 'Cold'] as $k => $lbl)
+            <option value="{{ $k }}" {{ request('temp') === $k ? 'selected' : '' }}>{{ __($lbl) }}</option>
+        @endforeach
+    </select>
+    <label for="pipeline-source-filter" class="visually-hidden">{{ __('Filter by lead source') }}</label>
+    <select id="pipeline-source-filter" class="form-select">
+        <option value="">{{ __('All lead sources') }}</option>
+        @foreach(\App\Services\CustomFieldService::getOptions('lead_source') as $key => $label)
+            <option value="{{ $key }}" {{ request('source') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+        @endforeach
+    </select>
+    <a href="{{ route('deals.export', request()->query()) }}" class="btn btn-outline-secondary btn-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
         {{ __('Export CSV') }}
     </a>
-    <div class="text-secondary" style="font-size: 0.8rem;">
-        @php $totalDeals = collect($deals)->flatten()->count(); @endphp
-        {{ $totalDeals }} {{ Str::plural('deal', $totalDeals) }} {{ __('in pipeline') }}
+    <a href="{{ route('deals.index', request()->only(['search', 'deal_type', 'agent', 'temp', 'source'])) }}" class="btn btn-outline-primary btn-sm" title="{{ __('Switch to the list view') }}">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        {{ __('List View') }}
+    </a>
+    <div class="text-secondary ms-auto" style="font-size: 0.8rem;" id="pipeline-total">
+        @php $totalDeals = $deals->count(); @endphp
+        {{ $totalDeals }} {{ Str::plural($modeTerms['deal_label'], $totalDeals) }} {{ __('in pipeline') }}
     </div>
+    <label class="form-check form-switch mb-0" style="font-size:0.78rem;" title="{{ __('Show stages that currently have no deals') }}">
+        <input class="form-check-input" type="checkbox" id="pipeline-show-empty" {{ (request('show_empty') || $totalDeals === 0) ? 'checked' : '' }}>
+        <span class="form-check-label">{{ __('Show empty stages') }}</span>
+    </label>
 </div>
 
-{{-- Deal type tabs: All / Leasing / Sales --}}
-@if(($businessMode ?? 'wholesale') === 'realestate')
+{{-- Deal type tabs: All / Leasing / Sales (both modes now) --}}
 <ul class="nav nav-pills mb-3 pipeline-type-tabs">
     @foreach(['all' => 'All', 'rent' => 'Leasing', 'sale' => 'Sales'] as $key => $label)
     <li class="nav-item">
@@ -294,44 +414,39 @@
            href="{{ url('/pipeline') . ($key === 'all' ? '' : '?deal_type=' . $key) }}"
            style="{{ (($dealType ?? null) === null && $key === 'all') || ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'font-weight:600' : '' }}">
             {{ __($label) }}
-            @if($key !== 'all')<span class="badge bg-secondary-lt ms-1">{{ $counts[$key] ?? 0 }}</span>@endif
+            <span class="badge {{ ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'bg-secondary' : 'bg-secondary-lt' }} ms-1">{{ $counts[$key] ?? 0 }}</span>
         </a>
     </li>
     @endforeach
 </ul>
-@endif
 
 <x-saved-views-bar entity-type="deals" />
 
-{{-- Accordion Pipeline --}}
-<div id="pipeline">
+{{-- Kanban board --}}
+<div id="pipeline" class="pipeline-board {{ (request('show_empty') || $totalDeals === 0) ? 'show-all' : '' }}">
     @foreach($stageLabels as $stageKey => $stageLabel)
     @php
-        $stageDeals = $deals[$stageKey] ?? collect();
-        $stageTotal = $stageDeals->sum('contract_price');
-        $stageFees = $stageDeals->sum($businessMode === 'realestate' ? 'total_commission' : 'assignment_fee');
+        $col = $columns[$stageKey];
+        $stageDeals = $col['deals'];
     @endphp
-    <div class="stage-row" data-stage="{{ $stageKey }}">
+    <div class="stage-row {{ $col['count'] === 0 ? 'is-empty' : '' }}" data-stage="{{ $stageKey }}">
         <div class="stage-header">
-            <svg class="stage-chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="9 6 15 12 9 18"/></svg>
             <span class="stage-name">{{ $stageLabel }}</span>
             <div class="stage-stats">
-                @if($stageTotal > 0)
-                    <span>{{ Fmt::currency($stageTotal, 0) }}</span>
+                @if($col['value'] > 0)
+                    <div data-stat="value" title="{{ __('Contract value') }}">{{ Fmt::currency($col['value'], 0) }}</div>
                 @endif
-                @if($stageFees > 0)
-                    <span class="text-success">{{ Fmt::currency($stageFees, 0) }} {{ $modeTerms['fee_label'] }}</span>
+                @if($col['forecast'] > 0)
+                    <div data-stat="forecast" class="text-indigo" title="{{ __('Weighted forecast') }}">{{ Fmt::currency($col['forecast'], 0) }}</div>
                 @endif
-                <span class="badge bg-secondary-lt">{{ $stageDeals->count() }}</span>
-                @php
-                    $staleDealCount = $stageDeals->filter(function($d) {
-                        return $d->stage_changed_at && (int) now()->diffInDays($d->stage_changed_at, true) > 5;
-                    })->count();
-                @endphp
-                @if($staleDealCount > 0)
-                <span class="badge bg-{{ $staleDealCount > 3 ? 'red' : 'yellow' }}-lt" title="{{ __(':count deal(s) need attention', ['count' => $staleDealCount]) }}">
+                @if($col['fees'] > 0)
+                    <div data-stat="fees" class="text-success" title="{{ __($modeTerms['money_label']) }}">{{ Fmt::currency($col['fees'], 0) }}</div>
+                @endif
+                <span class="badge bg-secondary-lt" data-stat="count">{{ $col['count'] }}</span>
+                @if($col['stale'] > 0)
+                <span class="badge bg-{{ $col['stale'] > 3 ? 'red' : 'yellow' }}-lt" title="{{ __(':count deal(s) need attention', ['count' => $col['stale']]) }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01"/><path d="M5 19h14a2 2 0 001.84-2.75l-7.1-12.25a2 2 0 00-3.5 0l-7.1 12.25a2 2 0 001.75 2.75"/></svg>
-                    {{ $staleDealCount }}
+                    {{ $col['stale'] }}
                 </span>
                 @endif
             </div>
@@ -340,7 +455,7 @@
             <div class="stage-cards-grid" data-stage="{{ $stageKey }}">
                 @forelse($stageDeals as $deal)
                 @php $daysInStage = $deal->stage_changed_at ? (int) now()->diffInDays($deal->stage_changed_at, true) : 0; @endphp
-                <div class="deal-card {{ $daysInStage > 10 ? 'deal-age-critical' : ($daysInStage > 5 ? 'deal-age-warning' : '') }}" data-deal-id="{{ $deal->id }}">
+                <div class="deal-card {{ $daysInStage > 10 ? 'deal-age-critical' : ($daysInStage > 5 ? 'deal-age-warning' : '') }}" data-deal-id="{{ $deal->id }}" data-value="{{ $deal->contract_price ?? 0 }}" data-fee="{{ $feeField ? $deal->{$feeField} : 0 }}">
                     <button class="btn btn-ghost-secondary btn-icon btn-sm quick-edit-btn" data-deal-id="{{ $deal->id }}" title="{{ __('Quick Edit') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h-1a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-1"/><path d="M20.385 6.585a2.1 2.1 0 0 0-2.97-2.97l-8.415 8.385v3h3l8.385-8.415z"/><path d="M16 5l3 3"/></svg>
                     </button>
@@ -358,16 +473,19 @@
                             @if($deal->lead && $deal->lead->property)
                                 {{ $deal->lead->property->address ?? '' }}<br>
                             @endif
+                            @if($deal->lead && $deal->lead->temperature)
+                                <span class="badge {{ $deal->lead->temperature === 'hot' ? 'bg-red-lt' : ($deal->lead->temperature === 'cold' ? 'bg-blue-lt' : 'bg-yellow-lt') }}">{{ ucfirst($deal->lead->temperature) }}</span>
+                            @endif
                             @if($deal->contract_price)
                                 {{ __('Contract:') }} <span data-field="contract_price" data-raw-value="{{ $deal->contract_price }}">{{ Fmt::currency($deal->contract_price, 0) }}</span>
                             @endif
-                            @if($businessMode === 'wholesale' && $deal->assignment_fee)
+                            @if($feeField === 'assignment_fee' && $deal->assignment_fee)
                                 &middot; {{ __('Fee:') }} <span data-field="assignment_fee" data-raw-value="{{ $deal->assignment_fee }}">{{ Fmt::currency($deal->assignment_fee, 0) }}</span>
-                            @elseif($businessMode === 'realestate' && $deal->total_commission)
+                            @elseif($feeField === 'total_commission' && $deal->total_commission)
                                 &middot; {{ __('Comm:') }} <span data-field="total_commission" data-raw-value="{{ $deal->total_commission }}">{{ Fmt::currency($deal->total_commission, 0) }}</span>
                             @endif
-                            @if($deal->contract_price || ($businessMode === 'wholesale' ? $deal->assignment_fee : $deal->total_commission))<br>@endif
-                            @if($deal->stage === 'under_contract' && $deal->due_diligence_end_date)
+                            @if($deal->contract_price || ($feeField === 'assignment_fee' ? $deal->assignment_fee : $deal->total_commission))<br>@endif
+                            @if($deal->due_diligence_applies && $deal->due_diligence_end_date)
                                 <span class="badge {{ $deal->is_due_diligence_urgent ? 'bg-red-lt' : 'bg-cyan-lt' }} mt-1" style="color:#fff;">
                                     {{ __('DD:') }} {{ $deal->due_diligence_days_remaining }}{{ __('d left') }}
                                 </span><br>
@@ -419,6 +537,15 @@
 (function() {
     const baseUrl = '{{ url("/pipeline") }}';
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+    const stageProbs = @json($stageProbs);
+    const currencyFmt = () => (typeof Intl !== 'undefined')
+        ? new Intl.NumberFormat(undefined, { style: 'currency', currency: '{{ Fmt::currencyCode() }}', maximumFractionDigits: 0 })
+        : null;
+    const fmt = (v) => {
+        const f = currencyFmt();
+        return f ? f.format(v || 0) : '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    };
+
     let dragDealId = null;
     let dragSourceStage = null;
     let dragSourceRow = null;
@@ -437,30 +564,48 @@
         }, 3000);
     }
 
-    // ── Accordion toggle ─────────────────────────────────
-    document.querySelectorAll('.stage-header').forEach(header => {
-        header.addEventListener('click', e => {
-            // Don't toggle if dropping
-            if (e.target.closest('.deal-card-drag')) return;
-            const row = header.closest('.stage-row');
-            const wasExpanded = row.classList.contains('expanded');
+    // ── Show / hide empty stage columns ─────────────────
+    const board = document.getElementById('pipeline');
+    const showEmpty = document.getElementById('pipeline-show-empty');
+    function applyShowEmpty() {
+        board.classList.toggle('show-all', showEmpty.checked);
+    }
+    showEmpty.addEventListener('change', applyShowEmpty);
 
-            // Collapse all
-            document.querySelectorAll('.stage-row.expanded').forEach(r => r.classList.remove('expanded'));
+    // Recompute a column's stats from its cards after a move
+    function recomputeColumn(row) {
+        const cards = row.querySelectorAll('.stage-cards-grid .deal-card');
+        const count = cards.length;
+        const value = Array.from(cards).reduce((s, c) => s + (parseFloat(c.dataset.value) || 0), 0);
+        const fees = Array.from(cards).reduce((s, c) => s + (parseFloat(c.dataset.fee) || 0), 0);
+        const prob = parseFloat(stageProbs[row.dataset.stage] ?? 0.5);
+        const forecast = value * prob;
 
-            // Toggle clicked
-            if (!wasExpanded) {
-                row.classList.add('expanded');
-                // Scroll into view if needed
-                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        });
-    });
+        row.classList.toggle('is-empty', count === 0);
 
-    // Auto-expand first stage that has deals
-    const firstWithDeals = document.querySelector('.stage-row .stage-cards-grid .deal-card');
-    if (firstWithDeals) {
-        firstWithDeals.closest('.stage-row').classList.add('expanded');
+        const stats = row.querySelector('.stage-stats');
+        stats.querySelector('[data-stat="count"]').textContent = count;
+
+        let v = stats.querySelector('[data-stat="value"]');
+        if (!v && value > 0) {
+            v = document.createElement('div'); v.dataset.stat = 'value'; v.title = '{{ __("Contract value") }}';
+            stats.prepend(v);
+        }
+        if (v) { v.textContent = fmt(value); if (value === 0) v.remove(); }
+
+        let fc = stats.querySelector('[data-stat="forecast"]');
+        if (!fc && forecast > 0) {
+            fc = document.createElement('div'); fc.dataset.stat = 'forecast'; fc.className = 'text-indigo'; fc.title = '{{ __("Weighted forecast") }}';
+            stats.insertBefore(fc, stats.querySelector('[data-stat="count"]'));
+        }
+        if (fc) { fc.textContent = fmt(forecast); if (forecast === 0) fc.remove(); }
+
+        let fe = stats.querySelector('[data-stat="fees"]');
+        if (!fe && fees > 0) {
+            fe = document.createElement('div'); fe.dataset.stat = 'fees'; fe.className = 'text-success'; fe.title = '{{ $modeTerms["money_label"] }}';
+            stats.insertBefore(fe, stats.querySelector('[data-stat="count"]'));
+        }
+        if (fe) { fe.textContent = fmt(fees); if (fees === 0) fe.remove(); }
     }
 
     // ── Drag & Drop ──────────────────────────────────────
@@ -478,7 +623,7 @@
 
         handle.addEventListener('dragend', () => {
             const card = handle.closest('.deal-card');
-            card.classList.remove('dragging');
+            if (card) card.classList.remove('dragging');
             document.querySelectorAll('.stage-row.drag-over').forEach(r => r.classList.remove('drag-over'));
             dragDealId = null;
             dragSourceStage = null;
@@ -486,7 +631,7 @@
         });
     });
 
-    // Each stage row is a drop target
+    // Each stage column is a drop target
     document.querySelectorAll('.stage-row').forEach(row => {
         const stage = row.dataset.stage;
 
@@ -512,7 +657,6 @@
             const dealId = e.dataTransfer.getData('text/plain');
             if (!dealId || stage === dragSourceStage) return;
 
-            // Optimistic UI: move card
             const card = document.querySelector(`.deal-card[data-deal-id="${dealId}"]`);
             if (!card) return;
 
@@ -527,11 +671,13 @@
             card.classList.remove('dragging');
 
             // Add empty message to source if now empty
-            if (!sourceGrid.querySelector('.deal-card')) {
+            if (sourceGrid && !sourceGrid.querySelector('.deal-card')) {
                 sourceGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
             }
 
-            updateStageStats();
+            recomputeColumn(dragSourceRow);
+            recomputeColumn(row);
+            updateTotals();
 
             // AJAX
             fetch(baseUrl + '/' + dealId + '/stage', {
@@ -543,38 +689,41 @@
                 },
                 body: JSON.stringify({ stage: stage })
             }).then(r => {
-                if (!r.ok) throw new Error('Failed');
+                if (!r.ok) {
+                    return r.json().then(body => { throw new Error((body && body.message) || 'Failed'); });
+                }
                 return r.json();
             }).then(data => {
                 if (data.success) {
                     showToast('{{ ($businessMode ?? "wholesale") === "realestate" ? __("Transaction moved to") : __("Deal moved to") }} ' + row.querySelector('.stage-name').textContent, 'success');
                 } else {
-                    throw new Error('Failed');
+                    throw new Error((data && data.message) || 'Failed');
                 }
-            }).catch(() => {
+            }).catch(err => {
                 // Revert
-                showToast('{{ __('Failed to move deal. Please try again.') }}', 'error');
-                targetGrid.querySelector('.stage-empty')?.remove();
-                sourceGrid.querySelector('.stage-empty')?.remove();
+                showToast(err && err.message && err.message !== 'Failed' ? err.message : '{{ __('Failed to move deal. Please try again.') }}', 'error');
+                if (targetGrid) { const t = targetGrid.querySelector('.stage-empty'); if (t) t.remove(); }
+                if (sourceGrid) { const s = sourceGrid.querySelector('.stage-empty'); if (s) s.remove(); }
                 sourceGrid.appendChild(card);
                 if (!targetGrid.querySelector('.deal-card')) {
                     targetGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
                 }
-                updateStageStats();
+                recomputeColumn(dragSourceRow);
+                recomputeColumn(row);
+                updateTotals();
             });
         });
     });
 
-    // ── Update badges/stats after move ───────────────────
-    function updateStageStats() {
-        document.querySelectorAll('.stage-row').forEach(row => {
-            const count = row.querySelectorAll('.deal-card').length;
-            const badge = row.querySelector('.stage-stats .badge');
-            if (badge) badge.textContent = count;
-        });
+    // ── Totals footer ────────────────────────────────────
+    function updateTotals() {
         const totalCount = document.querySelectorAll('.deal-card').length;
-        const totalEl = document.querySelector('.pipeline-filters .ms-auto');
-        if (totalEl) totalEl.textContent = totalCount + ' ' + (totalCount !== 1 ? '{{ __('deals') }}' : '{{ __('deal') }}') + ' {{ __('in pipeline') }}';
+        const totalEl = document.getElementById('pipeline-total');
+        if (totalEl) {
+            const word = '{{ Str::plural($modeTerms["deal_label"], 999) }}';
+            const single = '{{ $modeTerms["deal_label"] }}';
+            totalEl.textContent = totalCount + ' ' + (totalCount !== 1 ? word : single) + ' {{ __('in pipeline') }}';
+        }
     }
 
     // ── Card click → slide-over ──────────────────────────
@@ -598,6 +747,35 @@
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         }).then(r => r.json()).then(deal => {
             document.getElementById('panel-title').innerHTML = deal.title + ' <a href="{{ url("/pipeline") }}/' + deal.id + '" class="btn btn-outline-primary btn-sm ms-2" title="{{ __('View Full Deal') }}"><svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/><path d="M11 13l9 -9"/><path d="M15 4h5v5"/></svg> {{ __('Open') }}</a>';
+
+            let deadlineFields = deal.is_leasing
+                ? `
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">{{ __('Offer Sent Date') }}</label>
+                            <input type="date" name="offer_sent_date" class="form-control" value="${deal.offer_sent_date ? deal.offer_sent_date.split('T')[0] : ''}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">{{ __('Offer Validity (days)') }}</label>
+                            <input type="number" name="offer_validity_days" class="form-control" min="3" max="7" value="${deal.offer_validity_days || ''}">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">{{ __('Offer Signed Date') }}</label>
+                            <input type="date" name="offer_signed_date" class="form-control" value="${deal.offer_signed_date ? deal.offer_signed_date.split('T')[0] : ''}">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">{{ __('Payment & Tawtheeq/Ejari (days)') }}</label>
+                            <input type="number" name="registration_deadline_days" class="form-control" min="3" max="7" value="${deal.registration_deadline_days || ''}">
+                        </div>
+                    </div>`
+                : `
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('Inspection Period (days)') }}</label>
+                        <input type="number" name="inspection_period_days" class="form-control" min="0" value="${deal.inspection_period_days || ''}">
+                    </div>`;
+
             let html = `
                 <form id="deal-edit-form" data-deal-id="${deal.id}">
                     <div class="mb-3">
@@ -657,10 +835,7 @@
                             <input type="date" name="closing_date" class="form-control" value="${deal.closing_date ? deal.closing_date.split('T')[0] : ''}">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ __('Inspection Period (days)') }}</label>
-                        <input type="number" name="inspection_period_days" class="form-control" min="0" value="${deal.inspection_period_days || ''}">
-                    </div>
+                    ${deadlineFields}
                     ${deal.due_diligence_end_date ? `<div class="alert ${deal.is_due_diligence_urgent ? 'alert-danger' : 'alert-info'} mb-3"><strong>{{ __('Due Diligence:') }}</strong> {{ __('Ends') }} ${new Date(deal.due_diligence_end_date).toLocaleDateString()} (${deal.due_diligence_days_remaining ?? '?'} {{ __('days left') }})</div>` : ''}
                     <div class="mb-3">
                         <label class="form-label">{{ __('Notes') }}</label>
@@ -761,22 +936,30 @@
         document.getElementById('dealPanel').classList.remove('open');
     }
 
-    // ── Search & filter ──────────────────────────────────
+    // ── Search & filters ─────────────────────────────────
     const searchInput = document.getElementById('pipeline-search');
     const agentFilter = document.getElementById('pipeline-agent-filter');
+    const tempFilter = document.getElementById('pipeline-temp-filter');
+    const sourceFilter = document.getElementById('pipeline-source-filter');
 
-    function applyFilters() {
+    function buildParams() {
         const params = new URLSearchParams();
         const search = searchInput ? searchInput.value.trim() : '';
         const agent = agentFilter ? agentFilter.value : '';
-        // Preserve the active deal type tab (all / rent / sale)
-        @if(($businessMode ?? 'wholesale') === 'realestate')
+        const temp = tempFilter ? tempFilter.value : '';
+        const source = sourceFilter ? sourceFilter.value : '';
         const dealType = {{ $dealType !== null ? "'".$dealType."'" : "''" }};
         if (dealType) params.set('deal_type', dealType);
-        @endif
         if (search) params.set('search', search);
         if (agent) params.set('agent', agent);
-        const qs = params.toString();
+        if (temp) params.set('temp', temp);
+        if (source) params.set('source', source);
+        if (showEmpty.checked) params.set('show_empty', '1');
+        return params;
+    }
+
+    function applyFilters() {
+        const qs = buildParams().toString();
         window.location.href = '{{ url("/pipeline") }}' + (qs ? '?' + qs : '');
     }
 
@@ -787,6 +970,12 @@
     }
     if (agentFilter) {
         agentFilter.addEventListener('change', applyFilters);
+    }
+    if (tempFilter) {
+        tempFilter.addEventListener('change', applyFilters);
+    }
+    if (sourceFilter) {
+        sourceFilter.addEventListener('change', applyFilters);
     }
 
     // ── Move-to dropdown buttons ────────────────────────
@@ -905,7 +1094,14 @@
                         newFeeEl.textContent = '$' + Number(feeValue).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
                     }
 
+                    // Reflect the change in the card's stat datums + column totals
+                    if (contractPrice) card.dataset.value = contractPrice;
+                    if (feeValue) card.dataset.fee = feeValue;
+
                     showToast('{{ __("Deal updated successfully") }}', 'success');
+                    const row = card.closest('.stage-row');
+                    if (row) recomputeColumn(row);
+                    updateTotals();
                 } else {
                     throw new Error('Failed');
                 }

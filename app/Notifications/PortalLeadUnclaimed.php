@@ -3,23 +3,27 @@
 namespace App\Notifications;
 
 use App\Models\Lead;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Fired for admin users when an inbound portal lead could not be matched to an
- * agent and the tenant's portal-lead setting keeps it unassigned.
+ * Fired for admin/owner users when an inbound portal lead could not be matched
+ * to an agent and the tenant's portal-lead setting keeps it unassigned.
  *
- * Synchronous (no queue) so it always lands in the in-app bell on shared hosting.
+ * Land physically in the in-app bell, and email the Owner so the lead never
+ * lingers silently. Mail only — no digest-batching.
  */
-class PortalLeadUnclaimed extends Notification
+class PortalLeadUnclaimed extends Notification implements ShouldQueue
 {
-    public function __construct(protected Lead $lead)
-    {
-    }
+    use Queueable;
+
+    public function __construct(protected Lead $lead) {}
 
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', 'mail'];
     }
 
     public function toArray(object $notifiable): array
@@ -36,5 +40,21 @@ class PortalLeadUnclaimed extends Notification
             'url' => url("/leads/{$this->lead->id}"),
             'lead_id' => $this->lead->id,
         ];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $lead = $this->lead;
+
+        return (new MailMessage)
+            ->subject("[Keystone] Inbound lead awaiting assignment: {$lead->full_name}")
+            ->greeting("Hello {$notifiable->name},")
+            ->line('A new lead could not be matched to an agent and needs your attention.')
+            ->line('**Name:** '.($lead->full_name ?: 'N/A'))
+            ->line('**Phone:** '.($lead->phone ?: 'N/A'))
+            ->line('**Email:** '.($lead->email ?: 'N/A'))
+            ->line('**Source:** '.ucwords(str_replace('_', ' ', $lead->lead_source ?? 'N/A')))
+            ->action('Review Lead', url("/leads/{$lead->id}"))
+            ->line('Claim or assign this lead so it does not go unanswered.');
     }
 }

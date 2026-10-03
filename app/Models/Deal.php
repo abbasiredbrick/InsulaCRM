@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Scopes\TenantScope;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -25,6 +26,76 @@ class Deal extends Model
         'closed_won' => 'Closed Won',
         'closed_lost' => 'Closed Lost',
     ];
+
+    /**
+     * Probability (0–1) that a deal at this stage will convert to Closed Won.
+     * Used for weighted pipeline forecast. Covers every stage key across the
+     * leasing, wholesale and real-estate pipelines.
+     */
+    public const STAGE_PROBABILITIES = [
+        // Leasing
+        'new_lead' => 0.05,
+        'outreach' => 0.1,
+        'availability_shared' => 0.15,
+        'viewing_requested' => 0.3,
+        'viewing_scheduled' => 0.4,
+        'viewing_done' => 0.45,
+        'offer_sent' => 0.5,
+        'offer_signed' => 0.7,
+        'deposit_collected' => 0.8,
+        'tawtheeq_ejari' => 0.9,
+        'move_in_permit' => 0.95,
+        'moved_in' => 1.0,
+        // Wholesale
+        'prospecting' => 0.1,
+        'contacting' => 0.2,
+        'engaging' => 0.3,
+        'offer_presented' => 0.45,
+        'dispositions' => 0.8,
+        'assigned' => 0.9,
+        'closing' => 0.95,
+        // Real estate
+        'lead' => 0.1,
+        'listing_agreement' => 0.2,
+        'active_listing' => 0.25,
+        'showing' => 0.35,
+        'offer_received' => 0.5,
+        'inspection' => 0.8,
+        'appraisal' => 0.85,
+        // Shared
+        'negotiating' => 0.6,
+        'under_contract' => 0.75,
+        'closed_won' => 1.0,
+        'closed_lost' => 0.0,
+    ];
+
+    /**
+     * Leasing stages where the offer validity window is running: the signed
+     * offer has not happened yet, so the offer stays valid until the deadline.
+     */
+    public const RENT_OFFER_VALIDITY_STAGES = ['offer_sent', 'negotiating'];
+
+    /**
+     * Leasing stages where the payment + Tawtheeq/Ejari registration deadline
+     * (from offer_signed) applies: deposit must be collected and the contract
+     * registered before the window lapses.
+     */
+    public const RENT_REGISTRATION_STAGES = ['offer_signed', 'deposit_collected', 'tawtheeq_ejari'];
+
+    /**
+     * Default offer-validity / registration windows for rental transactions (days).
+     */
+    public const RENT_DEFAULT_VALIDITY_DAYS = 7;
+
+    public const RENT_DEFAULT_REGISTRATION_DAYS = 7;
+
+    /**
+     * Weighted-forecast probability for a single stage key (defaults to 0.5).
+     */
+    public static function stageProbability(string $stage, ?Tenant $tenant = null): float
+    {
+        return (float) (self::STAGE_PROBABILITIES[$stage] ?? 0.5);
+    }
 
     /**
      * Get pipeline stages for the current tenant's business mode.
@@ -103,6 +174,10 @@ class Deal extends Model
         'inspection_period_days',
         'contract_date',
         'due_diligence_end_date',
+        'offer_sent_date',
+        'offer_signed_date',
+        'offer_validity_days',
+        'registration_deadline_days',
         'closing_date',
         'listing_commission_pct',
         'buyer_commission_pct',
@@ -124,6 +199,10 @@ class Deal extends Model
             'earnest_money' => 'decimal:2',
             'contract_date' => 'date',
             'due_diligence_end_date' => 'date',
+            'offer_sent_date' => 'date',
+            'offer_signed_date' => 'date',
+            'offer_validity_days' => 'integer',
+            'registration_deadline_days' => 'integer',
             'closing_date' => 'date',
             'listing_commission_pct' => 'decimal:2',
             'buyer_commission_pct' => 'decimal:2',
@@ -143,6 +222,96 @@ class Deal extends Model
                 $deal->stage_changed_at = now();
             }
         });
+
+        static::saving(function (Deal $deal) {
+            $deal->applyStageAnchorsAndDueDiligence();
+        });
+    }
+
+    /**
+     * Auto-set the anchor dates for rental offer stages and recompute the
+     * due-diligence / contingency deadline from the authoritative formula.
+     *
+     * Rental formula:
+     *  - offer_sent / negotiating  -> offer_sent_date + offer_validity_days
+     *  - offer_signed and beyond   -> offer_signed_date + registration_deadline_days
+     * Sale/wholesale formula (unchanged):
+     *  - under_contract            -> contract_date + inspection_period_days
+     */
+    public function applyStageAnchorsAndDueDiligence(): void
+    {
+        if ($this->is_leasing) {
+            if ($this->stage === 'offer_sent' && ! $this->offer_sent_date) {
+                $this->offer_sent_date = now()->startOfDay();
+            }
+            if ($this->stage === 'offer_signed' && ! $this->offer_signed_date) {
+                $this->offer_signed_date = now()->startOfDay();
+            }
+        }
+
+        if ($this->dueDiligenceApplies() && $this->computeDueDiligenceEndDate()) {
+            $this->due_diligence_end_date = $this->computeDueDiligenceEndDate();
+        }
+    }
+
+    /**
+     * Whether a due-diligence / contingency deadline currently applies to this deal.
+     */
+    public function dueDiligenceApplies(): bool
+    {
+        if ($this->is_leasing) {
+            return in_array($this->stage, self::RENT_OFFER_VALIDITY_STAGES, true)
+                || in_array($this->stage, self::RENT_REGISTRATION_STAGES, true);
+        }
+
+        return $this->stage === 'under_contract';
+    }
+
+    /**
+     * Compute the due-diligence / contingency deadline from the authoritative formula.
+     */
+    public function computeDueDiligenceEndDate(): ?Carbon
+    {
+        if ($this->is_leasing) {
+            if (in_array($this->stage, self::RENT_OFFER_VALIDITY_STAGES, true) && $this->offer_sent_date) {
+                return $this->offer_sent_date->copy()
+                    ->addDays($this->offer_validity_days ?: self::RENT_DEFAULT_VALIDITY_DAYS);
+            }
+
+            if (in_array($this->stage, self::RENT_REGISTRATION_STAGES, true) && $this->offer_signed_date) {
+                return $this->offer_signed_date->copy()
+                    ->addDays($this->registration_deadline_days ?: self::RENT_DEFAULT_REGISTRATION_DAYS);
+            }
+
+            return null;
+        }
+
+        if ($this->stage === 'under_contract' && $this->contract_date && $this->inspection_period_days > 0) {
+            return $this->contract_date->copy()->addDays($this->inspection_period_days);
+        }
+
+        return null;
+    }
+
+    /**
+     * Human label for the current due-diligence / contingency window.
+     */
+    public function dueDiligencePeriodLabel(?Tenant $tenant = null): string
+    {
+        if ($this->is_leasing) {
+            return in_array($this->stage, self::RENT_REGISTRATION_STAGES, true)
+                ? __('Payment & Tawtheeq/Ejari deadline')
+                : __('Offer validity');
+        }
+
+        return \App\Services\BusinessModeService::isRealEstate($tenant)
+            ? __('Contingency deadline')
+            : __('Due diligence deadline');
+    }
+
+    public function getDueDiligenceAppliesAttribute(): bool
+    {
+        return $this->dueDiligenceApplies();
     }
 
     public function lead()

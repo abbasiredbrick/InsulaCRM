@@ -57,6 +57,7 @@ class PortalWebhookController extends Controller
         $signature = $request->header('X-dubizzle-Signature')
             ?? $request->header('X-Bayut-Signature')
             ?? $request->header('X-Hub-Signature-256')
+            ?? $request->header('X-Signature')
             ?? null;
 
         if ($signature !== null) {

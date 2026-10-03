@@ -33,6 +33,64 @@ Overriding columns is allowed per call (e.g. A2A excludes `email`) — but never
 re-inline the block. Update `LeadSearchService` instead, then refactor call
 sites to it.
 
+## Portal lead ingestion
+
+Inbound portal leads (Property Finder, Bayut) must be pulled through
+`App\Services\Portals\PortalLeadSyncService::pull()`. Never hand-roll a pull in a
+controller or command — the service is what keeps the `is_active` guard, the
+per-integration cache lock, and the cursor rule in one place, and those three
+used to drift apart per trigger.
+
+- **Triggers (all call the service):** the "Sync leads" button
+  (`portal-integrations.sync-leads`, `force: true`), the scheduled commands
+  `portals:pull-propertyfinder-leads` / `portals:pull-bayut-leads`
+  (`force: true` — the schedule *is* the primary trigger), and the in-app
+  catch-up `SyncOverduePortalLeads`, dispatched after the response by the
+  `CatchUpPortalLeads` middleware (throttled to 1×/5 min, pulls only
+  integrations overdue past `OVERDUE_AFTER_MINUTES`).
+- **The catch-up exists because the prod box had no cron entry** — leads only
+  appeared after a manual sync. Keep it, and keep the cron documented in
+  PROD-DEPLOY.md. `CatchUpPortalLeads::shouldCheck()` skips under
+  `runningUnitTests()` on purpose: the harness fires terminating callbacks, so
+  without that guard every feature test would attempt real portal HTTP.
+- **Cursor rule:** `leads_last_synced_at` advances only when `$result['error']`
+  is null. A partial page failure must surface as an error so the window is
+  re-read — never step the cursor over leads that were never fetched.
+- `PortalIntegration` has no `TenantScope`; tenancy is always an explicit
+  `where('tenant_id', …)`.
+
+## Lead assignment — the two routing switches
+
+`users.is_active` and `users.receives_leads` are distinct and both matter:
+
+- `is_active` — out of every pool (deactivation, not offboarding; see the
+  email-uniqueness note in `SettingsController::destroyAgent`).
+- `receives_leads` — the per-agent "Receives new leads" toggle in Settings →
+  Team. Opting out removes them from automatic assignment **only**; leads
+  already on their book stay put, and manual assignment/claim still works.
+
+**Every automatic path must use `User::scopeReceivingLeads()`** (or
+`isInLeadRotation()`), which is `is_active AND receives_leads`. It currently
+covers `LeadDistributionService::rotation()` (roundRobin + aiSmart),
+`AssignUnclaimedLeads`, and `PortalLeadService::findAgentByCode()` — that last
+one matters because portal leads route by the agent code embedded in the
+listing reference, bypassing the distribution formula entirely. Do not
+hand-roll `where('is_active', true)` on an assignment query again.
+
+Defaults are deliberately asymmetric, because an unchecked checkbox sends
+nothing: `inviteAgent` treats an absent field as **on** (matching the column
+default and the pre-checked box), `updateAgent` treats it as **off**.
+
+**The owner is out of the rotation by default.** `assignableRoleIdsFor()`
+excludes the `owner` role, so an owner is *never* created through Settings →
+Team — the only creation paths are `RegisterController::register()`,
+`InstallerService::installApplication()` and `InstallController`, all three of
+which set `receives_leads => $adminRole->name !== 'owner'`, plus migration
+`2026_09_30_000003_set_owner_receives_leads_false.php` to backfill existing
+owner accounts. Don't try to add an owner special case to `inviteAgent`: the
+role cannot be posted there. It is a default, not a lockout — an owner can still
+opt in from the edit modal, and `isInLeadRotation()` honours that.
+
 ## Search / Filter UI — the live-filter convention
 
 All list/board screens (leads table & kanban, inventory, Scheduling Hub) use the
@@ -63,6 +121,41 @@ same instant-search UI. Reuse it; never add a "Search/Filter" submit button.
 Reference implementations: `resources/views/leads/index.blade.php`,
 `leads/kanban.blade.php`, `inventory/index.blade.php`, `schedules/index.blade.php`.
 
+## Studio is a size, not a category — `bedrooms = 0`
+
+A studio is still an **apartment**. The studio/1BR/2BR/3BR split is the *size*
+axis, the same axis as the Bedrooms field, so it is recorded as
+`bedrooms = 0` — never as a `property_category`. (It briefly was a category;
+`isStudio()` still tolerates a stray `property_category = 'studio'` so any row
+written during that window renders as Studio rather than "1 BR Apartment".)
+
+The trap is that `0` is **falsy** in PHP, which is exactly how studios used to
+vanish from the UI.
+
+- **Render through `Property::bedroomLabel()`**, never
+  `$property->bedrooms ? … : null`. It returns `"Studio"` for 0, `"2BR"`
+  otherwise, `""` when bedrooms are simply unrecorded.
+- **`Property::isStudio()`** is `bedrooms === 0`. `null` must never read as a
+  studio — unrecorded bedrooms are a real state.
+- `display_name()` produces "Studio Apartment …"; `optionLabel()` skips the
+  bedroom half for a studio because `display_name` already carries it, so the
+  word never prints twice.
+- The inventory form offers a **Studio** checkbox beside Bedrooms that writes
+  `0`. Do not ask an agent to type `0` into Bedrooms.
+- `AvailabilityIngestService` reads studios from the **Unit Type** free-text
+  column (`featuresFromRaw`) and from a `Bedrooms` cell that literally says
+  "Studio" (`bedroomCount`). A "Studio" unit type **beats a Bedrooms column
+  that says 1** — PM sheets do exactly that, and taking the number is how
+  studios get imported and published as 1BR. So re-importing a source whose
+  sheet was corrected to "Studio" converts the existing unit in place.
+- `detectCategory()` deliberately returns `apartment` for a studio: a studio is
+  a size, so apartment-scoped queries and reports must include it.
+- **Portals have no studio *type*.** Property Finder gets `type: apartment` +
+  `bedrooms: "studio"`; Bayut gets `categoryId: 4` (apartment) + `beds: 0`.
+  Both are asserted in `tests/Feature/InventoryStudioTest.php`.
+- Category dropdowns are driven off `Property::CATEGORIES`. There is no
+  `studio` key and there should not be one.
+
 ## Commands
 
 - Run the whole suite: `php -d memory_limit=1G vendor/bin/phpunit`
@@ -78,7 +171,162 @@ Product name is **Keystone** (never the legacy name). Driven by server-env
 ## Test conventions
 
 Portals/wholesale use `business_mode` (=`realestate`), roles fixtures live in
-the base `TestCase`. Full suite is green: **771 tests / 2301 assertions**.
-Keep it green; a known-flaky test (`FollowupFeedbackTest::
-test_quick_log_posts_the_selected_card_type`) fails occasionally mid-suite —
-run isolated to confirm before debugging.
+the base `TestCase`. Full suite is green: **1059 tests / 3414 assertions**,
+with the exceptions listed below.
+Keep it green; a few tests fail occasionally mid-suite (a different one each
+run) — `FollowupFeedbackTest::test_quick_log_posts_the_selected_card_type`,
+`LeadManagementTest::test_whatsapp_activity_can_be_logged`,
+`TeamManagementTest::test_whatsapp_activity_notifies_manager`,
+`TeamManagementTest::test_activity_on_team_lead_notifies_managers`,
+`LeadAgentSharingTest::test_co_agent_can_log_activity_and_task_but_not_delete_lead`.
+`PortalRoutingTest::test_dedup_prevents_duplicate_from_same_listing_reference`
+(a fixture `agent_code` collision, e.g. two `AJ` agents in one test).
+All pass in isolation; run isolated to confirm before debugging.
+
+`CalendarTest::test_calendar_events_returns_json` and the two
+`CalendarRealEstateTest` cases that assert a non-empty events array are a
+**separate, persistent** problem, not this rotation: they fail even in
+isolation and fail on a clean tree (verified by stashing). They read
+`CalendarController::events()`, which is unrelated to the UI work below. Do not
+treat a red calendar run as a regression you introduced, and do not spend a
+cycle on it while working here.
+
+Never `git stash` to bisect a failure here: the working tree carries a large
+body of uncommitted work, so stashing produces a tree that will not even boot
+its own tests.
+
+## Recycled Leads pool import
+
+`RecycledLeadsImportService` is the only way portal exports enter the pool.
+Its rules are deliberate — do not relax them in a call site:
+
+- **The phone is the identity.** A row carrying a number matches on that
+  number alone; a different number is a different lead even when the email
+  matches. Email/WhatsApp username only identify contacts that arrive with no
+  number at all.
+- **Richer data wins, weaker never does.** A re-upload fills a missing email
+  and upgrades a name when the imported name says more (`nameIsRicher`), judged
+  on the combined name so a later row may split it differently.
+- **`lead_date` is the earliest enquiry**, not the date of the row that created
+  the record, and it never moves forward.
+- **One contact, both intents.** A contact with a rental *and* a purchase gets
+  one row with `alternate_deal_type` set — the pool shows "Rent + Sale" and
+  regeneration picks the intent. Regenerating a contact who is already an
+  active lead adds the intent to that lead (`additional_intents`) instead of
+  refusing or creating a second person.
+- Listing references match **per trimmed segment**, so `NF-R -12251230` is a
+  rental. Phone normalisation only strips a trunk zero for the GCC allowlist
+  (965/966/968/971/973/974) so Turkey/India/Pakistan numbers stay intact.
+- Rows tagged `from_agent`, and agent-profile/agent-account enquirers, are
+  never imported. A pool row can therefore stay untyped/unnamed when the only
+  CSV row that would fill it is one of ours — that is correct, not a gap.
+
+## Free text in views — `<x-linkified>`
+
+Any view rendering user- or portal-supplied free text (notes, activity bodies,
+meeting feedback, custom field values) must go through the
+`<x-linkified :text="..." />` component, not `{{ }}`. Portal leads arrive with
+a listing URL in the notes or in a custom field, and plain `{{ }}` rendered it
+as dead text.
+
+- Helper: `App\Helpers\TextRenderHelper::linkify()` (aliased `TextRender` in
+  `AppServiceProvider`, next to `Fmt`). Component:
+  `resources/views/components/linkified.blade.php`.
+- **It escapes first, then injects anchors**, so `{!! !!}` output is safe —
+  the only markup in the result is an `<a>` whose href the helper built itself.
+  Do not hand-roll a `str_replace` that wraps URLs in `<a>`: that is an XSS.
+- Scheme allowlist is `http`/`https` only. A bare `www.` gets `https://`
+  prefixed; `javascript:` and `data:` are never linked, they stay inert text.
+  Covered by `tests/Feature/LinkifiedTextTest.php`.
+- `newlines` prop: default `true` (note-style fields emit `<br>`); pass
+  `:newlines="false"` for inline/single-line spots (activity subjects, custom
+  field values, anything inside `text-truncate`).
+- Already wired: `leads/show` (notes, custom fields, activity subject/body, task
+  activity, meeting notes/feedback), `deals/show` (notes, activity subject/body),
+  `schedules/index` (feedback), `showings/show`, `recycled/show`,
+  `inventory/show`, `deals/_offers`, `open-houses/show`,
+  `availability/reviews`, `a2a/show` (contract terms).
+- Deliberately NOT linked: `<textarea>` inputs, `Str::limit`-truncated previews
+  (a truncated URL is a broken link), and short single-line labels like
+  `address`/`title`.
+
+### Portal URLs belong in custom_fields, never in notes
+
+A portal lead's enquiry URL is **one link**, not three. `PortalLeadService` used
+to append it to `notes` *and* store it in `custom_fields`, and
+`PortalPayloadNormalizer` resolves **both** `url` and `contact_link` from
+`responseLink` — so Property Finder leads got the same URL printed under
+"Notes", "Listing" and "Contact form". Fixes, in the order they were found:
+
+- Notes carry the client's `message` only; the URL is not appended.
+- `leads/show` dedupes the portal rows by URL, keeping the first heading, so a
+  PF lead shows one "Listing" row. When `listing_url` and `contact_link`
+  genuinely differ, both still show.
+- Covered by `LinkifiedTextTest`: one test asserts the URL is rendered exactly
+  once, one asserts distinct links both survive, one asserts the ingestion no
+  longer copies the URL into notes.
+
+### Backfilling portal URLs out of notes — do not blanket-strip
+
+Migration `2026_09_30_000004_backfill_portal_lead_notes_urls.php` moved 47
+production lead notes URLs into `custom_fields`. The two populations needed
+opposite treatment, which is why it inspects per row:
+
+- **Property Finder** — notes held *only* the URL, already duplicated in
+  `listing_url`/`contact_link`. Cleared.
+- **Bayut** — notes held the client's real message with the URL embedded
+  ("Hi, I am interested… Link: <url> Reference no.: 10219-GFPUOM") and
+  `custom_fields.listing_url` was **empty**. Stripping would have destroyed both
+  the only link and the message, so the URL is promoted into `listing_url`
+  first. A side benefit: those 33 leads gained a clickable link they never had.
+
+Guards that must not be relaxed:
+
+- **Scoped to `lead_source` in (bayut, property_finder, propertyfinder,
+  dubizzle).** Human-written notes with a URL ("See <url>. Call after 5pm") are
+  left alone; stripping a URL out of prose yields mangled text ("See. Call").
+- **Never promote-then-strip a second URL.** Only the first URL is removed.
+- Originals are snapshotted in `lead_notes_url_backfill` (restored by `down()`)
+  and in `leads_notes_url_backup` (47 rows, survives a rolled-back migration).
+  Both tables are kept until the backfill is signed off.
+- `PortalNotesUrlBackfillTest` covers promote/keep-message, clear-duplicate,
+  bare-link, leave-manual-alone, and `down()` restore.
+
+### Two portal links, never conflated: property page vs message thread
+
+A portal lead has two links that go to different places:
+
+| field         | opens                                              |
+|---------------|----------------------------------------------------|
+| `listing_url` | the property page the client was looking at         |
+| `contact_link`| the agent's message/WhatsApp thread about it        |
+
+They used to be conflated, so "Listing" opened a chat window. Enforced by
+`App\Services\Portals\PortalLinkResolver`:
+
+- **Property Finder** sends ONE url (`responseLink`) for both, and it is a
+  *thread*. It is stored as `contact_link` only. PF's property page is then
+  resolved from the reference.
+- **Bayut** returns `/property/details-{id}.html` (page) and `/pm/{id}/{uuid}`
+  (thread). Either can arrive first, so both are classified.
+- `/pm/{id}/…` yields the page `/property/details-{id}.html` by derivation —
+  safe because leads #10 and #24 share reference 10219-ZVrgZW and carry one URL
+  of each shape. Do **not** derive anything for PF.
+
+**Never store `propertyfinder.ae/properties/<slug>`.** Verified against four
+live references: it 404s. PF's Enterprise listing payload (probed on
+atlas.propertyfinder.com) exposes id/reference/location/price/media/state but no
+`url`, `publicUrl` or `slug`, so `PropertyFinderPortalService::listingPageUrl()`
+falls back to `referenceSearchUrl()` (`/en/search?q=<ref>`, HTTP 200) instead.
+
+**Never resolve `PropertyFinderPortalService` from the container.** Its
+constructor takes a `PortalIntegration`, and Eloquent models need no constructor
+arguments — so the container silently supplies an EMPTY integration, auth fails,
+and the service falls back to a bogus URL. Build it with the tenant's own
+integration (see `ResolvePortalListingLinks::pfService()`). An empty listing
+slot is better than a link that 404s.
+
+`leads/show` renders the block as "Portal Links" with rows "Listing" and
+"WhatsApp conversation"; identical values still collapse to one row.
+`portals:resolve-listing-links` re-derives existing leads (`--dry-run` first).
+Backup: `lead_link_split_backup`.

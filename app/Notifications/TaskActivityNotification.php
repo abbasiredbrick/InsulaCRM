@@ -13,8 +13,8 @@ use Illuminate\Notifications\Notification;
 
 class TaskActivityNotification extends Notification implements ShouldQueue
 {
-    use Queueable;
     use DigestAwareNotification;
+    use Queueable;
 
     public function __construct(
         protected Task $task,
@@ -38,10 +38,10 @@ class TaskActivityNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $tenantName = $this->tenant->name;
+        $leadName = $this->task->lead?->full_name ?? 'N/A';
 
         return (new MailMessage)
-            ->subject("[{$tenantName}] Task update: {$this->task->title}")
+            ->subject("[Keystone] Task update: {$leadName} — {$this->task->title}")
             ->greeting("Hello {$notifiable->name},")
             ->when($this->actor, fn ($mail) => $mail->line(__(':name updated "**:title**"', ['name' => $this->actor->name, 'title' => $this->task->title])))
             ->line($this->summary)

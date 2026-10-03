@@ -21,8 +21,8 @@ class ReportController extends Controller
         $to = $request->get('to', now()->format('Y-m-d'));
         $agentId = $request->get('agent_id');
 
-        $leadQuery = Lead::whereBetween('created_at', [$from, $to . ' 23:59:59']);
-        $dealQuery = Deal::whereBetween('created_at', [$from, $to . ' 23:59:59']);
+        $leadQuery = Lead::whereBetween('created_at', [$from, $to.' 23:59:59']);
+        $dealQuery = Deal::whereBetween('created_at', [$from, $to.' 23:59:59']);
 
         if (auth()->user()->isAgent()) {
             $userId = auth()->id();
@@ -54,7 +54,7 @@ class ReportController extends Controller
                 $leaseAgentId = $agentId;
             }
             $closedLeases = \App\Services\DashboardMetricsService::closedLeasesQuery($leaseAgentId)
-                ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                ->whereBetween('status_changed_at', [$from, $to.' 23:59:59'])
                 ->count();
         }
         $closedTotal = $closedDeals + $closedLeases;
@@ -64,8 +64,8 @@ class ReportController extends Controller
         $topAgents = [];
         if (auth()->user()->isAdmin()) {
             $topAgents = Deal::where('stage', 'closed_won')
-                ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
-                ->select('agent_id', DB::raw('count(*) as deals_closed'), DB::raw('sum(' . \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'] . ') as total_fees'))
+                ->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])
+                ->select('agent_id', DB::raw('count(*) as deals_closed'), DB::raw('sum('.\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'].') as total_fees'))
                 ->groupBy('agent_id')
                 ->with('agent')
                 ->orderByDesc('deals_closed')
@@ -76,11 +76,11 @@ class ReportController extends Controller
                 $leaseCounts = [];
                 $leaseFees = [];
                 foreach (\App\Services\DashboardMetricsService::closedLeasesQuery()
-                    ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
-                    ->with('properties:id,admin_fee')
+                    ->whereBetween('status_changed_at', [$from, $to.' 23:59:59'])
+                    ->withSum('deals', 'total_commission')
                     ->get() as $lease) {
                     $leaseCounts[$lease->agent_id] = ($leaseCounts[$lease->agent_id] ?? 0) + 1;
-                    $leaseFees[$lease->agent_id] = ($leaseFees[$lease->agent_id] ?? 0) + $lease->properties->sum('admin_fee');
+                    $leaseFees[$lease->agent_id] = ($leaseFees[$lease->agent_id] ?? 0) + (float) $lease->deals_sum_total_commission;
                 }
 
                 $topAgents = $topAgents->map(function ($row) use ($leaseCounts, $leaseFees) {
@@ -142,16 +142,16 @@ class ReportController extends Controller
             foreach ($leadsBySource as $source) {
                 $budget = $costs[$source->lead_source] ?? 0;
                 $closedFromSource = Deal::where('stage', 'closed_won')
-                    ->whereHas('lead', fn($q) => $q->where('lead_source', $source->lead_source))
-                    ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
+                    ->whereHas('lead', fn ($q) => $q->where('lead_source', $source->lead_source))
+                    ->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])
                     ->count();
                 if (\App\Services\BusinessModeService::isRealEstate()) {
                     $closedFromSource += \App\Services\DashboardMetricsService::closedLeasesQuery()
                         ->where('lead_source', $source->lead_source)
-                        ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
+                        ->whereBetween('status_changed_at', [$from, $to.' 23:59:59'])
                         ->count();
                 }
-                $leadSourceROI[] = (object)[
+                $leadSourceROI[] = (object) [
                     'source' => $source->lead_source,
                     'leads' => $source->count,
                     'closed' => $closedFromSource,
@@ -181,7 +181,7 @@ class ReportController extends Controller
 
             $leadsContactedMap = Lead::whereIn('agent_id', $agentIds)
                 ->where('status', '!=', 'new')
-                ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                ->whereBetween('created_at', [$from, $to.' 23:59:59'])
                 ->selectRaw('agent_id, count(*) as cnt')
                 ->groupBy('agent_id')->pluck('cnt', 'agent_id');
 
@@ -190,14 +190,14 @@ class ReportController extends Controller
                 : ['offer_presented', 'under_contract', 'closing', 'closed_won'];
             $offersMadeMap = Lead::whereIn('agent_id', $agentIds)
                 ->whereIn('status', $offerStatuses)
-                ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                ->whereBetween('created_at', [$from, $to.' 23:59:59'])
                 ->selectRaw('agent_id, count(*) as cnt')
                 ->groupBy('agent_id')->pluck('cnt', 'agent_id');
 
             $dealsClosedMap = Deal::whereIn('agent_id', $agentIds)
                 ->where('stage', 'closed_won')
-                ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
-                ->selectRaw('agent_id, count(*) as cnt, sum(' . \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'] . ') as fees')
+                ->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])
+                ->selectRaw('agent_id, count(*) as cnt, sum('.\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'].') as fees')
                 ->groupBy('agent_id')->get()->keyBy('agent_id');
 
             // Closed leases per agent (real estate mode)
@@ -205,11 +205,11 @@ class ReportController extends Controller
             if (\App\Services\BusinessModeService::isRealEstate()) {
                 foreach (\App\Services\DashboardMetricsService::closedLeasesQuery()
                     ->whereIn('agent_id', $agentIds)
-                    ->whereBetween('updated_at', [$from, $to . ' 23:59:59'])
-                    ->with('properties:id,admin_fee')
+                    ->whereBetween('status_changed_at', [$from, $to.' 23:59:59'])
+                    ->withSum('deals', 'total_commission')
                     ->get() as $lease) {
                     $leaseClosedMap[$lease->agent_id]['cnt'] = ($leaseClosedMap[$lease->agent_id]['cnt'] ?? 0) + 1;
-                    $leaseClosedMap[$lease->agent_id]['fees'] = ($leaseClosedMap[$lease->agent_id]['fees'] ?? 0) + $lease->properties->sum('admin_fee');
+                    $leaseClosedMap[$lease->agent_id]['fees'] = ($leaseClosedMap[$lease->agent_id]['fees'] ?? 0) + (float) $lease->deals_sum_total_commission;
                 }
             }
 
@@ -254,13 +254,15 @@ class ReportController extends Controller
         for ($m = 0; $m < 6; $m++) {
             $monthStart = now()->subMonths(5 - $m)->startOfMonth();
             $monthEnd = now()->subMonths(5 - $m)->endOfMonth();
-            if ($monthEnd->format('Y-m-d') < $trendStart) continue;
+            if ($monthEnd->format('Y-m-d') < $trendStart) {
+                continue;
+            }
 
             $monthLeads = Lead::whereBetween('created_at', [$monthStart, $monthEnd])->count();
             $monthClosed = Deal::where('stage', 'closed_won')->whereBetween('stage_changed_at', [$monthStart, $monthEnd])->count();
             if (\App\Services\BusinessModeService::isRealEstate()) {
                 $monthClosed += \App\Services\DashboardMetricsService::closedLeasesQuery($leaseAgentId)
-                    ->whereBetween('updated_at', [$monthStart, $monthEnd])
+                    ->whereBetween('status_changed_at', [$monthStart, $monthEnd])
                     ->count();
             }
             $conversionTrend[] = (object) [
@@ -273,16 +275,16 @@ class ReportController extends Controller
 
         // Lead-to-close velocity (avg days from lead creation to closed_won)
         $velocityData = Deal::where('deals.stage', 'closed_won')
-            ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
+            ->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])
             ->join('leads', 'deals.lead_id', '=', 'leads.id')
             ->when(DB::getDriverName() === 'sqlite', function ($q) {
                 $q->selectRaw('AVG(julianday(deals.stage_changed_at) - julianday(leads.created_at)) as avg_days')
-                  ->selectRaw('MIN(julianday(deals.stage_changed_at) - julianday(leads.created_at)) as min_days')
-                  ->selectRaw('MAX(julianday(deals.stage_changed_at) - julianday(leads.created_at)) as max_days');
+                    ->selectRaw('MIN(julianday(deals.stage_changed_at) - julianday(leads.created_at)) as min_days')
+                    ->selectRaw('MAX(julianday(deals.stage_changed_at) - julianday(leads.created_at)) as max_days');
             }, function ($q) {
                 $q->selectRaw('AVG(DATEDIFF(deals.stage_changed_at, leads.created_at)) as avg_days')
-                  ->selectRaw('MIN(DATEDIFF(deals.stage_changed_at, leads.created_at)) as min_days')
-                  ->selectRaw('MAX(DATEDIFF(deals.stage_changed_at, leads.created_at)) as max_days');
+                    ->selectRaw('MIN(DATEDIFF(deals.stage_changed_at, leads.created_at)) as min_days')
+                    ->selectRaw('MAX(DATEDIFF(deals.stage_changed_at, leads.created_at)) as max_days');
             })
             ->first();
 
@@ -328,7 +330,7 @@ class ReportController extends Controller
         }
 
         // Monthly chart data
-        if (!$widget || $widget === 'monthly') {
+        if (! $widget || $widget === 'monthly') {
             $months = [];
             $leadsPerMonth = [];
             $dealsPerMonth = [];
@@ -343,11 +345,15 @@ class ReportController extends Controller
                 $months[] = $date->format('M Y');
 
                 $lq = Lead::whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
-                if ($user->isAgent()) $lq->where(fn ($q) => $q->where('agent_id', $user->id)->orWhereHas('leadAgents', fn ($lqq) => $lqq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
+                if ($user->isAgent()) {
+                    $lq->where(fn ($q) => $q->where('agent_id', $user->id)->orWhereHas('leadAgents', fn ($lqq) => $lqq->where('agent_id', $user->id)->where('status', \App\Models\LeadAgent::STATUS_ACTIVE)));
+                }
                 $leadsPerMonth[] = $lq->count();
 
                 $dq = Deal::where('stage', 'closed_won')->whereMonth('created_at', $date->month)->whereYear('created_at', $date->year);
-                if ($user->isAgent()) $dq->where('agent_id', $user->id);
+                if ($user->isAgent()) {
+                    $dq->where('agent_id', $user->id);
+                }
                 $dealsPerMonth[] = $dq->count();
 
                 $closedLeasesPerMonth[] = $closedLeasesMonthly[$monthKey]['count'] ?? 0;
@@ -359,9 +365,11 @@ class ReportController extends Controller
         }
 
         // Lead sources data
-        if (!$widget || $widget === 'sources') {
+        if (! $widget || $widget === 'sources') {
             $sourceQuery = Lead::select('lead_source', DB::raw('count(*) as count'))->groupBy('lead_source');
-            if ($user->isAgent()) $sourceQuery->where('agent_id', $user->id);
+            if ($user->isAgent()) {
+                $sourceQuery->where('agent_id', $user->id);
+            }
             $leadSources = $sourceQuery->get();
 
             if ($widget === 'sources') {
@@ -380,7 +388,7 @@ class ReportController extends Controller
             foreach ($leadSources as $source) {
                 $budget = $costs[$source->lead_source] ?? 0;
                 $closedFromSource = Deal::where('stage', 'closed_won')
-                    ->whereHas('lead', fn($q) => $q->where('lead_source', $source->lead_source))
+                    ->whereHas('lead', fn ($q) => $q->where('lead_source', $source->lead_source))
                     ->count();
                 if (\App\Services\BusinessModeService::isRealEstate()) {
                     $closedFromSource += \App\Services\DashboardMetricsService::closedLeasesQuery()
@@ -401,10 +409,12 @@ class ReportController extends Controller
         }
 
         // Pipeline value by stage
-        if (!$widget || $widget === 'pipeline') {
+        if (! $widget || $widget === 'pipeline') {
             $pipelineValue = Deal::whereNotIn('stage', ['closed_won', 'closed_lost'])
                 ->select('stage', DB::raw('sum(contract_price) as total'));
-            if ($user->isAgent()) $pipelineValue->where('agent_id', $user->id);
+            if ($user->isAgent()) {
+                $pipelineValue->where('agent_id', $user->id);
+            }
             $pipelineValue = $pipelineValue->groupBy('stage')->get();
 
             if ($widget === 'pipeline') {
@@ -428,8 +438,8 @@ class ReportController extends Controller
         $activeDeals = (clone $dealQuery)->whereNotIn('stage', ['closed_won', 'closed_lost'])->count();
 
         $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
-        $closedDealsThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->count();
-        $dealFeesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereMonth('created_at', now()->month)->sum($feeColumn);
+        $closedDealsThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereBetween('stage_changed_at', [now()->startOfMonth(), now()->endOfMonth()])->count();
+        $dealFeesThisMonth = (clone $dealQuery)->where('stage', 'closed_won')->whereBetween('stage_changed_at', [now()->startOfMonth(), now()->endOfMonth()])->sum($feeColumn);
 
         // Closed leases (real estate mode)
         $leaseAgentId = $user->isAgent() ? $user->id : null;
@@ -465,8 +475,10 @@ class ReportController extends Controller
         $from = $request->get('from', now()->subMonths(6)->format('Y-m-d'));
         $to = $request->get('to', now()->format('Y-m-d'));
 
-        $query = Lead::whereBetween('created_at', [$from, $to . ' 23:59:59']);
-        if (auth()->user()->isAgent()) $query->where('agent_id', auth()->id());
+        $query = Lead::whereBetween('created_at', [$from, $to.' 23:59:59']);
+        if (auth()->user()->isAgent()) {
+            $query->where('agent_id', auth()->id());
+        }
 
         $leads = $query->select('lead_source', DB::raw('count(*) as count'))
             ->groupBy('lead_source')->get();
@@ -492,8 +504,8 @@ class ReportController extends Controller
         $to = $request->get('to', now()->format('Y-m-d'));
 
         $agents = Deal::where('stage', 'closed_won')
-            ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
-            ->select('agent_id', DB::raw('count(*) as deals_closed'), DB::raw('sum(' . \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'] . ') as total_fees'))
+            ->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])
+            ->select('agent_id', DB::raw('count(*) as deals_closed'), DB::raw('sum('.\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'].') as total_fees'))
             ->groupBy('agent_id')
             ->with('agent')
             ->orderByDesc('deals_closed')
@@ -526,9 +538,9 @@ class ReportController extends Controller
         $funnel = [];
         foreach ($funnelStages as $stage) {
             if ($stage === 'closed_won') {
-                $funnel[$stage] = Deal::where('stage', $stage)->whereBetween('created_at', [$from, $to . ' 23:59:59'])->count();
+                $funnel[$stage] = Deal::where('stage', $stage)->whereBetween('created_at', [$from, $to.' 23:59:59'])->count();
             } else {
-                $funnel[$stage] = Lead::where('status', $stage)->whereBetween('created_at', [$from, $to . ' 23:59:59'])->count();
+                $funnel[$stage] = Lead::where('status', $stage)->whereBetween('created_at', [$from, $to.' 23:59:59'])->count();
             }
         }
 
@@ -555,9 +567,10 @@ class ReportController extends Controller
         $teamPerformance = User::assignable(auth()->user()->tenant)
             ->get()
             ->map(function ($agent) use ($from, $to) {
-                $leadsContacted = Lead::where('agent_id', $agent->id)->where('status', '!=', 'new')->whereBetween('created_at', [$from, $to . ' 23:59:59'])->count();
-                $dealsClosed = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])->count();
-                $feesGenerated = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])->sum(\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column']);
+                $leadsContacted = Lead::where('agent_id', $agent->id)->where('status', '!=', 'new')->whereBetween('created_at', [$from, $to.' 23:59:59'])->count();
+                $dealsClosed = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])->count();
+                $feesGenerated = Deal::where('agent_id', $agent->id)->where('stage', 'closed_won')->whereBetween('deals.stage_changed_at', [$from, $to.' 23:59:59'])->sum(\App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column']);
+
                 return (object) compact('agent', 'leadsContacted', 'dealsClosed', 'feesGenerated');
             });
 

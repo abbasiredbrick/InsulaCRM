@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Lead;
 use App\Models\PortalIntegration;
-use App\Models\Property;
+use App\Models\PropertyMedia;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -20,7 +20,7 @@ class PortalIntegrationTest extends TestCase
     {
         return PortalIntegration::create(array_merge([
             'tenant_id' => $this->tenant->id,
-            'portal'    => $portal,
+            'portal' => $portal,
             'is_active' => true,
         ], $overrides));
     }
@@ -40,10 +40,10 @@ class PortalIntegrationTest extends TestCase
     public function test_update_saves_encrypted_credentials(): void
     {
         $this->post(route('portal-integrations.update', 'bayut'), [
-            'api_token'       => 'bayut-bearer-token-1234567890',
-            'base_url'        => 'https://push.bayut.example',
+            'api_token' => 'bayut-bearer-token-1234567890',
+            'base_url' => 'https://push.bayut.example',
             'agent_reference' => 'AGENT-1',
-            'webhook_secret'  => 'wh-s3cret',
+            'webhook_secret' => 'wh-s3cret',
         ])->assertRedirect();
 
         $integration = PortalIntegration::where('tenant_id', $this->tenant->id)->where('portal', 'bayut')->firstOrFail();
@@ -84,28 +84,28 @@ class PortalIntegrationTest extends TestCase
         $payload = [
             'id' => 'chat-123',
             'enquirer' => [
-                'name'         => 'Ahmed Khan',
+                'name' => 'Ahmed Khan',
                 'phone_number' => '+971 50 111 2222',
             ],
             'listing' => [
-                'url'         => 'https://www.dubizzle.ae/listing/dz-777',
-                'reference'   => 'DZ-777',
+                'url' => 'https://www.dubizzle.ae/listing/dz-777',
+                'reference' => 'DZ-777',
                 'received_at' => 1750000000,
             ],
         ];
 
         $body = json_encode($payload);
-        $signature = md5('shh' . $body);
+        $signature = md5('shh'.$body);
 
         $this->postJson(route('portal.webhooks.receive', 'bayut'), $payload, [
             'X-dubizzle-Signature' => $signature,
         ])->assertOk()->assertJson(['status' => 'ok']);
 
         $this->assertDatabaseHas('leads', [
-            'tenant_id'   => $this->tenant->id,
-            'first_name'  => 'Ahmed',
-            'last_name'   => 'Khan',
-            'phone'       => '+971 50 111 2222',
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Ahmed',
+            'last_name' => 'Khan',
+            'phone' => '+971 50 111 2222',
             'lead_source' => 'dubizzle',
         ]);
 
@@ -117,7 +117,7 @@ class PortalIntegrationTest extends TestCase
         $this->assertSame($this->adminUser->id, $lead->agent_id);
 
         $this->assertDatabaseHas('lead_property', [
-            'lead_id'     => $lead->id,
+            'lead_id' => $lead->id,
             'property_id' => $property->id,
         ]);
     }
@@ -129,7 +129,7 @@ class PortalIntegrationTest extends TestCase
         $payload = ['id' => 'chat-1', 'name' => 'Bad Signer', 'phone' => '+971 00 000 0000'];
 
         $this->postJson(route('portal.webhooks.receive', 'bayut'), $payload, [
-            'X-dubizzle-Signature' => md5('wrong-secret' . json_encode($payload)),
+            'X-dubizzle-Signature' => md5('wrong-secret'.json_encode($payload)),
         ])->assertStatus(401);
 
         $this->assertDatabaseCount('leads', 0);
@@ -154,10 +154,10 @@ class PortalIntegrationTest extends TestCase
 
         $payload = [
             'lead' => [
-                'id'          => 'pf-lead-9',
+                'id' => 'pf-lead-9',
                 'customerName' => 'Priya Sharma',
                 'phoneNumber' => '+971 55 888 7777',
-                'listing'     => ['reference' => 'PF-11'],
+                'listing' => ['reference' => 'PF-11'],
             ],
         ];
 
@@ -166,9 +166,9 @@ class PortalIntegrationTest extends TestCase
             ->assertJson(['status' => 'ok']);
 
         $this->assertDatabaseHas('leads', [
-            'tenant_id'   => $this->tenant->id,
-            'first_name'  => 'Priya',
-            'phone'       => '+971 55 888 7777',
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Priya',
+            'phone' => '+971 55 888 7777',
             'lead_source' => 'propertyfinder',
         ]);
     }
@@ -190,7 +190,7 @@ class PortalIntegrationTest extends TestCase
                 ],
             ], 200),
             'https://push.bayut.example/listings' => Http::response([
-                'id'  => 'BN-991',
+                'id' => 'BN-991',
                 'url' => 'https://www.bayut.com/.../bn-991',
             ], 200),
         ]);
@@ -413,30 +413,345 @@ class PortalIntegrationTest extends TestCase
     public function test_push_to_propertyfinder_creates_draft_and_publishes(): void
     {
         $this->createIntegration('propertyfinder', [
-            'api_token'            => 'pf-key',
-            'api_secret'           => 'pf-secret',
-            'public_profile_id'    => 'PUB-1',
-            'default_location_id'  => 'LOC-100',
+            'api_token' => 'pf-key',
+            'api_secret' => 'pf-secret',
+            'base_url' => 'https://api.propertyfinder.ae',
+            'public_profile_id' => 'PUB-1',
+            'default_location_id' => 'LOC-100',
         ]);
 
         Http::fake([
-            'api.propertyfinder.ae*' => Http::response(['id' => 'PF-42'], 200),
+            'https://atlas.propertyfinder.com/v1/auth/token' => Http::response([
+                'accessToken' => 'pf-jwt-token',
+                'tokenType' => 'Bearer',
+                'expiresIn' => 1800,
+            ], 200),
+            'https://atlas.propertyfinder.com/v1/listings/*/publish' => Http::response([
+                'id' => 'PF-42',
+                'url' => 'https://www.propertyfinder.ae/properties/pf-42',
+            ], 200),
+            'https://atlas.propertyfinder.com/v1/listings' => Http::response(['id' => 'PF-42'], 200),
         ]);
 
         $property = $this->createProperty([
             'intent' => 'sale',
             'property_category' => 'townhouse',
+            'city' => 'Dubai',
             'rera_permit_no' => 'RERA-PF-1',
             'availability' => 'ready_to_list',
             'list_price' => 3500000,
         ]);
 
+        PropertyMedia::create([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $property->id,
+            'type' => 'photo',
+            'external_url' => 'https://images.example.test/pf.jpg',
+            'sort_order' => 1,
+            'is_primary' => true,
+        ]);
+
         $this->post(route('inventory.push', [$property, 'propertyfinder']))->assertRedirect();
+
+        Http::assertSent(fn ($request) => $request->url() === 'https://atlas.propertyfinder.com/v1/auth/token'
+            && $request->data() === ['apiKey' => 'pf-key', 'apiSecret' => 'pf-secret']);
+
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://atlas.propertyfinder.com/v1/listings') {
+                return false;
+            }
+
+            $body = $request->data();
+
+            return ($body['uaeEmirate'] ?? null) === 'dubai'
+                && ($body['category'] ?? null) === 'residential'
+                && ($body['type'] ?? null) === 'townhouse'
+                && ($body['furnishingType'] ?? null) === 'unfurnished'
+                && ($body['price']['type'] ?? null) === 'sale'
+                && ($body['price']['amounts']['sale'] ?? null) === 3500000
+                && ($body['location']['id'] ?? null) === (int) 'LOC-100'
+                && ($body['assignedTo']['id'] ?? null) === (int) 'PUB-1'
+                && isset($body['title']['en'], $body['description']['en'])
+                && ($body['media']['images'][0]['original']['url'] ?? null) === 'https://images.example.test/pf.jpg'
+                && ($body['compliance']['listingAdvertisementNumber'] ?? null) === 'RERA-PF-1';
+        });
 
         $property->refresh();
 
         $this->assertSame('live', $property->propertyfinder_status);
-        $this->assertSame('PF-42', $property->propertyfinder_listing_reference);
+        $this->assertSame((string) $property->id, $property->propertyfinder_listing_reference);
+        $this->assertSame('https://www.propertyfinder.ae/properties/pf-42', $property->propertyfinder_url);
+    }
+
+    public function test_push_to_propertyfinder_sandbox_uses_sandbox_credentials(): void
+    {
+        $this->createIntegration('propertyfinder', [
+            'api_token' => 'prod-key',
+            'api_secret' => 'prod-secret',
+            'sandbox_api_token' => 'sandbox-key',
+            'sandbox_api_secret' => 'sandbox-secret',
+            'use_sandbox' => true,
+            'public_profile_id' => 'PUB-1',
+            'default_location_id' => 'LOC-100',
+        ]);
+
+        Http::fake([
+            'https://sandbox.atlas.propertyfinder.com/v1/auth/token' => Http::response([
+                'accessToken' => 'sandbox-jwt',
+                'tokenType' => 'Bearer',
+                'expiresIn' => 1800,
+            ], 200),
+            'https://sandbox.atlas.propertyfinder.com/v1/listings*' => Http::response(['id' => 'SBOX-1'], 200),
+        ]);
+
+        $property = $this->createProperty([
+            'intent' => 'rent',
+            'property_category' => 'apartment',
+            'city' => 'Abu Dhabi',
+            'rera_permit_no' => 'ADREC-PF-1',
+            'availability' => 'ready_to_list',
+            'rent_price' => 120000,
+            'rent_period' => 'yearly',
+        ]);
+
+        PropertyMedia::create([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $property->id,
+            'type' => 'photo',
+            'external_url' => 'https://images.example.test/sandbox.jpg',
+            'sort_order' => 1,
+        ]);
+
+        $this->post(route('inventory.push', [$property, 'propertyfinder']))->assertRedirect();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sandbox.atlas.propertyfinder.com/v1/auth/token')
+            && $request->data() === ['apiKey' => 'sandbox-key', 'apiSecret' => 'sandbox-secret']);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sandbox.atlas.propertyfinder.com/v1/listings')
+            && str_contains($request->url(), '/publish'));
+
+        $this->assertSame('live', $property->fresh()->propertyfinder_status);
+    }
+
+    public function test_propertyfinder_leads_pull_creates_leads_with_pagination(): void
+    {
+        $integration = $this->createIntegration('propertyfinder', [
+            'api_token' => 'pf-leads-key',
+            'api_secret' => 'pf-leads-secret',
+        ]);
+
+        Http::fake([
+            'https://atlas.propertyfinder.com/v1/auth/token' => Http::response([
+                'accessToken' => 'pf-jwt',
+                'tokenType' => 'Bearer',
+                'expiresIn' => 1800,
+            ], 200),
+            'https://atlas.propertyfinder.com/v1/leads*' => Http::sequence()
+                ->push([
+                    'data' => [
+                        [
+                            'id' => 'pf-lead-100',
+                            'entityType' => 'listing',
+                            'channel' => 'whatsapp',
+                            'status' => 'sent',
+                            'sender' => [
+                                'name' => 'Rania Khalil',
+                                'contacts' => [['type' => 'phone', 'value' => '+971 50 123 9999']],
+                            ],
+                            'listing' => ['id' => 'L-1', 'reference' => '42'],
+                            'createdAt' => '2026-09-25T08:00:00Z',
+                        ],
+                    ],
+                    'pagination' => ['page' => 1, 'perPage' => 50, 'total' => 2, 'totalPages' => 2],
+                ], 200)
+                ->push([
+                    'data' => [
+                        [
+                            'id' => 'pf-lead-101',
+                            'entityType' => 'listing',
+                            'channel' => 'email',
+                            'status' => 'replied',
+                            'sender' => [
+                                'name' => 'Omar Farouk',
+                                'contacts' => [['type' => 'email', 'value' => 'omar@example.com']],
+                            ],
+                            'listing' => ['id' => 'L-2', 'reference' => '44'],
+                            'createdAt' => '2026-09-25T09:00:00Z',
+                        ],
+                    ],
+                    'pagination' => ['page' => 2, 'perPage' => 50, 'total' => 2, 'totalPages' => 2],
+                ], 200),
+        ]);
+
+        $this->post(route('portal-integrations.sync-leads', 'propertyfinder'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('leads', [
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Rania',
+            'phone' => '+971 50 123 9999',
+            'lead_source' => 'property_finder',
+        ]);
+
+        $this->assertDatabaseHas('leads', [
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Omar',
+            'email' => 'omar@example.com',
+            'lead_source' => 'property_finder',
+        ]);
+
+        $lead = Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('custom_fields->portal_reference', 'pf-lead-100')
+            ->first();
+        $this->assertNotNull($lead);
+        $this->assertSame('42', $lead->custom_fields['listing_reference'] ?? null);
+        $this->assertSame('2026-09-25T08:00:00Z', $lead->custom_fields['received_at'] ?? null);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/v1/leads')
+            && str_contains($request->url(), 'page=2'));
+
+        $this->assertNotNull($integration->fresh()->leads_last_synced_at);
+    }
+
+    public function test_propertyfinder_real_webhook_envelope_creates_lead(): void
+    {
+        $this->createIntegration('propertyfinder');
+
+        $payload = [
+            'id' => '00000000-0000-0000-0000-000000000042',
+            'type' => 'lead.created',
+            'timestamp' => '2026-09-25T10:00:00Z',
+            'entity' => ['id' => 'pf-lead-77', 'type' => 'lead'],
+            'payload' => [
+                'channel' => 'whatsapp',
+                'status' => 'sent',
+                'entityType' => 'listing',
+                'publicProfile' => ['id' => 123],
+                'listing' => ['id' => 'L-9', 'reference' => '77'],
+                'sender' => [
+                    'name' => 'Omar Farouk',
+                    'contacts' => [
+                        ['type' => 'phone', 'value' => '+971 50 123 4567'],
+                        ['type' => 'email', 'value' => 'omar@example.com'],
+                    ],
+                ],
+                'tags' => [],
+                'createdAt' => '2026-09-25T10:00:00Z',
+            ],
+        ];
+
+        $this->postJson(route('portal.webhooks.receive', 'propertyfinder'), $payload)
+            ->assertOk()
+            ->assertJson(['status' => 'ok']);
+
+        $lead = Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('custom_fields->portal_reference', 'pf-lead-77')
+            ->first();
+
+        $this->assertNotNull($lead);
+        $this->assertSame('Omar', $lead->first_name);
+        $this->assertSame('Farouk', $lead->last_name);
+        $this->assertSame('+971 50 123 4567', $lead->phone);
+        $this->assertSame('omar@example.com', $lead->email);
+        $this->assertSame('77', $lead->custom_fields['listing_reference'] ?? null);
+    }
+
+    public function test_update_saves_sandbox_credentials_and_mode(): void
+    {
+        $this->post(route('portal-integrations.update', 'propertyfinder'), [
+            'api_token' => 'prod-key',
+            'api_secret' => 'prod-secret',
+            'sandbox_api_token' => 'sandbox-key',
+            'sandbox_api_secret' => 'sandbox-secret',
+            'use_sandbox' => '1',
+        ])->assertRedirect();
+
+        $integration = PortalIntegration::where('tenant_id', $this->tenant->id)->where('portal', 'propertyfinder')->firstOrFail();
+
+        $this->assertTrue($integration->use_sandbox);
+        $this->assertSame('prod-key', $integration->api_token);
+        $this->assertSame('sandbox-key', $integration->sandbox_api_token);
+        $this->assertSame('sandbox-secret', $integration->sandbox_api_secret);
+    }
+
+    public function test_propertyfinder_connection_test_succeeds_via_leads_endpoint(): void
+    {
+        $this->createIntegration('propertyfinder', [
+            'api_token' => 'pf-key',
+            'api_secret' => 'pf-secret',
+        ]);
+
+        Http::fake([
+            'https://atlas.propertyfinder.com/v1/auth/token' => Http::response([
+                'accessToken' => 'pf-jwt',
+                'tokenType' => 'Bearer',
+                'expiresIn' => 1800,
+            ], 200),
+            'https://atlas.propertyfinder.com/v1/users' => Http::response(['detail' => 'Forbidden', 'type' => 'AUTHORIZATION'], 403),
+            'https://atlas.propertyfinder.com/v1/credits/balance' => Http::response(['detail' => 'Forbidden', 'type' => 'AUTHORIZATION'], 403),
+            'https://atlas.propertyfinder.com/v1/leads*' => Http::response(['data' => [], 'pagination' => []], 200),
+        ]);
+
+        $this->post(route('portal-integrations.test', 'propertyfinder'))
+            ->assertRedirect()
+            ->assertSessionHas('success', fn ($msg) => str_contains($msg, 'leads endpoint'));
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/v1/leads'));
+    }
+
+    public function test_propertyfinder_connection_test_reports_auth_failure_detail(): void
+    {
+        $this->createIntegration('propertyfinder', [
+            'api_token' => 'pf-key',
+            'api_secret' => 'pf-secret',
+        ]);
+
+        Http::fake([
+            'https://atlas.propertyfinder.com/v1/auth/token' => Http::response([
+                'detail' => 'The request requires user authentication.',
+                'title' => 'Unauthorized',
+                'type' => 'AUTHENTICATION',
+            ], 401),
+        ]);
+
+        $this->post(route('portal-integrations.test', 'propertyfinder'))
+            ->assertRedirect();
+
+        Http::assertSentCount(1);
+        $this->assertStringContainsString('HTTP 401', session('error'));
+    }
+
+    public function test_propertyfinder_request_retries_once_on_401(): void
+    {
+        $this->createIntegration('propertyfinder', [
+            'api_token' => 'pf-key',
+            'api_secret' => 'pf-secret',
+        ]);
+
+        $tokenCalls = 0;
+
+        Http::fake(function (\Illuminate\Http\Client\Request $request) use (&$tokenCalls) {
+            if ($request->url() === 'https://atlas.propertyfinder.com/v1/auth/token') {
+                $tokenCalls++;
+
+                return Http::response(['accessToken' => 'pf-jwt-'.$tokenCalls, 'tokenType' => 'Bearer', 'expiresIn' => 1800], 200);
+            }
+
+            if (str_contains($request->url(), '/v1/leads')) {
+                return $request->header('Authorization')[0] === 'Bearer pf-jwt-1'
+                    ? Http::response(['detail' => 'Unauthorized', 'type' => 'AUTHENTICATION'], 401)
+                    : Http::response(['data' => [], 'pagination' => []], 200);
+            }
+
+            return Http::response(['error' => 'not expected'], 500);
+        });
+
+        $this->post(route('portal-integrations.sync-leads', 'propertyfinder'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(2, $tokenCalls);
     }
 
     public function test_sync_locations_pulls_paginated_catalog_and_dedupes(): void

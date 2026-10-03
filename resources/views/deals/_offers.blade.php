@@ -8,7 +8,7 @@
     <div class="card-header">
         <h3 class="card-title">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-cash me-1" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
-            {{ __('Offers') }}
+            {{ __('Sales Offers') }}
             @if($offerCount > 0)
             <span class="badge bg-blue-lt ms-2">{{ $offerCount }}</span>
             @endif
@@ -27,7 +27,7 @@
                 @csrf
                 <div class="card bg-light border">
                     <div class="card-body">
-                        <h4 class="mb-3">{{ __('New Offer') }}</h4>
+                        <h4 class="mb-3">{{ __('New Sales Offer') }}</h4>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label required">{{ __('Buyer Name') }}</label>
@@ -179,7 +179,7 @@
                 </div>
 
                 @if($offer->notes)
-                    <div class="text-secondary small mb-2">{{ $offer->notes }}</div>
+                    <div class="text-secondary small mb-2"><x-linkified :text="$offer->notes" /></div>
                 @endif
 
                 <!-- Action Buttons -->

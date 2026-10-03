@@ -79,4 +79,119 @@ class DealTest extends TestCase
 
         $this->assertNotNull($deal->fresh()->stage_changed_at);
     }
+
+    public function test_rent_offer_sent_sets_anchor_and_validity_deadline(): void
+    {
+        $this->actingAsAdmin();
+        $deal = $this->createDeal([
+            'deal_type' => 'rent',
+            'stage' => 'offer_sent',
+            'offer_validity_days' => 5,
+        ]);
+
+        $fresh = $deal->fresh();
+        $this->assertEquals(now()->startOfDay()->toDateString(), $fresh->offer_sent_date->toDateString());
+        $this->assertTrue($fresh->due_diligence_applies);
+        $this->assertEquals(
+            now()->startOfDay()->addDays(5)->toDateString(),
+            $fresh->due_diligence_end_date->toDateString()
+        );
+    }
+
+    public function test_rent_offer_validity_defaults_to_seven_days(): void
+    {
+        $this->actingAsAdmin();
+        $deal = $this->createDeal([
+            'deal_type' => 'rent',
+            'stage' => 'offer_sent',
+        ]);
+
+        $this->assertEquals(
+            now()->startOfDay()->addDays(7)->toDateString(),
+            $deal->fresh()->due_diligence_end_date->toDateString()
+        );
+    }
+
+    public function test_rent_offer_signed_sets_anchor_and_registration_deadline(): void
+    {
+        $this->actingAsAdmin();
+        $deal = $this->createDeal([
+            'deal_type' => 'rent',
+            'stage' => 'offer_signed',
+            'registration_deadline_days' => 4,
+        ]);
+
+        $fresh = $deal->fresh();
+        $this->assertEquals(now()->startOfDay()->toDateString(), $fresh->offer_signed_date->toDateString());
+        $this->assertTrue($fresh->due_diligence_applies);
+        $this->assertEquals(
+            now()->startOfDay()->addDays(4)->toDateString(),
+            $fresh->due_diligence_end_date->toDateString()
+        );
+    }
+
+    public function test_rent_deadline_persists_through_registration_stages(): void
+    {
+        $this->actingAsAdmin();
+        $deal = $this->createDeal([
+            'deal_type' => 'rent',
+            'stage' => 'offer_signed',
+            'registration_deadline_days' => 5,
+        ]);
+        $signedDate = $deal->fresh()->offer_signed_date;
+
+        $deal->update(['stage' => 'deposit_collected']);
+
+        $fresh = $deal->fresh();
+        $this->assertEquals($signedDate->toDateString(), $fresh->offer_signed_date->toDateString());
+        $this->assertTrue($fresh->due_diligence_applies);
+        $this->assertEquals($signedDate->copy()->addDays(5)->toDateString(), $fresh->due_diligence_end_date->toDateString());
+    }
+
+    public function test_rent_deadline_does_not_apply_after_registration(): void
+    {
+        $this->actingAsAdmin();
+        $deal = $this->createDeal([
+            'deal_type' => 'rent',
+            'stage' => 'moved_in',
+            'offer_signed_date' => now()->subDays(10)->startOfDay(),
+        ]);
+
+        $fresh = $deal->fresh();
+        $this->assertFalse($fresh->due_diligence_applies);
+        $this->assertNull($fresh->due_diligence_end_date);
+    }
+
+    public function test_sale_under_contract_deadline_uses_contract_date_plus_inspection(): void
+    {
+        $this->actingAsAdmin();
+        $contractDate = now()->subDays(3)->startOfDay();
+        $deal = $this->createDeal([
+            'deal_type' => 'sale',
+            'stage' => 'under_contract',
+            'contract_date' => $contractDate,
+            'inspection_period_days' => 10,
+        ]);
+
+        $this->assertEquals(
+            $contractDate->copy()->addDays(10)->toDateString(),
+            $deal->fresh()->due_diligence_end_date->toDateString()
+        );
+    }
+
+    public function test_period_label_is_offer_validity_for_rent_offer_sent(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_sent']);
+
+        $this->assertEquals('Offer validity', $deal->dueDiligencePeriodLabel($this->tenant));
+    }
+
+    public function test_period_label_is_payment_tawtheeq_for_rent_offer_signed(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+
+        $this->assertEquals('Payment & Tawtheeq/Ejari deadline', $deal->dueDiligencePeriodLabel($this->tenant));
+    }
 }

@@ -145,12 +145,30 @@
                         <div class="datagrid-title">{{ __('Inspection Period') }}</div>
                         <div class="datagrid-content">{{ $deal->inspection_period_days ? $deal->inspection_period_days . ' ' . __('days') : '-' }}</div>
                     </div>
+                    @if($deal->is_leasing)
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Offer Validity') }}</div>
+                        <div class="datagrid-content">{{ $deal->offer_validity_days ? $deal->offer_validity_days . ' ' . __('days') : '-' }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Offer Sent') }}</div>
+                        <div class="datagrid-content">{{ $deal->offer_sent_date ? Fmt::date($deal->offer_sent_date) : '-' }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Payment & Tawtheeq/Ejari') }}</div>
+                        <div class="datagrid-content">{{ $deal->registration_deadline_days ? $deal->registration_deadline_days . ' ' . __('days') : '-' }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">{{ __('Offer Signed') }}</div>
+                        <div class="datagrid-content">{{ $deal->offer_signed_date ? Fmt::date($deal->offer_signed_date) : '-' }}</div>
+                    </div>
+                    @endif
                 </div>
 
-                @if($deal->stage === 'under_contract' && $deal->due_diligence_end_date)
+                @if($deal->due_diligence_applies && $deal->due_diligence_end_date)
                 <div class="mt-3">
                     <div class="alert {{ $deal->is_due_diligence_urgent ? 'alert-danger' : 'alert-info' }}">
-                        <strong>{{ __('Due Diligence:') }}</strong>
+                        <strong>{{ $deal->dueDiligencePeriodLabel() }}:</strong>
                         {{ __('Ends') }} {{ $deal->due_diligence_end_date->format('M d, Y') }}
                         @if($deal->due_diligence_days_remaining !== null)
                             ({{ $deal->due_diligence_days_remaining }} {{ __('days remaining') }})
@@ -162,7 +180,7 @@
                 @if($deal->notes)
                 <div class="mt-3">
                     <h4>{{ __('Notes') }}</h4>
-                    <p>{{ $deal->notes }}</p>
+                    <x-linkified :text="$deal->notes" />
                 </div>
                 @endif
             </div>
@@ -323,10 +341,10 @@
                             <div class="col">
                                 <div class="text-truncate">
                                     <strong>{{ __(ucwords(str_replace('_', ' ', $activity->type))) }}</strong>
-                                    @if($activity->subject) - {{ $activity->subject }} @endif
+                                    @if($activity->subject) - <x-linkified :text="$activity->subject" :newlines="false" /> @endif
                                 </div>
                                 @if($activity->body)
-                                <div class="text-secondary small">{{ $activity->body }}</div>
+                                <div class="text-secondary small"><x-linkified :text="$activity->body" /></div>
                                 @endif
                                 <div class="text-secondary small">
                                     {{ $activity->agent->name ?? '' }} &middot; {{ $activity->logged_at ? $activity->logged_at->diffForHumans() : $activity->created_at->diffForHumans() }}
@@ -343,8 +361,11 @@
         </div>
         @if(($businessMode ?? 'wholesale') === 'realestate')
             @include('deals._transaction_checklist', ['deal' => $deal])
-            @include('deals._offers', ['deal' => $deal])
-            @include('deals._offer_letters', ['deal' => $deal])
+            @if($deal->dealType() === 'sale')
+                @include('deals._offers', ['deal' => $deal])
+            @else
+                @include('deals._offer_letters', ['deal' => $deal])
+            @endif
         @endif
     </div>
 
@@ -465,8 +486,9 @@
             <div class="card-body">
                 <form id="stage-form">
                     <select name="stage" class="form-select mb-2" id="stage-select">
-                        @foreach(\App\Models\Deal::stageLabels() as $key => $label)
-                            <option value="{{ $key }}" {{ $deal->stage === $key ? 'selected' : '' }}>{{ $label }}</option>
+                        @php $stageOptions = $deal->is_leasing ? \App\Models\Deal::leasingStages() : \App\Models\Deal::stageLabels(); @endphp
+                        @foreach($stageOptions as $key => $label)
+                            <option value="{{ $key }}" {{ $deal->stage === $key ? 'selected' : '' }}>{{ __($label) }}</option>
                         @endforeach
                     </select>
                     <button type="submit" class="btn btn-primary w-100">{{ __('Update Stage') }}</button>
@@ -499,6 +521,24 @@
                         <input type="number" name="inspection_period_days" class="form-control form-control-sm" min="0" value="{{ $deal->inspection_period_days }}">
                     </div>
                     @else
+                    @if($deal->is_leasing)
+                    <div class="mb-2">
+                        <label class="form-label">{{ __('Offer Sent Date') }}</label>
+                        <input type="date" name="offer_sent_date" class="form-control form-control-sm" value="{{ $deal->offer_sent_date ? $deal->offer_sent_date->format('Y-m-d') : '' }}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">{{ __('Offer Validity (days)') }}</label>
+                        <input type="number" name="offer_validity_days" class="form-control form-control-sm" min="3" max="7" value="{{ $deal->offer_validity_days }}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">{{ __('Offer Signed Date') }}</label>
+                        <input type="date" name="offer_signed_date" class="form-control form-control-sm" value="{{ $deal->offer_signed_date ? $deal->offer_signed_date->format('Y-m-d') : '' }}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">{{ __('Payment & Tawtheeq/Ejari (days)') }}</label>
+                        <input type="number" name="registration_deadline_days" class="form-control form-control-sm" min="3" max="7" value="{{ $deal->registration_deadline_days }}">
+                    </div>
+                    @else
                     <div class="mb-2">
                         <label class="form-label">{{ __('Listing Commission (%)') }}</label>
                         <input type="number" name="listing_commission_pct" class="form-control form-control-sm" step="0.01" min="0" max="100" value="{{ $deal->listing_commission_pct }}">
@@ -515,6 +555,7 @@
                         <label class="form-label">{{ __('MLS #') }}</label>
                         <input type="text" name="mls_number" class="form-control form-control-sm" maxlength="30" value="{{ $deal->mls_number }}">
                     </div>
+                    @endif
                     @endif
                     <div class="mb-2">
                         <label class="form-label">{{ __('Contract Date') }}</label>

@@ -18,6 +18,7 @@ class User extends Authenticatable
         'email',
         'password',
         'is_active',
+        'receives_leads',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'two_factor_enabled',
@@ -48,6 +49,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'receives_leads' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'onboarding_completed' => 'boolean',
             'dashboard_widgets' => 'array',
@@ -70,6 +72,16 @@ class User extends Authenticatable
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Internal team conversations the user participates in.
+     */
+    public function conversations()
+    {
+        return $this->belongsToMany(Conversation::class, 'conversation_user')
+            ->withPivot('last_read_at')
+            ->withTimestamps();
     }
 
     public function cloudConnections()
@@ -292,6 +304,33 @@ class User extends Authenticatable
         })->pluck('id');
 
         return $query->where('tenant_id', $tenant->id)->whereIn('role_id', $roleIds);
+    }
+
+    /**
+     * Users who may be picked up by lead distribution.
+     *
+     * This is the routing pool definition, and it is deliberately narrower than
+     * scopeAssignable(): a member may be assignable by hand (an admin can hand
+     * them a lead, they can claim one) while still being switched out of
+     * automatic assignment. is_active and receives_leads are the two switches:
+     * deactivation takes somebody out of every pool, whereas receives_leads is
+     * a per-agent opt-out of *incoming* work only - their existing book of
+     * business is untouched.
+     *
+     * Every automatic path must go through this scope, otherwise a member who
+     * opted out keeps receiving leads through a back door.
+     */
+    public function scopeReceivingLeads($query)
+    {
+        return $query->where('is_active', true)->where('receives_leads', true);
+    }
+
+    /**
+     * Whether this member is currently in their tenant's routing pool.
+     */
+    public function isInLeadRotation(): bool
+    {
+        return (bool) $this->is_active && (bool) $this->receives_leads;
     }
 
     /**

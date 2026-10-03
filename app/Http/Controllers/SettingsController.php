@@ -88,9 +88,10 @@ class SettingsController extends Controller
 
         // Commission formula + per-member compensation plans.
         $commissionSettings = $tenant->commissionCalculationSettings();
+        $commissionRates = $tenant->commissionRateSettings();
         $compensationPlans = \App\Models\AgentCompensation::get()->keyBy('user_id');
 
-        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'assignableRoles', 'secondaryRoleOptions', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady', 'reassignTargets', 'businessModeImpact', 'commissionSettings', 'compensationPlans'));
+        return view('settings.index', compact('tenant', 'agents', 'teamMembers', 'roles', 'assignableRoles', 'secondaryRoleOptions', 'leadSourceCosts', 'webhooks', 'preparedUpdate', 'updateHistory', 'manualSnapshots', 'updateManagerReady', 'reassignTargets', 'businessModeImpact', 'commissionSettings', 'commissionRates', 'compensationPlans'));
     }
 
     public function updateGeneral(GeneralSettingsRequest $request)
@@ -466,7 +467,7 @@ class SettingsController extends Controller
         $tenant = auth()->user()->tenant;
         $allowedRoleIds = $this->assignableRoleIdsFor(auth()->user(), $tenant);
 
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
@@ -478,15 +479,21 @@ class SettingsController extends Controller
                     $fail(__('The manager must be a member of this tenant.'));
                 }
             }],
+            'receives_leads' => 'nullable|boolean',
         ]);
 
         $agent = User::create([
             'tenant_id' => auth()->user()->tenant_id,
-            'role_id' => $request->role_id,
-            'reports_to' => $request->filled('reports_to') ? $request->reports_to : null,
+            'reports_to' => $request->filled('reports_to') ? $validated['reports_to'] : null,
+            'role_id' => $validated['role_id'],
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            // An absent field means "left on" here (updateAgent reads the same
+            // field as off, because an unchecked box sends nothing). The owner
+            // role cannot be invited - assignableRoleIdsFor() excludes it - so
+            // this default never has to special-case owners.
+            'receives_leads' => $request->has('receives_leads') ? $request->boolean('receives_leads') : true,
         ]);
 
         $secondaryRoleIds = collect($request->input('additional_roles', []))
@@ -524,6 +531,7 @@ class SettingsController extends Controller
                     $fail(__('The manager must be a member of this tenant.'));
                 }
             }],
+            'receives_leads' => 'nullable|boolean',
         ]);
 
         $newRole = Role::find($validated['role_id']);
@@ -546,6 +554,10 @@ class SettingsController extends Controller
         $user->email = $validated['email'];
         $user->role_id = $validated['role_id'];
         $user->reports_to = $request->filled('reports_to') ? $validated['reports_to'] : null;
+        // An unchecked checkbox is simply absent from the payload, so read the
+        // raw request rather than $validated - otherwise the opt-out could never
+        // be saved. Leads already on their book are left alone either way.
+        $user->receives_leads = $request->boolean('receives_leads');
 
         if ($oldEmail !== $validated['email']) {
             $user->email_verified_at = null;
@@ -563,6 +575,7 @@ class SettingsController extends Controller
             'email' => $user->email,
             'role_id' => $user->role_id,
             'reports_to' => $user->reports_to,
+            'receives_leads' => $user->receives_leads,
         ]);
 
         return redirect()->route('settings.index', ['tab' => 'team'])
@@ -1025,6 +1038,36 @@ class SettingsController extends Controller
         AuditLog::log('settings.commission_formula_updated', $tenant, $options['commission_calculation']);
 
         return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', __('Commission formula saved.'));
+    }
+
+    /**
+     * Save the standard brokerage commission rates (percentage of the contract
+     * value) used to prefill offer letters and auto-apply commission on close.
+     */
+    public function updateCommissionRates(Request $request)
+    {
+        $data = $request->validate([
+            'residential_lease' => 'required|numeric|min:0|max:100',
+            'commercial_lease' => 'required|numeric|min:0|max:100',
+            'sales' => 'required|numeric|min:0|max:100',
+            'vat' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $options = $tenant->custom_options ?? [];
+
+        $options['commission_rates'] = [
+            'residential_lease' => (string) (float) $data['residential_lease'],
+            'commercial_lease' => (string) (float) $data['commercial_lease'],
+            'sales' => (string) (float) $data['sales'],
+            'vat' => (string) (float) $data['vat'],
+        ];
+
+        $tenant->update(['custom_options' => $options]);
+
+        AuditLog::log('settings.commission_rates_updated', $tenant, $options['commission_rates']);
+
+        return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', __('Standard commission rates saved.'));
     }
 
     /**

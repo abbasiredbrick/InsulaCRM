@@ -27,7 +27,7 @@
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Bedrooms') }}</div>
-                        <div class="datagrid-content">{{ $property->bedrooms ?? '-' }}</div>
+                        <div class="datagrid-content">{{ $property->bedroomLabel() !== '' ? $property->bedroomLabel() : '-' }}</div>
                     </div>
                     <div class="datagrid-item">
                         <div class="datagrid-title">{{ __('Bathrooms') }}</div>

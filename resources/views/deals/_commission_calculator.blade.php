@@ -9,6 +9,30 @@
         </h3>
     </div>
     <div class="card-body">
+        @php
+            $std = app(\App\Services\DealCommissionService::class);
+            $stdRate = $std->rateFor($deal);
+            $stdGross = $std->grossFor($deal);
+            $stdAmount = $std->commissionFor($deal);
+        @endphp
+        <div class="alert alert-info py-2">
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">{{ __('Standard Commission') }}</span>
+                <strong>{{ \App\Helpers\TenantFormatHelper::currency($stdAmount) }}</strong>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">{{ __('Rate') }}</span>
+                <span>{{ rtrim(rtrim(number_format($stdRate, 2, '.', ''), '0'), '.') }}%
+                    @if($deal->dealType() === 'sale') {{ __('of sales value') }}
+                    @else{{ __('of annual value') }}@endif
+                </span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">{{ __('Contract Value') }}</span>
+                <span>{{ \App\Helpers\TenantFormatHelper::currency($stdGross) }}</span>
+            </div>
+            <small class="text-secondary">{{ __('Applied automatically when this transaction closes as Won. Adjust below only for special terms.') }}</small>
+        </div>
         <div class="mb-2">
             <label class="form-label">{{ __('Sale Price ($)') }}</label>
             <input type="number" class="form-control form-control-sm" id="calc-sale-price" step="0.01" min="0" value="{{ $deal->contract_price ?? '' }}">

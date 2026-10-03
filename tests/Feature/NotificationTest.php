@@ -28,6 +28,15 @@ class NotificationTest extends TestCase
         $response->assertJsonStructure(['notifications', 'unread_count']);
     }
 
+    public function test_recent_in_browser_redirects_to_notifications_page(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->get(route('notifications.recent'));
+
+        $response->assertRedirect(route('notifications.index'));
+    }
+
     public function test_notification_is_stored_in_database(): void
     {
         $this->actingAsAdmin();

@@ -3,13 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Activity;
-use App\Models\AuditLog;
-use App\Models\DncEntry;
 use App\Models\Lead;
-use App\Models\User;
 use App\Notifications\LeadReassigned;
 use App\Notifications\TeamLeadActivity;
-use App\Services\TeamNotifier;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -32,8 +28,8 @@ class TeamManagementTest extends TestCase
         $this->actingAsAdmin();
 
         $manager = $this->createUserWithRole('agent');
-        $agentA  = $this->createUserWithRole('agent');
-        $agentB  = $this->createUserWithRole('agent');
+        $agentA = $this->createUserWithRole('agent');
+        $agentB = $this->createUserWithRole('agent');
 
         $manager->update(['reports_to' => $this->adminUser->id]);
         $agentA->update(['reports_to' => $manager->id]);
@@ -244,7 +240,7 @@ class TeamManagementTest extends TestCase
         $manager = $this->createUserWithRole('agent');
         $manager->update(['reports_to' => $this->adminUser->id]);
         $from = $this->createUserWithRole('agent');
-        $to   = $this->createUserWithRole('agent');
+        $to = $this->createUserWithRole('agent');
         $from->update(['reports_to' => $manager->id]);
         $to->update(['reports_to' => $manager->id]);
 
@@ -265,9 +261,9 @@ class TeamManagementTest extends TestCase
 
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
-            'type'    => 'note',
-            'subject' => 'Reassigned to ' . $to->name,
-            'body'    => 'Not performing',
+            'type' => 'note',
+            'subject' => 'Reassigned to '.$to->name,
+            'body' => 'Not performing',
         ]);
 
         Notification::assertSentTo($from, LeadReassigned::class);
@@ -276,6 +272,38 @@ class TeamManagementTest extends TestCase
         Notification::assertSentTo($this->adminUser, LeadReassigned::class);
         // The acting manager should not self-notify.
         Notification::assertNotSentTo($manager, LeadReassigned::class);
+    }
+
+    public function test_reassign_emails_the_new_agent_but_not_old_agent_or_managers(): void
+    {
+        $this->actingAsAdmin();
+
+        $manager = $this->createUserWithRole('agent');
+        $manager->update(['reports_to' => $this->adminUser->id]);
+        $from = $this->createUserWithRole('agent');
+        $to = $this->createUserWithRole('agent');
+        $from->update(['reports_to' => $manager->id]);
+        $to->update(['reports_to' => $manager->id]);
+
+        $lead = $this->createLead(['agent_id' => $from->id]);
+
+        $this->actingAs($manager);
+        $this->postJson(route('leads.reassign', $lead), [
+            'agent_id' => $to->id,
+            'reason' => 'Workload balancing',
+        ])->assertRedirect();
+
+        // Only the newly-assigned agent should be mail-eligible.
+        $notification = new LeadReassigned($lead->fresh(), $from, $to->fresh(), 'Workload balancing');
+        $this->assertContains('mail', $notification->via($to->fresh()));
+        $this->assertNotContains('mail', $notification->via($from));
+        $this->assertNotContains('mail', $notification->via($manager));
+
+        $mail = $notification->toMail($to->fresh());
+        $this->assertInstanceOf(\Illuminate\Notifications\Messages\MailMessage::class, $mail);
+        $this->assertStringContainsString('[Keystone]', (string) $mail->subject);
+        $this->assertStringContainsString('New lead assigned', (string) $mail->subject);
+        $this->assertStringNotContainsString($this->tenant->name, (string) $mail->subject);
     }
 
     public function test_reassign_by_owner_without_reason_still_works(): void

@@ -60,9 +60,9 @@ class SendAiPipelineDigest extends Command
 
                 foreach ($admins as $admin) {
                     try {
-                        Mail::raw($digest, function ($msg) use ($admin, $tenant) {
+                        Mail::raw($digest, function ($msg) use ($admin) {
                             $msg->to($admin->email)
-                                ->subject("[{$tenant->name}] AI Pipeline Digest — ".now()->format('M d, Y'));
+                                ->subject('[Keystone] AI Pipeline Digest — '.now()->format('M d, Y'));
                         });
                     } catch (\Throwable $e) {
                         Log::warning('Failed to send digest email', ['user_id' => $admin->id, 'error' => $e->getMessage()]);

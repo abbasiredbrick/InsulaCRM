@@ -49,7 +49,7 @@ class LeaseExpiringReminder extends Notification implements ShouldQueue
         $dateWord = $this->daysLeft === 0 ? 'today' : "in {$this->daysLeft} days";
 
         return (new MailMessage)
-            ->subject("[{$this->tenant->name}] Lease expiring {$dateWord} — action needed")
+            ->subject("[Keystone] Lease for {$client} expiring {$dateWord} — action needed")
             ->greeting("Hello {$notifiable->name},")
             ->line("A lease is approaching its expiry date and the client's contract will end on **{$this->lease->contract_end_date->format('M j, Y')}**.")
             ->line("**Client:** {$client}")

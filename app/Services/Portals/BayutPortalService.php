@@ -25,9 +25,7 @@ class BayutPortalService
         'factory' => 8,
     ];
 
-    public function __construct(protected PortalIntegration $integration)
-    {
-    }
+    public function __construct(protected PortalIntegration $integration) {}
 
     public function publish(Property $property): array
     {
@@ -55,9 +53,9 @@ class BayutPortalService
                 ->asJson()
                 ->acceptJson()
                 ->timeout(60)
-                ->post(rtrim($this->integration->base_url, '/') . '/listings', $payload);
+                ->post(rtrim($this->integration->base_url, '/').'/listings', $payload);
         } catch (\Throwable $e) {
-            return $this->error('Could not reach Bayut: ' . $e->getMessage());
+            return $this->error('Could not reach Bayut: '.$e->getMessage());
         }
 
         return $this->interpret($response, $property);
@@ -78,7 +76,7 @@ class BayutPortalService
         $response = Http::withToken($this->integration->api_token)
             ->asJson()
             ->acceptJson()
-            ->delete(rtrim($this->integration->base_url, '/') . '/listings/' . $reference);
+            ->delete(rtrim($this->integration->base_url, '/').'/listings/'.$reference);
 
         return $this->interpret($response, $property);
     }
@@ -93,20 +91,20 @@ class BayutPortalService
             $response = Http::withToken($this->integration->api_token)
                 ->acceptJson()
                 ->timeout(15)
-                ->get(rtrim($this->integration->base_url, '/') . '/agents');
+                ->get(rtrim($this->integration->base_url, '/').'/agents');
 
             if ($response->successful()) {
                 return [
                     'ok' => true,
-                    'message' => 'Connected. ' . $this->summarize($response),
+                    'message' => 'Connected. '.$this->summarize($response),
                 ];
             }
 
             $body = Str::limit((string) $response->body(), 300);
 
-            return $this->error('Bayut responded HTTP ' . $response->status() . '. ' . $body);
+            return $this->error('Bayut responded HTTP '.$response->status().'. '.$body);
         } catch (\Throwable $e) {
-            return $this->error('Could not reach Bayut: ' . $e->getMessage());
+            return $this->error('Could not reach Bayut: '.$e->getMessage());
         }
     }
 
@@ -136,7 +134,7 @@ class BayutPortalService
                 continue;
             }
             $byId[(string) $id] = true;
-            $catalog[] = ['id' => $id, 'label' => (string) ($option['label'] ?? ('Location ' . $id))];
+            $catalog[] = ['id' => $id, 'label' => (string) ($option['label'] ?? ('Location '.$id))];
         }
 
         $page = max(1, (int) ($this->integration->location_sync_page ?? 0) + 1);
@@ -148,10 +146,10 @@ class BayutPortalService
                 $response = Http::withToken($this->integration->api_token)
                     ->acceptJson()
                     ->timeout(20)
-                    ->get(rtrim($this->integration->base_url, '/') . '/locations', ['page' => $page]);
+                    ->get(rtrim($this->integration->base_url, '/').'/locations', ['page' => $page]);
 
                 if (! $response->successful()) {
-                    return $this->error('Bayut responded HTTP ' . $response->status() . ' on page ' . $page . ': ' . Str::limit((string) $response->body(), 300));
+                    return $this->error('Bayut responded HTTP '.$response->status().' on page '.$page.': '.Str::limit((string) $response->body(), 300));
                 }
 
                 $payload = $response->json() ?? [];
@@ -171,7 +169,7 @@ class BayutPortalService
                     $label = trim(implode(' | ', array_values(array_filter((array) $breadcrumb))));
 
                     if (blank($label)) {
-                        $label = $location['title']['en'] ?? $location['name'] ?? ('Location ' . $id);
+                        $label = $location['title']['en'] ?? $location['name'] ?? ('Location '.$id);
                     }
 
                     $byId[(string) $id] = true;
@@ -190,7 +188,7 @@ class BayutPortalService
                 }
             } while ($page <= $lastPage);
         } catch (\Throwable $e) {
-            return $this->error('Could not reach Bayut: ' . $e->getMessage());
+            return $this->error('Could not reach Bayut: '.$e->getMessage());
         }
 
         $done = $page - 1;
@@ -212,14 +210,14 @@ class BayutPortalService
         if ($finished) {
             return [
                 'ok' => true,
-                'message' => 'Synced all ' . count($catalog) . ' Bayut locations.',
+                'message' => 'Synced all '.count($catalog).' Bayut locations.',
                 'locations' => array_values($catalog),
             ];
         }
 
         return [
             'ok' => true,
-            'message' => 'Synced ' . count($catalog) . ' Bayut locations so far (page ' . $done . ' of ~' . $lastPage . ') — press Sync again to continue.',
+            'message' => 'Synced '.count($catalog).' Bayut locations so far (page '.$done.' of ~'.$lastPage.') — press Sync again to continue.',
             'locations' => array_values($catalog),
         ];
     }
@@ -263,7 +261,7 @@ class BayutPortalService
             $response = Http::withToken($this->integration->api_token)
                 ->acceptJson()
                 ->timeout(16)
-                ->get(rtrim($this->integration->base_url, '/') . '/locations', [
+                ->get(rtrim($this->integration->base_url, '/').'/locations', [
                     'filter[title]' => $term,
                     'page' => 1,
                 ]);
@@ -295,7 +293,7 @@ class BayutPortalService
                 $label = trim(implode(' | ', array_values(array_filter((array) $breadcrumb))));
 
                 if (blank($label)) {
-                    $label = $location['title']['en'] ?? $location['name'] ?? ('Location ' . $id);
+                    $label = $location['title']['en'] ?? $location['name'] ?? ('Location '.$id);
                 }
 
                 $byId[(string) $id] = true;
@@ -314,7 +312,7 @@ class BayutPortalService
                 $payload = Http::withToken($this->integration->api_token)
                     ->acceptJson()
                     ->timeout(16)
-                    ->get(rtrim($this->integration->base_url, '/') . '/locations', [
+                    ->get(rtrim($this->integration->base_url, '/').'/locations', [
                         'filter[title]' => $term,
                         'page' => $page,
                     ])
@@ -330,21 +328,21 @@ class BayutPortalService
     protected function payload(Property $property): array
     {
         $payload = [
-            'agentId'         => $this->resolveAgentId(),
-            'categoryId'      => $this->categoryId($property),
-            'purposeId'       => $property->intent === 'sale' ? 1 : 2,
-            'locationId'      => (int) ($property->bayut_location_id ?: $this->integration->default_location_id),
-            'title'           => ['en' => Str::limit($property->display_name, 120)],
-            'description'     => ['en' => Str::limit((string) $property->marketing_description, 4000)],
-            'area'            => $this->areaInSqm($property),
+            'agentId' => $this->resolveAgentId(),
+            'categoryId' => $this->categoryId($property),
+            'purposeId' => $property->intent === 'sale' ? 1 : 2,
+            'locationId' => (int) ($property->bayut_location_id ?: $this->integration->default_location_id),
+            'title' => ['en' => Str::limit($property->listingTitle(), 120)],
+            'description' => ['en' => Str::limit((string) $property->marketing_description, 4000)],
+            'area' => $this->areaInSqm($property),
             'referenceNumber' => $this->listingReference($property),
-            'permitNumber'    => (string) $property->rera_permit_no ?: null,
-            'permitType'      => $property->permit_regime === 'abudhabi' ? 'madhmoun' : 'rera',
-            'currency'        => 'AED',
-            'period'          => $property->rent_period === 'monthly' ? 'monthly' : 'yearly',
-            'beds'            => (int) ($property->bedrooms ?? 0),
-            'baths'           => (int) ($property->bathrooms ?? 0),
-            'furnished'       => $property->furnishing === 'furnished',
+            'permitNumber' => (string) $property->rera_permit_no ?: null,
+            'permitType' => $property->permit_regime === 'abudhabi' ? 'madhmoun' : 'rera',
+            'currency' => 'AED',
+            'period' => $property->rent_period === 'monthly' ? 'monthly' : 'yearly',
+            'beds' => $property->isStudio() ? 0 : (int) ($property->bedrooms ?? 0),
+            'baths' => (int) ($property->bathrooms ?? 0),
+            'furnished' => $property->furnishing === 'furnished',
         ];
 
         if (in_array($property->intent, ['sale', 'both'], true)) {
@@ -377,12 +375,12 @@ class BayutPortalService
             $isLive = in_array($status, ['', 'live', 'published', 'active', 'approved', 'listed'], true);
 
             return [
-                'ok'        => true,
-                'status'    => $status !== '' ? $status : 'live',
+                'ok' => true,
+                'status' => $status !== '' ? $status : 'live',
                 'reference' => $body['id'] ?? $body['referenceNumber'] ?? $body['reference'] ?? $body['listing']['id'] ?? null,
-                'url'       => $body['url'] ?? $body['link'] ?? null,
-                'message'   => $isLive ? 'Accepted by Bayut.' : $this->draftMessage($body, $status),
-                'raw'       => $body,
+                'url' => $body['url'] ?? $body['link'] ?? null,
+                'message' => $isLive ? 'Accepted by Bayut.' : $this->draftMessage($body, $status),
+                'raw' => $body,
             ];
         }
 
@@ -408,7 +406,7 @@ class BayutPortalService
             $text .= ' Tip: Bayut requires an approved agent profile — a valid BRN (Dubai) or BLN (Abu Dhabi/Al Ain) must be set on the Bayut agent before it can publish.';
         }
 
-        return $this->error('Bayut rejected the listing (HTTP ' . $response->status() . '): ' . $text);
+        return $this->error('Bayut rejected the listing (HTTP '.$response->status().'): '.$text);
     }
 
     /**
@@ -428,20 +426,20 @@ class BayutPortalService
             $reasons[] = 'no listing photos were attached';
         }
 
-        $text = 'Bayut accepted the listing but kept it as a DRAFT (status: ' . $status . '), so it is not visible on the portal yet';
+        $text = 'Bayut accepted the listing but kept it as a DRAFT (status: '.$status.'), so it is not visible on the portal yet';
 
         if ($reasons) {
-            $text .= ' — ' . implode('; ', $reasons);
+            $text .= ' — '.implode('; ', $reasons);
         }
 
         if ($issue = $this->agentProfileIssue()) {
-            $text .= '. ' . $issue;
+            $text .= '. '.$issue;
         }
 
         $canActivate = ! empty($body['canBeActivated']);
 
         $text .= '. Complete the Bayut agent profile and permit, then activate the listing from Bayut Profolio'
-            . ($canActivate ? ' (this listing can be activated).' : '.');
+            .($canActivate ? ' (this listing can be activated).' : '.');
 
         return $text;
     }
@@ -456,7 +454,7 @@ class BayutPortalService
             $response = Http::withToken($this->integration->api_token)
                 ->acceptJson()
                 ->timeout(15)
-                ->get(rtrim($this->integration->base_url, '/') . '/agents');
+                ->get(rtrim($this->integration->base_url, '/').'/agents');
         } catch (\Throwable $e) {
             return null;
         }
@@ -474,8 +472,8 @@ class BayutPortalService
             $reason = $agent['meta']['rejection_reason'] ?? null;
 
             if ($status && $status !== 'on') {
-                return 'The Bayut agent profile is "' . $status . '"'
-                    . ($reason ? ' (' . $reason . ')' : '') . ', so it cannot publish live ads yet';
+                return 'The Bayut agent profile is "'.$status.'"'
+                    .($reason ? ' ('.$reason.')' : '').', so it cannot publish live ads yet';
             }
 
             return null;
@@ -492,7 +490,7 @@ class BayutPortalService
     {
         $code = app(\App\Services\AgentCodeService::class)->codeForProperty($property);
 
-        return $code !== null ? $code . '-' . $property->id : (string) $property->id;
+        return $code !== null ? $code.'-'.$property->id : (string) $property->id;
     }
 
     protected function categoryId(Property $property): ?int
@@ -545,7 +543,7 @@ class BayutPortalService
             $response = Http::withToken($this->integration->api_token)
                 ->acceptJson()
                 ->timeout(15)
-                ->get(rtrim($this->integration->base_url, '/') . '/agents');
+                ->get(rtrim($this->integration->base_url, '/').'/agents');
         } catch (\Throwable $e) {
             return null;
         }
@@ -575,12 +573,12 @@ class BayutPortalService
     {
         $body = $response->json();
         if (! is_array($body)) {
-            return 'Response HTTP ' . $response->status() . '.';
+            return 'Response HTTP '.$response->status().'.';
         }
 
         $count = $body['count'] ?? $body['total'] ?? count($body);
 
-        return 'Endpoint returned ' . $count . ' items.';
+        return 'Endpoint returned '.$count.' items.';
     }
 
     protected function error(string $message): array

@@ -1465,4 +1465,289 @@ class AvailabilityImportTest extends TestCase
             ->assertOk()
             ->assertSee('Availability Import Guide');
     }
+
+    // ── Studios ────────────────────────────────────────────────────────────
+    //
+    // A studio is a SIZE, not a category: the unit stays an apartment and is
+    // carried by bedrooms = 0. PM sheets routinely say "Studio" in the Unit
+    // Type column while putting 1 in Bedrooms, and that is exactly how studios
+    // used to be imported (and published) as 1BR.
+
+    /** Sheet with no Bedrooms column - the size lives in the Unit Type text. */
+    protected function studioSheet(): string
+    {
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        return implode("\n", [
+            $col(['Marina Gate', '101', 'Studio', '55,000']),
+            $col(['', '102', 'Studio With Balcony', '57,000']),
+            $col(['Marina Gate', '201', '1 BR', '70,000']),
+            $col(['', '202', '2 BR + Maids Room', '95,000']),
+        ]);
+    }
+
+    protected function createBedroomsColumnSource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Studio PM',
+            // col4 is mapped to bedrooms but left out of the rows below.
+            'default_city' => 'Dubai',
+            'parse_options' => [
+                'delimiter' => 'tab',
+                'has_header' => false,
+                'inherit_columns' => ['col0'],
+            ],
+            'column_map' => [
+                'col0' => 'building',
+                'col1' => 'unit_no',
+                'col2' => 'features',
+                'col3' => 'rent',
+                // A Bedrooms column that disagrees with the unit type.
+                'col4' => 'bedrooms',
+            ],
+            'status_map' => ['vacant' => 'ready_to_list'],
+        ]);
+    }
+
+    public function test_a_studio_unit_type_imports_as_zero_bedrooms(): void
+    {
+        $service = new AvailabilityIngestService;
+        $table = $service->parseText($this->studioSheet(), [
+            'delimiter' => 'tab',
+            'has_header' => false,
+            'inherit_columns' => ['col0'],
+        ]);
+
+        // This sheet has no Bedrooms column, so the size comes purely from the
+        // Unit Type text.
+        $source = $this->createBedroomsColumnSource();
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(4, $result['created']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();
+
+        $studios = $units->where('unit_no', '101');
+        $this->assertSame(0, (int) $studios->first()->bedrooms);
+        $this->assertTrue($studios->first()->isStudio());
+        // A studio is still an apartment.
+        $this->assertSame('apartment', $studios->first()->property_category);
+        $this->assertStringContainsString('Studio', $studios->first()->display_name);
+
+        // "Studio With Balcony" must not be read as a studio by accident losing
+        // the rest of the description.
+        $this->assertSame(0, (int) $units->where('unit_no', '102')->first()->bedrooms);
+
+        // The normal sizes are untouched.
+        $this->assertSame(1, (int) $units->where('unit_no', '201')->first()->bedrooms);
+        $this->assertSame(2, (int) $units->where('unit_no', '202')->first()->bedrooms);
+    }
+
+    public function test_a_studio_unit_type_beats_a_bedrooms_column_of_one(): void
+    {
+        $service = new AvailabilityIngestService;
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // Bedrooms (col4) says 1 for a unit the sheet calls a Studio.
+        $text = implode("\n", [
+            $col(['Marina Gate', '101', 'Studio', '55,000', '1']),
+        ]);
+
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Conflicting PM',
+            'default_city' => 'Dubai',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false, 'inherit_columns' => ['col0']],
+            'column_map' => [
+                'col0' => 'building',
+                'col1' => 'unit_no',
+                'col2' => 'features',
+                'col3' => 'rent',
+                'col4' => 'bedrooms',
+            ],
+            'status_map' => ['vacant' => 'ready_to_list'],
+        ]);
+
+        $table = $service->parseText($text, $source->parse_options);
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+
+        $this->assertSame(0, (int) $unit->bedrooms, 'the unit type must win over the bedrooms column');
+        $this->assertTrue($unit->isStudio());
+    }
+
+    public function test_studio_written_into_the_bedrooms_column_itself_is_read(): void
+    {
+        $service = new AvailabilityIngestService;
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // No Unit Type column at all - the Bedrooms cell itself says "Studio".
+        $text = implode("\n", [
+            $col(['Marina Gate', '101', '55,000', 'Studio']),
+        ]);
+
+        $source = AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Bedrooms Column PM',
+            'default_city' => 'Dubai',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false, 'inherit_columns' => ['col0']],
+            'column_map' => [
+                'col0' => 'building',
+                'col1' => 'unit_no',
+                'col2' => 'rent',
+                'col3' => 'bedrooms',
+            ],
+            'status_map' => ['vacant' => 'ready_to_list'],
+        ]);
+
+        $table = $service->parseText($text, $source->parse_options);
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+
+        $this->assertSame(0, (int) $unit->bedrooms);
+        $this->assertTrue($unit->isStudio());
+    }
+
+    public function test_re_import_turns_a_previously_mis_typed_1br_into_a_studio(): void
+    {
+        $service = new AvailabilityIngestService;
+        $source = $this->createBedroomsColumnSource();
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // First import: the sheet calls it a 1 BR.
+        $first = $service->parseText(implode("\n", [
+            $col(['Marina Gate', '101', '1 BR', '55,000', '1']),
+        ]), $source->parse_options);
+        $service->ingest($source, $first['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+        $this->assertSame(1, (int) $unit->bedrooms);
+        $this->assertFalse($unit->isStudio());
+
+        // The PM corrects the sheet to "Studio" and the re-import applies it.
+        $second = $service->parseText(implode("\n", [
+            $col(['Marina Gate', '101', 'Studio', '55,000', '1']),
+        ]), $source->parse_options);
+        $result = $service->ingest($source, $second['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(1, $result['updated']);
+        $this->assertSame(0, $result['created']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();
+        $this->assertCount(1, $units, 're-import must update, not duplicate');
+        $this->assertSame(0, (int) $units->first()->bedrooms);
+        $this->assertTrue($units->first()->isStudio());
+    }
+
+    // Some PMs (Bloom does this) leave the unit type column empty and put the
+    // size in the remarks prose - "Flat Studio". Nothing else on the row carries
+    // it, so the unit used to import with no bedroom count at all and stayed
+    // invisible in the studio filter.
+    protected function createRemarksOnlySource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Remarks PM',
+            'default_city' => 'Dubai',
+            'parse_options' => [
+                'delimiter' => 'tab',
+                'has_header' => false,
+                'inherit_columns' => ['col0'],
+            ],
+            'column_map' => [
+                'col0' => 'building',
+                'col1' => 'unit_no',
+                'col2' => 'features',
+                'col3' => 'rent',
+                'col4' => 'remarks',
+            ],
+            'status_map' => ['vacant' => 'ready_to_list'],
+        ]);
+    }
+
+    public function test_a_studio_named_only_in_the_remarks_imports_as_zero_bedrooms(): void
+    {
+        $service = new AvailabilityIngestService;
+        $source = $this->createRemarksOnlySource();
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // The Bloom Towers B/C shape: no size anywhere except the remarks.
+        $table = $service->parseText(implode("\n", [
+            $col(['Bloom Towers B', '2,808', '', '55,000', 'Flat Studio']),
+            $col(['', '1406', '', '62,000', 'Flat Studio']),
+            $col(['', '1501', '', '80,000', 'Chalet']),
+        ]), $source->parse_options);
+
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();
+
+        foreach (['2,808', '1406'] as $unitNo) {
+            $studio = $units->firstWhere('unit_no', $unitNo);
+            $this->assertSame(0, (int) $studio->bedrooms, "unit {$unitNo} is a studio and must import as 0");
+            $this->assertTrue($studio->isStudio());
+            $this->assertSame('apartment', $studio->property_category);
+            $this->assertStringContainsString('Studio', $studio->marketing_title);
+        }
+
+        // A remarks line with no size claim stays unrecorded rather than 0.
+        $other = $units->firstWhere('unit_no', '1501');
+        $this->assertNull($other->bedrooms);
+        $this->assertFalse($other->isStudio());
+    }
+
+    public function test_a_studio_mention_in_remarks_never_overrides_a_real_bedroom_count(): void
+    {
+        $service = new AvailabilityIngestService;
+        $source = $this->createRemarksOnlySource();
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // Remarks are prose: "next door" / "may convert" mentions of a studio must
+        // not turn a real 2 BR into a studio.
+        $table = $service->parseText(implode("\n", [
+            $col(['Marina Gate', '101', '2 BR + Maids Room', '95,000', 'A studio is available next door']),
+            $col(['', '102', '3 BR', '140,000', 'Owner may convert the study to a studio']),
+        ]), $source->parse_options);
+
+        $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();
+
+        $this->assertSame(2, (int) $units->firstWhere('unit_no', '101')->bedrooms);
+        $this->assertSame(3, (int) $units->firstWhere('unit_no', '102')->bedrooms);
+        $this->assertFalse($units->firstWhere('unit_no', '102')->isStudio());
+    }
+
+    public function test_re_import_turns_an_undetermined_size_studio_from_remarks(): void
+    {
+        $service = new AvailabilityIngestService;
+        $source = $this->createRemarksOnlySource();
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        // First import: the sheet says nothing about the size at all.
+        $first = $service->parseText(implode("\n", [
+            $col(['Bloom Towers B', '2,808', '', '55,000', '']),
+        ]), $source->parse_options);
+        $service->ingest($source, $first['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $unit = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+        $this->assertNull($unit->bedrooms);
+
+        // The PM then fills the remarks in with "Flat Studio".
+        $second = $service->parseText(implode("\n", [
+            $col(['Bloom Towers B', '2,808', '', '55,000', 'Flat Studio']),
+        ]), $source->parse_options);
+        $result = $service->ingest($source, $second['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(1, $result['updated']);
+        $this->assertSame(0, $result['created']);
+
+        $units = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->get();
+        $this->assertCount(1, $units, 're-import must update, not duplicate');
+        $this->assertSame(0, (int) $units->first()->bedrooms);
+        $this->assertTrue($units->first()->isStudio());
+    }
 }

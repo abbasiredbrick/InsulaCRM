@@ -6,15 +6,15 @@ use App\Helpers\TenantFormatHelper;
 use App\Models\Buyer;
 use App\Models\Deal;
 use App\Models\Lead;
-use App\Models\Property;
 use App\Models\OpenHouse;
+use App\Models\Property;
 use App\Models\Showing;
 use App\Models\User;
 use App\Policies\BuyerPolicy;
 use App\Policies\DealPolicy;
 use App\Policies\LeadPolicy;
-use App\Policies\PropertyPolicy;
 use App\Policies\OpenHousePolicy;
+use App\Policies\PropertyPolicy;
 use App\Policies\ShowingPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -23,8 +23,8 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         AliasLoader::getInstance()->alias('Fmt', TenantFormatHelper::class);
+        AliasLoader::getInstance()->alias('TextRender', \App\Helpers\TextRenderHelper::class);
     }
 
     /**

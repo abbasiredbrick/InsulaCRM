@@ -45,6 +45,10 @@ class RegisterController extends Controller
                 'email' => $request->email,
                 'password' => bcrypt($request->password),
                 'onboarding_completed' => false,
+                // The owner is the escalation point, not a member of the
+                // distribution pool, so a workspace starts with the founder out
+                // of automatic assignment.
+                'receives_leads' => $adminRole->name !== 'owner',
             ]);
         });
 

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        window.Echo = window.Echo || echoInstance;
         initBroadcastListeners(echoInstance);
     } catch (e) {
         console.log('{{ config('app.name') }}: Broadcasting unavailable, using polling fallback.');
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        window.Echo = window.Echo || echoInstance;
         initBroadcastListeners(echoInstance);
     } catch (e) {
         console.log('{{ config('app.name') }}: Broadcasting unavailable, using polling fallback.');

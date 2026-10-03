@@ -54,7 +54,15 @@
                     <div class="row mt-3">
                         <div class="col-md-3">
                             <label class="form-label">{{ __('Bedrooms') }}</label>
-                            <input type="number" name="bedrooms" min="0" class="form-control @error('bedrooms') is-invalid @enderror" value="{{ old('bedrooms', $property->bedrooms) }}">
+                            <div class="input-group">
+                                <input type="number" name="bedrooms" min="0" max="20" class="form-control @error('bedrooms') is-invalid @enderror" value="{{ old('bedrooms', $property->bedrooms) }}" id="bedroomsInput">
+                                <div class="input-group-text">
+                                    <div class="form-check form-check-inline m-0">
+                                        <input class="form-check-input mt-0" type="checkbox" id="isStudio" {{ (string) old('bedrooms', $property->bedrooms) === '0' ? 'checked' : '' }}>
+                                        <label class="form-check-label small" for="isStudio">{{ __('Studio') }}</label>
+                                    </div>
+                                </div>
+                            </div>
                             @error('bedrooms') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
@@ -278,6 +286,13 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="col-md-4">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="assign_leads_to_owner" name="assign_leads_to_owner" value="1" {{ old('assign_leads_to_owner', $property->assign_leads_to_owner) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="assign_leads_to_owner">{{ __('Assign leads for this unit to the unit owner') }}</label>
+                            </div>
+                            <small class="text-muted">{{ __('When checked, linking this unit to a lead or receiving a portal lead for this unit will automatically assign the lead to the assigned agent.') }}</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -289,3 +304,29 @@
         </form>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    // Studio is a size, not a category: it is stored as bedrooms = 0 and the
+    // unit stays an apartment. Ticking Studio writes 0; unticking clears the
+    // field so a unit is not left as a studio by accident.
+    (function () {
+        var input = document.getElementById('bedroomsInput');
+        var studio = document.getElementById('isStudio');
+        if (!input || !studio) { return; }
+
+        function syncFromCheckbox() {
+            input.value = studio.checked ? '0' : '';
+            input.readOnly = studio.checked;
+        }
+
+        studio.addEventListener('change', syncFromCheckbox);
+        input.addEventListener('input', function () {
+            studio.checked = input.value === '0';
+            input.readOnly = studio.checked;
+        });
+
+        input.readOnly = studio.checked;
+    })();
+</script>
+@endpush

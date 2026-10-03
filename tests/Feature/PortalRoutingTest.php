@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Lead;
 use App\Models\PortalIntegration;
-use App\Models\Property;
 use App\Models\User;
 use App\Services\Portals\PortalLeadService;
 use Tests\TestCase;
@@ -22,7 +21,7 @@ class PortalRoutingTest extends TestCase
     {
         return PortalIntegration::create(array_merge([
             'tenant_id' => $this->tenant->id,
-            'portal'    => 'bayut',
+            'portal' => 'bayut',
             'is_active' => true,
         ], $overrides));
     }
@@ -36,13 +35,13 @@ class PortalRoutingTest extends TestCase
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-1',
-            'name'      => 'Sara Ahmed',
-            'phone'     => '+971501234567',
-            'email'     => '',
+            'id' => 'lead-1',
+            'name' => 'Sara Ahmed',
+            'phone' => '+971501234567',
+            'email' => '',
             'reference' => 'AJ-42',
-            'url'       => 'https://bayut.com/en/property/details-42',
-            'message'   => 'Interested',
+            'url' => 'https://bayut.com/en/property/details-42',
+            'message' => 'Interested',
         ]);
 
         $this->assertNotNull($lead);
@@ -53,6 +52,11 @@ class PortalRoutingTest extends TestCase
         $this->assertDatabaseHas('lead_property', [
             'lead_id' => $lead->id, 'property_id' => $property->id,
         ]);
+        // The routed agent is emailed about the new portal lead.
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('notifications')
+            ->where('notifiable_id', $owner->id)
+            ->where('type', \App\Notifications\LeadAssigned::class)
+            ->count());
     }
 
     public function test_lead_from_old_plain_id_reference_still_links_property(): void
@@ -61,10 +65,10 @@ class PortalRoutingTest extends TestCase
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-2',
-            'name'      => 'Khalid Omar',
-            'phone'     => '+971502222222',
-            'email'     => '',
+            'id' => 'lead-2',
+            'name' => 'Khalid Omar',
+            'phone' => '+971502222222',
+            'email' => '',
             'reference' => '42',
         ]);
 
@@ -84,10 +88,10 @@ class PortalRoutingTest extends TestCase
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-3',
-            'name'      => 'Priya Sharma',
-            'phone'     => '+971503333333',
-            'email'     => '',
+            'id' => 'lead-3',
+            'name' => 'Priya Sharma',
+            'phone' => '+971503333333',
+            'email' => '',
             'reference' => 'ZZ-42',
         ]);
 
@@ -105,10 +109,10 @@ class PortalRoutingTest extends TestCase
         $integration = $this->createIntegration();
 
         $lead = (new PortalLeadService)->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-9',
-            'name'      => 'Priya Sharma',
-            'phone'     => '+971503333333',
-            'email'     => '',
+            'id' => 'lead-9',
+            'name' => 'Priya Sharma',
+            'phone' => '+971503333333',
+            'email' => '',
             'reference' => 'ZZ-42',
         ]);
 
@@ -116,7 +120,7 @@ class PortalRoutingTest extends TestCase
         $this->assertNull($lead->agent_id);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $this->adminUser->id,
-            'type'          => \App\Notifications\PortalLeadUnclaimed::class,
+            'type' => \App\Notifications\PortalLeadUnclaimed::class,
         ]);
     }
 
@@ -131,10 +135,10 @@ class PortalRoutingTest extends TestCase
         $service = new PortalLeadService;
 
         $lead = $service->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-5',
-            'name'      => 'Sara Ahmed',
-            'phone'     => '0501234567',
-            'email'     => '',
+            'id' => 'lead-5',
+            'name' => 'Sara Ahmed',
+            'phone' => '0501234567',
+            'email' => '',
             'reference' => 'AJ-10',
         ]);
 
@@ -144,10 +148,10 @@ class PortalRoutingTest extends TestCase
 
         $second = $this->createProperty(['bayut_listing_id' => 'AJ-42']);
         $again = $service->createFromPayload($integration, 'bayut', [
-            'id'        => 'lead-6',
-            'name'      => 'Sara Ahmed',
-            'phone'     => '+971 50 123 4567',
-            'email'     => '',
+            'id' => 'lead-6',
+            'name' => 'Sara Ahmed',
+            'phone' => '+971 50 123 4567',
+            'email' => '',
             'reference' => 'AJ-42',
         ]);
 
@@ -158,7 +162,7 @@ class PortalRoutingTest extends TestCase
         $this->assertTrue($again->custom_fields['returning_opportunity'] ?? false);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $owner->id,
-            'type'          => \App\Notifications\ReturningClientInterest::class,
+            'type' => \App\Notifications\ReturningClientInterest::class,
         ]);
     }
 
@@ -170,10 +174,10 @@ class PortalRoutingTest extends TestCase
         $service = new PortalLeadService;
 
         $payload = [
-            'id'        => 'lead-7',
-            'name'      => 'Sara Ahmed',
-            'phone'     => '+971501234567',
-            'email'     => '',
+            'id' => 'lead-7',
+            'name' => 'Sara Ahmed',
+            'phone' => '+971501234567',
+            'email' => '',
             'reference' => 'AJ-42',
         ];
 
@@ -186,7 +190,13 @@ class PortalRoutingTest extends TestCase
         $this->assertSame(1, Lead::withoutGlobalScopes()->where('lead_source', 'bayut')->count());
         $this->assertFalse($second->custom_fields['returning_opportunity'] ?? false);
         $this->assertDatabaseCount('lead_property', 1);
-        $this->assertDatabaseCount('notifications', 0);
+        // The fresh lead emails its assigned agent once; the duplicate adds
+        // nothing more (no second notification, no unclaimed alert).
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('notifications')
+            ->where('notifiable_id', $owner->id)
+            ->where('type', \App\Notifications\LeadAssigned::class)
+            ->count());
+        $this->assertDatabaseCount('notifications', 1);
     }
 
     public function test_dedup_prevents_duplicate_from_same_listing_reference(): void
@@ -195,10 +205,10 @@ class PortalRoutingTest extends TestCase
         $integration = $this->createIntegration();
 
         $payload = [
-            'id'        => 'lead-4',
-            'name'      => 'Sara Ahmed',
-            'phone'     => '+971501234567',
-            'email'     => '',
+            'id' => 'lead-4',
+            'name' => 'Sara Ahmed',
+            'phone' => '+971501234567',
+            'email' => '',
             'reference' => 'AJ-42',
         ];
 

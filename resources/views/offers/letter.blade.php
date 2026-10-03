@@ -19,6 +19,43 @@
             color: #1a1a1a;
             background: #f1f3f5;
         }
+        .print-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 210mm;
+            margin: 0 auto 12px;
+            padding: 12px 16px;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .print-toolbar .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            background: #0b3954;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .print-toolbar .btn:hover { background: #07293c; }
+        .print-toolbar .btn-outline {
+            color: #475569;
+            background: transparent;
+            border: 1px solid #cbd5e1;
+        }
+        .print-toolbar .btn-outline:hover { background: #f1f3f5; }
+        .print-toolbar .spacer { flex: 1; }
         .sheet {
             max-width: 210mm;
             min-height: 296mm;
@@ -53,11 +90,18 @@
         .footer { margin-top: 26px; font-size: 10px; color: #868e96; border-top: 1px solid #dee2e6; padding-top: 8px; text-align: center; }
         @media print {
             body { background: #fff; }
+            .print-toolbar { display: none !important; }
             .sheet { margin: 0; border: none; padding: 12mm; max-width: none; min-height: auto; }
         }
     </style>
 </head>
 <body>
+    <div class="print-toolbar">
+        <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+        <a href="{{ $deal ? route('deals.show', $deal) : '#' }}" class="btn btn-outline">Back to Deal</a>
+        <span class="spacer"></span>
+        <span style="color:#64748b; font-size:12px;">Use "Save as PDF" in the print dialog to export.</span>
+    </div>
     <div class="sheet">
         <div class="head">
             <div class="offering">

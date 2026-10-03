@@ -16,7 +16,7 @@ class DealRequest extends FormRequest
     {
         return [
             'title' => 'sometimes|required|string|max:255',
-            'stage' => 'sometimes|required|in:' . implode(',', array_keys(Deal::leasingStages() + Deal::saleStages())),
+            'stage' => 'sometimes|required|in:'.implode(',', array_keys(Deal::leasingStages() + Deal::saleStages())),
             'contract_price' => 'nullable|numeric|min:0',
             'assignment_fee' => 'nullable|numeric|min:0',
             'earnest_money' => 'nullable|numeric|min:0',
@@ -31,6 +31,10 @@ class DealRequest extends FormRequest
             'contract_date' => 'nullable|date',
             'closing_date' => 'nullable|date',
             'due_diligence_end_date' => 'nullable|date',
+            'offer_sent_date' => 'nullable|date',
+            'offer_signed_date' => 'nullable|date',
+            'offer_validity_days' => 'nullable|integer|min:3|max:7',
+            'registration_deadline_days' => 'nullable|integer|min:3|max:7',
             'notes' => 'nullable|string',
         ];
     }

@@ -230,8 +230,7 @@ class LeadLifecycleTest extends TestCase
     {
         $this->realEstateTenant();
         $lead = $this->createLead(['deal_type' => 'rent', 'status' => 'closed_won', 'updated_at' => now()]);
-        $property = $this->createProperty(['tenant_id' => $this->tenant->id, 'admin_fee' => 1000]);
-        $lead->properties()->attach($property->id);
+        $this->createDeal(['lead_id' => $lead->id, 'deal_type' => 'rent', 'stage' => 'moved_in', 'total_commission' => 1000]);
 
         $response = $this->getJson(route('dashboard.data'));
 

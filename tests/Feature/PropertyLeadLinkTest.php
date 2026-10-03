@@ -153,7 +153,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
 
         $this->get(route('inventory.index'))
             ->assertOk()
-            ->assertSee('JBR Penthouse')
+            ->assertSee($unit->unitLabel())
             ->assertSee('Ahmed Khan');
     }
 
@@ -166,7 +166,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
         $this->get(route('leads.show', $lead))
             ->assertOk()
             ->assertSee('Linked Inventory Units')
-            ->assertSee('Downtown Loft');
+            ->assertSee($unit->unitLabel());
     }
 
     public function test_properties_nav_is_hidden_in_realestate_mode(): void
@@ -231,7 +231,7 @@ $this->put(route('leads.update', $lead), $this->leadPayload([
 
         $this->get(route('leads.table'))
             ->assertOk()
-            ->assertSee('Palm Tower A')
+            ->assertSee($unit->unitLabel())
             ->assertSee('Sara Nader');
     }
 }

@@ -47,9 +47,10 @@ class CalendarReminderNotification extends Notification implements ShouldQueue
         \App\Helpers\TenantFormatHelper::setTenant($this->tenant);
 
         $what = $this->recordTitle();
+        $leadName = $this->record->lead ? ($this->record->lead->full_name ?? '') : '';
 
         return (new MailMessage)
-            ->subject('['.$this->tenant->name.'] Reminder: '.$what)
+            ->subject('[Keystone] Reminder: '.$what.($leadName ? ' — '.$leadName : ''))
             ->greeting('Hello '.$notifiable->name.',')
             ->line('You have an upcoming item in your calendar.')
             ->line('**'.$what.'**')

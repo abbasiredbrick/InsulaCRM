@@ -4,14 +4,17 @@ namespace App\Notifications;
 
 use App\Models\Lead;
 use App\Models\User;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * In-app notification when a lead is reassigned away from an agent (old agent)
- * or reassigned within a team (managers).
+ * Notification when a lead is reassigned to a new agent (new agent), away from
+ * an agent (old agent) or within a team (managers).
  *
- * Deliberately synchronous (no ShouldQueue): the production server has no queue
- * worker, so the database channel must persist immediately.
+ * The newly assigned agent receives an email (unless they opted into the daily
+ * digest), matching the lead-assignment delivery convention. Deliberately
+ * synchronous (no ShouldQueue): the production server has no queue worker, so
+ * the database channel must persist immediately.
  */
 class LeadReassigned extends Notification
 {
@@ -24,7 +27,34 @@ class LeadReassigned extends Notification
 
     public function via(object $notifiable): array
     {
+        $isNewAgent = $notifiable->id === $this->to->id;
+
+        if ($isNewAgent && ($notifiable->notification_delivery ?? 'instant') !== 'daily_digest') {
+            return ['database', 'mail'];
+        }
+
         return ['database'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $mail = (new MailMessage)
+            ->subject(__('[Keystone] New lead assigned: :name', [
+                'name' => $this->lead->full_name,
+            ]))
+            ->greeting(__('Hello :name,', ['name' => $notifiable->name]))
+            ->line(__('A lead has been assigned to you.'))
+            ->line('**'.__('Name').':** '.$this->lead->full_name)
+            ->line('**'.__('Phone').':** '.($this->lead->phone ?: 'N/A'))
+            ->line('**'.__('Email').':** '.($this->lead->email ?: 'N/A'));
+
+        if ($this->reason) {
+            $mail->line('**'.__('Reason').':** '.$this->reason);
+        }
+
+        return $mail
+            ->action(__('View Lead'), url("/leads/{$this->lead->id}"))
+            ->line(__('Please follow up with this lead promptly.'));
     }
 
     public function toArray(object $notifiable): array
@@ -36,7 +66,7 @@ class LeadReassigned extends Notification
             $title = __('New lead assigned to you');
             $body = __('Lead :name has been assigned to you.', ['name' => $this->lead->full_name]);
             if ($this->from !== null) {
-                $body .= ' ' . __('It was moved from :from.', ['from' => $this->from->name]);
+                $body .= ' '.__('It was moved from :from.', ['from' => $this->from->name]);
             }
         } elseif ($isFromAgent) {
             $title = __('Lead reassigned');
@@ -54,7 +84,7 @@ class LeadReassigned extends Notification
         }
 
         if ($this->reason) {
-            $body .= ' ' . __('Reason: :reason', ['reason' => $this->reason]);
+            $body .= ' '.__('Reason: :reason', ['reason' => $this->reason]);
         }
 
         return [

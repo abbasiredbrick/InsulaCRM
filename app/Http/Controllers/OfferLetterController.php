@@ -41,8 +41,9 @@ class OfferLetterController extends Controller
     }
 
     /**
-     * Issue a new offer letter for the deal. Discounts require manager/admin
-     * approval and put the letter into 'pending_approval' until granted.
+     * Issue a new offer letter for the deal. Every offer letter requires
+     * manager/admin approval and its status reflects that (pending_approval /
+     * issued) depending on who created it.
      */
     public function store(Request $request, Deal $deal)
     {
@@ -54,14 +55,16 @@ class OfferLetterController extends Controller
 
         $status = __('Offer letter :no issued.', ['no' => $offer->offer_no]);
         if ($offer->status === 'pending_approval') {
-            $status = __('Offer letter :no created with a discount — pending manager approval.', ['no' => $offer->offer_no]);
+            $status = __('Offer letter :no created — Waiting for Approval.', ['no' => $offer->offer_no]);
         }
 
         return redirect()->route('deals.show', $deal)->with('success', $status);
     }
 
     /**
-     * Render the printable (A4) offer letter for the client to sign.
+     * Render the printable (A4) offer letter for the client to sign. Only an
+     * approved letter can be printed by a non-approver; managers/admins may
+     * preview it even while it is awaiting approval.
      */
     public function print(OfferLetter $offerLetter)
     {
@@ -69,12 +72,18 @@ class OfferLetterController extends Controller
         abort_unless($deal, 404);
         $this->authorize('view', $deal);
 
+        $user = auth()->user();
+        if (! $offerLetter->isApproved() && ! $this->offers->canApproveOffer($user)) {
+            abort(403, __('This offer letter is awaiting manager approval.'));
+        }
+
         return response($this->offers->render($offerLetter))
             ->header('Content-Type', 'text/html');
     }
 
     /**
-     * Manager/admin approves the discount on a pending offer letter.
+     * Manager/admin approves a pending offer letter, unblocking printing and
+     * signing.
      */
     public function approve(Request $request, OfferLetter $offerLetter)
     {
@@ -83,14 +92,14 @@ class OfferLetterController extends Controller
         $this->authorize('update', $deal);
 
         try {
-            $this->offers->approveDiscount($offerLetter, auth()->user());
+            $this->offers->approve($offerLetter, auth()->user());
         } catch (\RuntimeException $e) {
             throw ValidationException::withMessages(['discount' => $e->getMessage()]);
         }
 
-        \App\Models\AuditLog::log('offer_letter.discount_approved', $offerLetter, ['discount' => $offerLetter->discount_amount]);
+        \App\Models\AuditLog::log('offer_letter.approved', $offerLetter);
 
-        return redirect()->route('deals.show', $deal)->with('success', __('Discount approved — the offer letter is now issued.'));
+        return redirect()->route('deals.show', $deal)->with('success', __('Offer letter approved — it can now be printed for the client.'));
     }
 
     /**
@@ -157,6 +166,61 @@ class OfferLetterController extends Controller
         \App\Models\AuditLog::log('offer_letter.declined', $offerLetter);
 
         return redirect()->route('deals.show', $deal)->with('success', __('Offer letter marked as declined.'));
+    }
+
+    public function update(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        try {
+            $this->offers->updateFromValidated($offerLetter, $request->user(), $this->validateOffer($request));
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['original_amount' => $e->getMessage()])->withInput();
+        }
+
+        \App\Models\AuditLog::log('offer_letter.updated', $offerLetter);
+
+        return redirect()
+            ->route('deals.show', $deal)
+            ->with('success', $offerLetter->status === 'issued'
+                ? __('Offer letter updated and issued.')
+                : __('Offer letter updated — waiting for approval.'));
+    }
+
+    public function withdraw(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        try {
+            $this->offers->withdraw($offerLetter, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
+        }
+
+        \App\Models\AuditLog::log('offer_letter.withdrawn', $offerLetter);
+
+        return redirect()->route('deals.show', $deal)->with('success', __('Offer letter withdrawn.'));
+    }
+
+    public function destroy(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        try {
+            $this->offers->destroy($offerLetter, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['status' => $e->getMessage()]);
+        }
+
+        \App\Models\AuditLog::log('offer_letter.deleted', $offerLetter);
+
+        return redirect()->route('deals.show', $deal)->with('success', __('Offer letter deleted.'));
     }
 
     protected function validateOffer(Request $request): array

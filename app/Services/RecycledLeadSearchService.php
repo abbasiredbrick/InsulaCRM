@@ -37,6 +37,26 @@ class RecycledLeadSearchService
     }
 
     /**
+     * Constrain the pool to leads whose enquiry date falls within a range.
+     *
+     * Filtering by the imported Bayut "Date" column (lead_date) is how agents
+     * pull the leads due for regeneration — e.g. all enquiries from the last
+     * period, or a specific month, before assigning them in bulk.
+     */
+    public function applyLeadDateRange(Builder $query, mixed $from = null, mixed $to = null): Builder
+    {
+        if (is_string($from) && trim($from) !== '') {
+            $query->whereDate('lead_date', '>=', trim($from));
+        }
+
+        if (is_string($to) && trim($to) !== '') {
+            $query->whereDate('lead_date', '<=', trim($to));
+        }
+
+        return $query;
+    }
+
+    /**
      * Scope to the shared working set: every pool record in the acting user's
      * tenant. Admins and cold-call agents work the same pool today (mirrors the
      * Cold Calls module); assignment narrows it via the assignee filter.

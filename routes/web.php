@@ -19,6 +19,7 @@ use App\Http\Controllers\BuyerVerificationController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\CalendarSyncController;
 use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ComparableSaleController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DealController;
@@ -267,7 +268,13 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/recycled', [\App\Http\Controllers\RecycledLeadController::class, 'index'])->name('recycled.index');
         Route::get('/recycled/import', [\App\Http\Controllers\RecycledLeadController::class, 'create'])->name('recycled.create');
         Route::post('/recycled/import', [\App\Http\Controllers\RecycledLeadController::class, 'import'])->name('recycled.import');
+        Route::get('/recycled/import/portal', [\App\Http\Controllers\RecycledPortalImportController::class, 'create'])->name('recycled.portal-import.create');
+        Route::post('/recycled/import/portal', [\App\Http\Controllers\RecycledPortalImportController::class, 'store'])->name('recycled.portal-import.store');
+        Route::get('/recycled/import/portal/{run}', [\App\Http\Controllers\RecycledPortalImportController::class, 'show'])->name('recycled.portal-import.show');
+        Route::post('/recycled/import/portal/{run}/confirm', [\App\Http\Controllers\RecycledPortalImportController::class, 'confirm'])->name('recycled.portal-import.confirm');
+        Route::post('/recycled/import/portal/{run}/cancel', [\App\Http\Controllers\RecycledPortalImportController::class, 'cancel'])->name('recycled.portal-import.cancel');
         Route::post('/recycled/run-recycle', [\App\Http\Controllers\RecycledLeadController::class, 'runRecycle'])->name('recycled.runRecycle');
+        Route::post('/recycled/bulk-assign', [\App\Http\Controllers\RecycledLeadController::class, 'bulkAssign'])->name('recycled.bulkAssign');
         Route::get('/recycled/{recycledLead}', [\App\Http\Controllers\RecycledLeadController::class, 'show'])->name('recycled.show');
         Route::post('/recycled/{recycledLead}/status', [\App\Http\Controllers\RecycledLeadController::class, 'updateStatus'])->name('recycled.status');
         Route::post('/recycled/{recycledLead}/assign', [\App\Http\Controllers\RecycledLeadController::class, 'assign'])->name('recycled.assign');
@@ -365,6 +372,18 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllRead');
 
+    // ── Team Chat (all roles) ─────────────────────────────
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    Route::get('/chat/users/search', [ChatController::class, 'searchUsers'])->name('chat.users.search');
+    Route::get('/chat/unread', [ChatController::class, 'unread'])->name('chat.unread');
+    Route::get('/chat/sidebar', [ChatController::class, 'sidebar'])->name('chat.sidebar');
+    Route::post('/chat/direct', [ChatController::class, 'startDirect'])->name('chat.direct');
+    Route::post('/chat/group', [ChatController::class, 'startGroup'])->name('chat.group');
+    Route::get('/chat/{conversation}', [ChatController::class, 'show'])->name('chat.show');
+    Route::get('/chat/{conversation}/messages', [ChatController::class, 'messages'])->name('chat.messages');
+    Route::post('/chat/{conversation}/messages', [ChatController::class, 'storeMessage'])->name('chat.store');
+    Route::post('/chat/{conversation}/read', [ChatController::class, 'read'])->name('chat.read');
+
     // ── Saved Views (all authenticated roles) ────────────────────────
     Route::prefix('saved-views')->group(function () {
         Route::get('/', [SavedViewController::class, 'index'])->name('saved-views.index');
@@ -438,6 +457,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::redirect('/leads/kanban', '/leads');
         Route::post('/leads/bulk-action', [LeadController::class, 'bulkAction'])->name('leads.bulkAction');
         Route::resource('leads', LeadController::class)->except(['index']);
+        Route::get('/leads/{lead}/chat', [ChatController::class, 'leadChat'])->name('leads.chat');
         Route::patch('/leads/{lead}/status', [LeadController::class, 'updateStatus'])->name('leads.updateStatus');
         Route::post('/leads/{lead}/claim', [LeadController::class, 'claim'])->name('leads.claim');
 
@@ -491,6 +511,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     Route::middleware('role:admin,agent,acquisition_agent,disposition_agent,listing_agent,buyers_agent')->group(function () {
         Route::get('/pipeline/export', [DealController::class, 'export'])->name('deals.export');
         Route::get('/pipeline', [DealController::class, 'pipeline'])->name('pipeline');
+        Route::get('/deals', [DealController::class, 'index'])->name('deals.index');
         Route::get('/pipeline/{deal}', [DealController::class, 'show'])->name('deals.show');
         Route::put('/pipeline/{deal}', [DealController::class, 'update'])->name('deals.update');
         Route::patch('/pipeline/{deal}', [DealController::class, 'update'])->name('deals.quickUpdate');
@@ -517,6 +538,9 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/offer-letters/{offerLetter}/download-signed', [OfferLetterController::class, 'downloadSigned'])->name('deal.offers.downloadSigned');
         Route::post('/offer-letters/{offerLetter}/upload-signed', [OfferLetterController::class, 'uploadSigned'])->name('deal.offers.uploadSigned');
         Route::post('/offer-letters/{offerLetter}/approve', [OfferLetterController::class, 'approve'])->name('deal.offers.approve');
+        Route::patch('/offer-letters/{offerLetter}', [OfferLetterController::class, 'update'])->name('deal.offers.update');
+        Route::post('/offer-letters/{offerLetter}/withdraw', [OfferLetterController::class, 'withdraw'])->name('deal.offers.withdraw');
+        Route::delete('/offer-letters/{offerLetter}', [OfferLetterController::class, 'destroy'])->name('deal.offers.destroy');
         Route::patch('/offer-letters/{offerLetter}/status', [OfferLetterController::class, 'updateStatus'])->name('deal.offers.status');
 
         // Activities on deals
@@ -659,6 +683,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::put('/settings/portal-leads', [SettingsController::class, 'updatePortalLeadSettings'])->name('settings.updatePortalLeadSettings');
         Route::put('/settings/portal-credits', [SettingsController::class, 'updatePortalCreditsSettings'])->name('settings.updatePortalCreditsSettings');
         Route::post('/settings/commission', [SettingsController::class, 'updateCommissionSettings'])->name('settings.updateCommissionSettings');
+        Route::post('/settings/commission-rates', [SettingsController::class, 'updateCommissionRates'])->name('settings.updateCommissionRates');
         Route::put('/settings/agents/{user}/compensation', [SettingsController::class, 'updateCommissionPlan'])->name('settings.updateCommissionPlan');
 
         // DNC Management

@@ -48,6 +48,13 @@ class DealPolicy
             return true;
         }
 
-        return $user->isAgent() && $deal->agent_id === $user->id;
+        if ($user->isAgent() && $deal->agent_id === $user->id) {
+            return true;
+        }
+
+        // Managers can drive their team's deals (e.g. approving offer letters).
+        return $deal->agent_id !== null
+            && $user->isManager()
+            && in_array($deal->agent_id, $user->teamUserIds(), true);
     }
 }

@@ -133,7 +133,7 @@
                             <span class="text-secondary">-</span>
                         @endif
                     </td>
-                    <td>{{ $property->bedrooms ?? '-' }}</td>
+                    <td>{{ $property->bedroomLabel() !== '' ? $property->bedroomLabel() : '-' }}</td>
                     <td>{{ $property->bathrooms ?? '-' }}</td>
                     <td>{{ $property->square_footage ? number_format($property->square_footage) : '-' }}</td>
                     <td>{{ $property->year_built ?? '-' }}</td>

@@ -36,6 +36,7 @@
             <a href="{{ route('notifications.index', ['filter' => 'tasks']) }}" class="btn btn-sm {{ $currentFilter === 'tasks' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Tasks') }}</a>
             <a href="{{ route('notifications.index', ['filter' => 'team']) }}" class="btn btn-sm {{ $currentFilter === 'team' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Team') }}</a>
             <a href="{{ route('notifications.index', ['filter' => 'availability']) }}" class="btn btn-sm {{ $currentFilter === 'availability' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Availability') }}</a>
+            <a href="{{ route('notifications.index', ['filter' => 'chat']) }}" class="btn btn-sm {{ $currentFilter === 'chat' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('Chat') }}</a>
         </div>
     </div>
     <div class="list-group list-group-flush">
@@ -84,6 +85,9 @@
                                 @break
                             @case('activity')
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12h4l3 8l4 -16l3 8h4"/></svg>
+                                @break
+                            @case('messages')
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M21 14l-3 -3h-7a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h9a1 1 0 0 1 1 1v10"/><path d="M14 15v-2a2 2 0 0 0 -2 -2h-7l-3 3v11l2.5 -2.5"/></svg>
                                 @break
                             @default
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 5a2 2 0 0 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>

@@ -137,7 +137,7 @@
                     </div>
                     <div class="small text-secondary text-truncate">{{ $subtitle }}</div>
                     @if($item['feedback'])
-                    <div class="small text-secondary mt-1" style="white-space:pre-line;">{{ $item['feedback'] }}</div>
+                    <div class="small text-secondary mt-1"><x-linkified :text="$item['feedback']" /></div>
                     @endif
                 </div>
                 <div class="col-auto text-center d-none d-md-block" style="min-width: 170px;">

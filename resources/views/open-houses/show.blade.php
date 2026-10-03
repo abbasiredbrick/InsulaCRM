@@ -61,14 +61,14 @@
                 @if($openHouse->description)
                 <div class="mt-3">
                     <h4 class="subheader">{{ __('Description') }}</h4>
-                    <p>{{ $openHouse->description }}</p>
+                    <x-linkified :text="$openHouse->description" />
                 </div>
                 @endif
 
                 @if($openHouse->notes)
                 <div class="mt-3">
                     <h4 class="subheader">{{ __('Notes') }}</h4>
-                    <p>{{ $openHouse->notes }}</p>
+                    <x-linkified :text="$openHouse->notes" />
                 </div>
                 @endif
             </div>

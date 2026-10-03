@@ -8,6 +8,7 @@ use App\Models\PortalIntegration;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Notifications\LeadAssigned;
 use App\Notifications\PortalLeadUnclaimed;
 use App\Notifications\ReturningClientInterest;
 use App\Services\ContactNormalizer;
@@ -23,6 +24,17 @@ class PortalLeadService
      */
     public const DUPLICATE_WINDOW_MINUTES = 120;
 
+    private ?PortalLinkResolver $links = null;
+
+    /**
+     * Classifies the two portal URLs a payload may carry (property page vs
+     * message thread) so neither is ever filed under the other's heading.
+     */
+    public function links(): PortalLinkResolver
+    {
+        return $this->links ??= app(PortalLinkResolver::class);
+    }
+
     public function createFromPayload(PortalIntegration $integration, string $source, array $data): ?Lead
     {
         $tenant = $integration->tenant;
@@ -31,7 +43,7 @@ class PortalLeadService
         $phone = $this->cleanPhone($data['phone'] ?? null);
         $email = trim((string) ($data['email'] ?? ''));
 
-        if ($first === '' && $phone === null && $email === '') {
+        if ($phone === null && $email === '') {
             return null;
         }
 
@@ -64,30 +76,42 @@ class PortalLeadService
             return $this->handleExistingClient($existing, $integration, $source, $property, $data, $phone, $email);
         }
 
+        // The listing/enquiry URL is stored in custom_fields (listing_url and
+        // contact_link) and rendered as the clickable "Portal Listing" block on
+        // the lead page. Appending it to notes as well used to show the same
+        // link three times on one screen, so the notes carry the client's
+        // message only.
         $notes = implode("\n", array_filter([
             $data['message'] ?? null,
-            $data['url'] ?? null,
         ]));
 
+        // A portal payload can carry both a property page and a message thread,
+        // and Property Finder sends the message URL for both. Classify them so
+        // "Listing" opens the listing and "WhatsApp" opens the conversation.
+        $links = $this->links()->resolve(
+            [$data['url'] ?? null, $data['contact_link'] ?? null],
+            $integration->portal
+        );
+
         $lead = Lead::withoutGlobalScopes()->create([
-            'tenant_id'   => $tenant->id,
-            'agent_id'    => $routedAgent?->id,
-            'first_name'  => $first,
-            'last_name'   => $last,
-            'phone'       => $phone,
-            'email'       => $email !== '' ? $email : null,
+            'tenant_id' => $tenant->id,
+            'agent_id' => $routedAgent?->id,
+            'first_name' => $first,
+            'last_name' => $last,
+            'phone' => $phone,
+            'email' => $email !== '' ? $email : null,
             'lead_source' => $source,
-            'status'      => 'new',
+            'status' => 'new',
             'temperature' => 'warm',
-            'notes'       => $notes !== '' ? $notes : null,
+            'notes' => $notes !== '' ? $notes : null,
             'custom_fields' => array_filter([
-                'portal'              => $integration->portal,
-                'portal_reference'    => $data['id'] ?? null,
-                'listing_reference'   => $data['reference'] ?? null,
-                'listing_url'         => $data['url'] ?? null,
+                'portal' => $integration->portal,
+                'portal_reference' => $data['id'] ?? null,
+                'listing_reference' => $data['reference'] ?? null,
+                'listing_url' => $links['listing_url'],
                 'listing_property_id' => $property?->id,
-                'contact_link'        => $data['contact_link'] ?? null,
-                'received_at'         => $data['received_at'] ?? null,
+                'contact_link' => $links['contact_link'],
+                'received_at' => $data['received_at'] ?? null,
             ]),
         ]);
 
@@ -96,9 +120,18 @@ class PortalLeadService
             $this->handleUnmatched($lead, $tenant);
         }
 
+        // New-lead notification: email the agent the lead was assigned to
+        // (routed or distributed), otherwise email the Owner so an unassigned
+        // inbound lead never lingers silently.
+        $this->notifyNewLeadRouting($lead, $tenant);
+
         $this->linkProperty($lead, $property);
 
-        AuditLog::log('lead.received_from_portal_' . $source, $lead);
+        if ($property !== null) {
+            app(\App\Services\UnitLeadAssignmentService::class)->assignToUnitOwnerIfRequired($lead, $property);
+        }
+
+        AuditLog::log('lead.received_from_portal_'.$source, $lead);
 
         return $lead;
     }
@@ -132,6 +165,7 @@ class PortalLeadService
     {
         if ($property !== null) {
             $lead->properties()->syncWithoutDetaching([$property->id]);
+            app(\App\Services\UnitLeadAssignmentService::class)->assignToUnitOwnerIfRequired($lead, $property);
         }
 
         $custom = $lead->custom_fields ?? [];
@@ -154,7 +188,7 @@ class PortalLeadService
         $lead->save();
 
         AuditLog::log('lead.returning_client_interest', $lead, null, [
-            'portal'    => $integration->portal,
+            'portal' => $integration->portal,
             'reference' => $data['reference'] ?? null,
             'property_id' => $property?->id,
         ]);
@@ -173,8 +207,7 @@ class PortalLeadService
 
     /**
      * Leaves a brand-new unassigned portal lead to the tenant's configured
-     * handling: either push it into the routing pool or keep it unassigned and
-     * alert the admins.
+     * handling: either push it into the routing pool or keep it unassigned.
      */
     protected function handleUnmatched(Lead $lead, Tenant $tenant): void
     {
@@ -186,11 +219,33 @@ class PortalLeadService
             } catch (\Throwable $e) {
                 Log::warning('Portal lead distribution failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
             }
+        }
+    }
+
+    /**
+     * Notify on a brand-new inbound portal lead: the assigned agent gets the
+     * lead-assigned email, or when the lead stayed unassigned the Owner(s) are
+     * emailed instead (tenant-level notify_admins applies).
+     */
+    protected function notifyNewLeadRouting(Lead $lead, Tenant $tenant): void
+    {
+        $lead->refresh();
+
+        $agent = $lead->agent;
+
+        if ($agent !== null) {
+            if ($tenant->wantsNotification('lead_assigned')) {
+                try {
+                    $agent->notify(new LeadAssigned($lead, $tenant));
+                } catch (\Throwable $e) {
+                    Log::warning('Portal lead assignment notification failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+                }
+            }
 
             return;
         }
 
-        if (($settings['notify_admins'] ?? true)) {
+        if (($tenant->portalLeadSettings()['notify_admins'] ?? true)) {
             $this->notifyAdmins($lead, new PortalLeadUnclaimed($lead));
         }
     }
@@ -229,6 +284,12 @@ class PortalLeadService
 
     /**
      * Database-level probe for an active agent carrying an agent code.
+     *
+     * A member who has switched off receiving leads is deliberately not matched
+     * here either: their listings still route enquiries by agent code, so
+     * without the opt-out the listing-based route would hand them portal leads
+     * behind the distribution formula's back. The lead then falls through to
+     * handleUnmatched() and is distributed to somebody who is in the rotation.
      */
     protected function findAgentByCode(int $tenantId, string $agentCode): ?User
     {
@@ -236,6 +297,7 @@ class PortalLeadService
             ->where('tenant_id', $tenantId)
             ->where('agent_code', $agentCode)
             ->where('is_active', true)
+            ->where('receives_leads', true)
             ->first();
     }
 

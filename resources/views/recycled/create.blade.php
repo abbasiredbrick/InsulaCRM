@@ -19,6 +19,16 @@
     <div class="alert alert-danger">{{ session('error') }}</div>
 @endif
 
+<div class="card mb-3">
+    <div class="card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h3 class="card-title">{{ __('Already have API access?') }}</h3>
+            <div class="text-muted small">{{ __('Pull previous enquiries directly from Bayut, Dubizzle, or Property Finder (last 89 days), preview the result, then confirm what enters the pool.') }}</div>
+        </div>
+        <a href="{{ route('recycled.portal-import.create') }}" class="btn btn-outline-primary">{{ __('Pull via Portal API') }}</a>
+    </div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-7">
         <div class="card">
@@ -46,9 +56,20 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">{{ __('Category') }}</label>
+                        <select name="category" class="form-select">
+                            <option value="">{{ __('Auto-detect from file (recommended)') }}</option>
+                            @foreach($categories as $key => $label)
+                                <option value="{{ $key }}" {{ old('category') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-hint mt-2">{{ __('How the leads contacted you. Bayut report exports are detected automatically (WhatsApp / Phone / Email logs), so this override is only for files where auto-detection reads the wrong channel.') }}</div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">{{ __('Excel / CSV file') }} <span class="text-danger">*</span></label>
                         <input type="file" name="file" class="form-control" accept=".xlsx,.csv,.txt" required>
-                        <div class="form-hint">{{ __('.xlsx, .csv or .txt (up to 10 MB). First row must be the column header.') }}</div>
+                        <div class="form-hint">{{ __('.xlsx, .csv or .txt (up to 10 MB). Bayut report exports with a title/preamble row are detected automatically.') }}</div>
                     </div>
 
                     <div class="mb-3">
@@ -75,15 +96,36 @@
                 <h3 class="card-title">{{ __('Expected columns') }}</h3>
             </div>
             <div class="card-body">
-                <p class="text-muted">{{ __('The importer recognises these header names (case-insensitive) from Bayut / Dubizzle / PropertyFinder exports. Only Name or Phone is required per row.') }}</p>
+                <p class="text-muted">{{ __('The importer recognises these header names (case-insensitive) from Bayut / Dubizzle / PropertyFinder exports. A phone, WhatsApp number or email is required per row.') }}</p>
+
+                <div class="alert alert-info py-2 small">
+                    <strong>{{ __('Property Finder history:') }}</strong>
+                    {{ __('The PF API only reaches back 89 days, so older history comes from PF Expert: export up to 180 days per file (3 years available) from Leads → Custom range → Export, then upload each file here.') }}
+                    <a href="https://support.propertyfinder.ae/hc/en-us/articles/36865116212754-Leads-Export" target="_blank" rel="noopener">{{ __('PF export guide') }}</a>
+                </div>
+
+                <h6 class="text-uppercase text-muted">{{ __('Property Finder columns') }}</h6>
+                <ul class="text-muted small">
+                    <li><code>Channel</code> — the row's lead category (WhatsApp / call / email)</li>
+                    <li><code>Sender Name</code> / <code>Sender Phone</code> / <code>Sender Email</code> — the contact</li>
+                    <li><code>WhatsApp Username</code> — kept as its own field; a handle is a contact route on its own</li>
+                    <li><code>Call Record File</code> — played inline on the pool record (the portal's link expires eventually)</li>
+                    <li><code>Listing Reference</code> — for Pristine, a <code>-R-</code> segment marks a rental and <code>-S-</code> a sale</li>
+                    <li><code>Tags</code> — rows tagged <code>from_agent</code> are your own agent's enquiries and are dropped</li>
+                </ul>
 
                 <h6 class="text-uppercase text-muted">{{ __('Contact') }}</h6>
                 <ul class="text-muted small">
                     <li><code>Name</code> or <code>First Name</code> / <code>Last Name</code></li>
-                    <li><code>Phone</code> (also <i>Mobile</i>, <i>Tel</i>, <i>WhatsApp</i>)</li>
+                    <li><code>Phone</code> / <code>Mobile</code> / <code>WhatsApp</code> — stored internationally, e.g. <code>+971 50 123 4567</code></li>
                     <li><code>Email</code>, <code>Reference</code> (lead / enquiry id)</li>
                     <li><code>Portal</code> / <code>Source</code> (optional per row)</li>
                 </ul>
+
+                <div class="alert alert-warning py-2 small mb-3">
+                    <strong>{{ __('Rows without any phone, WhatsApp number, WhatsApp username or email are dropped.') }}</strong>
+                    {{ __('A contact with no reachable number, handle or address has no value — the import report tells you how many were discarded for this reason.') }}
+                </div>
 
                 <h6 class="text-uppercase text-muted">{{ __('Transaction history') }}</h6>
                 <ul class="text-muted small">

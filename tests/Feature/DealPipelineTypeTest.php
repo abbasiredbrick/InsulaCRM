@@ -104,4 +104,50 @@ class DealPipelineTypeTest extends TestCase
         $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
         $response->assertHeader('Content-Disposition', 'attachment; filename=deals-export-'.now()->format('Y-m-d').'.csv');
     }
+
+    public function test_pipeline_summary_shows_value_forecast_and_generated(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'wholesale']);
+
+        $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented', 'contract_price' => 200000, 'assignment_fee' => 10000]);
+        $won = $this->createDeal(['deal_type' => 'sale', 'stage' => 'closed_won', 'contract_price' => 150000, 'assignment_fee' => 8000]);
+        $won->update(['stage_changed_at' => now()]);
+
+        $this->get('/pipeline')
+            ->assertSee('Active deals')
+            ->assertSee('Pipeline value')
+            ->assertSee('$200,000')
+            ->assertSee('Weighted forecast')
+            ->assertSee('$90,000')
+            ->assertSee('Business generated')
+            ->assertSee('$8,000')
+            ->assertSee('Closed', false);
+    }
+
+    public function test_pipeline_filters_by_temperature_and_lead_source(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'wholesale']);
+
+        $hot = $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented']);
+        $hot->lead->update(['temperature' => 'hot', 'lead_source' => 'zillow']);
+        $cold = $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented']);
+        $cold->lead->update(['temperature' => 'cold', 'lead_source' => 'facebook_ads']);
+
+        $this->get('/pipeline?temp=hot&source=zillow')
+            ->assertSee($hot->lead->full_name)
+            ->assertDontSee($cold->lead->full_name);
+    }
+
+    public function test_pipeline_renders_wholesale_stages_only_for_sale_tab(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'wholesale']);
+
+        $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented']);
+
+        $this->get('/pipeline?deal_type=sale')
+            ->assertSee('Offer Presented')
+            ->assertSee('Dispositions')
+            ->assertDontSee('active_listing')
+            ->assertDontSee('offer_received');
+    }
 }

@@ -32,14 +32,14 @@ class TeamController extends Controller
                 ->count();
             $member->closed_leads_this_month = Lead::where('agent_id', $member->id)
                 ->where('status', 'closed_won')
-                ->whereBetween('updated_at', [$monthStart, $monthEnd])
+                ->whereBetween('status_changed_at', [$monthStart, $monthEnd])
                 ->count();
             $member->open_deals_value = (float) Deal::where('agent_id', $member->id)
                 ->whereNotIn('stage', ['closed_won', 'closed_lost'])
                 ->sum('contract_price');
             $member->closed_deals_this_month = Deal::where('agent_id', $member->id)
                 ->where('stage', 'closed_won')
-                ->whereBetween('created_at', [$monthStart, $monthEnd])
+                ->whereBetween('stage_changed_at', [$monthStart, $monthEnd])
                 ->count();
             $member->activities_7d = Activity::where('agent_id', $member->id)
                 ->where('logged_at', '>=', now()->subDays(7))

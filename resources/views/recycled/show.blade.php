@@ -136,14 +136,14 @@
 
                     @if($recycled->notes)
                         <dt class="col-12">{{ __('Notes') }}</dt>
-                        <dd class="col-12 text-muted mb-0">{{ $recycled->notes }}</dd>
+                        <dd class="col-12 text-muted mb-0"><x-linkified :text="$recycled->notes" /></dd>
                     @endif
                 </dl>
 
                 @if($recycled->call_notes)
                     <hr>
                     <h6 class="text-uppercase text-muted">{{ __('Call log') }}</h6>
-                    <pre class="text-muted small" style="white-space: pre-wrap; font-family: inherit; margin-bottom: 0;">{{ $recycled->call_notes }}</pre>
+                    <div class="text-muted small" style="white-space: pre-wrap; font-family: inherit; margin-bottom: 0;"><x-linkified :text="$recycled->call_notes" /></div>
                 @endif
             </div>
         </div>

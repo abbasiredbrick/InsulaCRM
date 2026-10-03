@@ -25,7 +25,7 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index'))
             ->assertOk()
-            ->assertSee('2BR Apartment in Dubai Marina');
+            ->assertSee($property->unitLabel());
     }
 
     public function test_store_creates_a_brokerage_unit(): void
@@ -164,14 +164,14 @@ class InventoryTest extends TestCase
 
     public function test_advanced_search_filters_by_rent_range(): void
     {
-        $this->createProperty([
+        $cheap = $this->createProperty([
             'marketing_title' => 'Cheap Studio',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
             'rent_price' => 60000,
             'rent_period' => 'yearly',
         ]);
-        $this->createProperty([
+        $premium = $this->createProperty([
             'marketing_title' => 'Premium 3BR',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
@@ -181,20 +181,20 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index').'?rent_min=100000&rent_max=200000')
             ->assertOk()
-            ->assertDontSee('Cheap Studio')
-            ->assertSee('Premium 3BR');
+            ->assertDontSee($cheap->unitLabel())
+            ->assertSee($premium->unitLabel());
     }
 
     public function test_index_sorts_by_price(): void
     {
-        $this->createProperty([
+        $priciest = $this->createProperty([
             'marketing_title' => 'Priciest Penthouse',
             'intent' => 'sale',
             'availability' => 'ready_to_list',
             'list_price' => 2500000,
             'asking_price' => 2500000,
         ]);
-        $this->createProperty([
+        $oldTown = $this->createProperty([
             'marketing_title' => 'Apt in Old Town',
             'intent' => 'sale',
             'availability' => 'ready_to_list',
@@ -207,15 +207,15 @@ class InventoryTest extends TestCase
             ->getContent();
 
         $this->assertLessThan(
-            strpos($asc, 'Priciest Penthouse'),
-            strpos($asc, 'Apt in Old Town'),
+            strpos($asc, $priciest->unitLabel()),
+            strpos($asc, $oldTown->unitLabel()),
             'Ascending price sort must list the cheaper unit first.'
         );
     }
 
     public function test_index_ignores_unknown_sort_columns(): void
     {
-        $this->createProperty([
+        $unit = $this->createProperty([
             'marketing_title' => 'Fort Knox',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
@@ -225,7 +225,7 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index').'?sort=users.password&direction=desc')
             ->assertOk()
-            ->assertSee('Fort Knox');
+            ->assertSee($unit->unitLabel());
     }
 
     public function test_filter_options_are_cascaded(): void
@@ -274,7 +274,7 @@ class InventoryTest extends TestCase
 
     public function test_advanced_search_filters_by_community_furnishing_and_photos(): void
     {
-        $this->createProperty([
+        $furnished = $this->createProperty([
             'marketing_title' => 'Furnished Marina Unit',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
@@ -282,7 +282,7 @@ class InventoryTest extends TestCase
             'sub_community' => 'Marina Heights',
             'furnishing' => 'furnished',
         ]);
-        $this->createProperty([
+        $unfurnished = $this->createProperty([
             'marketing_title' => 'Unfurnished Reef',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
@@ -292,13 +292,13 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index').'?community=Dubai+Marina&furnishing=furnished')
             ->assertOk()
-            ->assertSee('Furnished Marina Unit')
-            ->assertDontSee('Unfurnished Reef');
+            ->assertSee($furnished->unitLabel())
+            ->assertDontSee($unfurnished->unitLabel());
     }
 
     public function test_bedroom_filters_default_to_any_not_zero(): void
     {
-        $this->createProperty([
+        $twoBed = $this->createProperty([
             'marketing_title' => 'Two Bed Marina Unit',
             'bedrooms' => 2,
             'intent' => 'rent',
@@ -324,19 +324,19 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index').'?search='.urlencode('marina'))
             ->assertOk()
-            ->assertSee('Two Bed Marina Unit');
+            ->assertSee($twoBed->unitLabel());
     }
 
     public function test_search_matches_bedroom_shorthand(): void
     {
-        $this->createProperty([
+        $twoBr = $this->createProperty([
             'marketing_title' => 'Luxury 2BR Apartment in Marina',
             'bedrooms' => 2,
             'intent' => 'rent',
             'availability' => 'ready_to_list',
             'community' => 'Dubai Marina',
         ]);
-        $this->createProperty([
+        $threeBr = $this->createProperty([
             'marketing_title' => 'Premium 3BR Villa in Hills',
             'bedrooms' => 3,
             'intent' => 'rent',
@@ -347,21 +347,21 @@ class InventoryTest extends TestCase
         foreach (['2BR', '2 BR', '2bhk', '2 BHK', '2 bed', '2 bedroom', '2bd'] as $term) {
             $response = $this->get(route('inventory.index').'?search='.urlencode($term));
             $response->assertOk()
-                ->assertSee('Luxury 2BR Apartment in Marina')
-                ->assertDontSee('Premium 3BR Villa in Hills');
+                ->assertSee($twoBr->unitLabel())
+                ->assertDontSee($threeBr->unitLabel());
         }
     }
 
     public function test_search_combines_bedroom_and_text_words(): void
     {
-        $this->createProperty([
+        $twoBed = $this->createProperty([
             'marketing_title' => 'Sunset 2BR Apartment in Marina',
             'bedrooms' => 2,
             'intent' => 'rent',
             'availability' => 'ready_to_list',
             'community' => 'Dubai Marina',
         ]);
-        $this->createProperty([
+        $threeBed = $this->createProperty([
             'marketing_title' => 'Sunset 3BR Apartment in Marina',
             'bedrooms' => 3,
             'intent' => 'rent',
@@ -371,8 +371,8 @@ class InventoryTest extends TestCase
 
         $this->get(route('inventory.index').'?search='.urlencode('2 marina'))
             ->assertOk()
-            ->assertSee('Sunset 2BR Apartment in Marina')
-            ->assertDontSee('Sunset 3BR Apartment in Marina');
+            ->assertSee($twoBed->unitLabel())
+            ->assertDontSee($threeBed->unitLabel());
     }
 
     public function test_property_manager_can_browse_and_filter_all_inventory(): void
@@ -395,7 +395,7 @@ class InventoryTest extends TestCase
             'intent' => 'both',
             'availability' => 'listed',
         ]);
-        $this->createProperty([
+        $unassignedUnit = $this->createProperty([
             'assigned_agent_id' => null,
             'marketing_title' => 'Unassigned Unit',
             'intent' => 'both',
@@ -404,14 +404,14 @@ class InventoryTest extends TestCase
 
         $this->actingAs($pm)->get(route('inventory.index'))
             ->assertOk()
-            ->assertSee('Agent Assigned Unit')
-            ->assertSee('Unassigned Unit')
+            ->assertSee($agentUnit->unitLabel())
+            ->assertSee($unassignedUnit->unitLabel())
             ->assertSee('name="agent"', false);
 
         $this->actingAs($pm)->get(route('inventory.index').'?agent='.$agent->id)
             ->assertOk()
-            ->assertSee('Agent Assigned Unit')
-            ->assertDontSee('Unassigned Unit');
+            ->assertSee($agentUnit->unitLabel())
+            ->assertDontSee($unassignedUnit->unitLabel());
 
         $this->assertNotNull($agentUnit->fresh());
     }

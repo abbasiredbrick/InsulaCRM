@@ -52,7 +52,7 @@
                                 @if($review->property->rent_price)
                                     {{ \App\Helpers\TenantFormatHelper::currency($review->property->rent_price) }}
                                 @endif
-                                {{ $review->property->bedrooms !== null ? $review->property->bedrooms . ' BR' : '' }}
+                                {{ $review->property->bedroomLabel() }}
                             </div>
                         @else
                             <span class="text-muted">—</span>
@@ -68,7 +68,7 @@
                     <td>
                         <div>{{ __($review->reason_label) }}</div>
                         @if($review->notes)
-                            <div class="text-muted small">{{ $review->notes }}</div>
+                            <div class="text-muted small"><x-linkified :text="$review->notes" /></div>
                         @endif
                     </td>
                     <td class="text-nowrap">

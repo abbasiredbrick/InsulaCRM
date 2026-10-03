@@ -469,7 +469,21 @@ class AvailabilityIngestService
                 $availableFrom = $explicitAvailableFrom ?: ($isUpcoming ? $handover : null);
                 $handoverDate = $isUpcoming ? null : $handover;
 
-                $bedrooms = $data['bedrooms'] ?? $features['bedrooms'];
+                // "Studio" in the unit type beats a Bedrooms column that says 1 -
+                // otherwise a re-import publishes the studio as a 1BR.
+                $bedrooms = ! empty($features['is_studio']) ? 0 : ($data['bedrooms'] ?? $features['bedrooms']);
+
+                // Sheets do not agree on which column carries the size. Bloom
+                // (and others) leave the unit type blank and write "Flat Studio"
+                // into the remarks prose, so a studio would import with no bedroom
+                // count at all and stay invisible in the studio filter. When no
+                // bedroom count could be derived anywhere, fall back to the studio
+                // token in any free-text column. Only applied to an undetermined
+                // count: remarks are prose ("studio available next door") and must
+                // never override a real bedroom number.
+                if ($bedrooms === null && $this->mentionsStudio($featuresRaw, $remarksRaw, $amenitiesRaw)) {
+                    $bedrooms = 0;
+                }
                 $squareFootage = $data['square_footage'] ?? $features['square_footage'];
                 $furnishing = $data['furnishing'] ?? $features['furnishing'];
 
@@ -910,6 +924,24 @@ class AvailabilityIngestService
     }
 
     /**
+     * Does this sheet text call the unit a studio?
+     *
+     * Single definition shared by every size-detection path so the studio token
+     * cannot drift: the unit type column, the Bedrooms column, and the free-text
+     * fallback applied when no bedroom count could be derived at all.
+     */
+    protected function mentionsStudio(string ...$texts): bool
+    {
+        foreach ($texts as $text) {
+            if (preg_match('/\bstudio\b/i', (string) $text)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Parse a bedroom count from a "No. of Bedrooms" style cell, which often
      * carries extra digits that are NOT part of the count, e.g.
      * "3 BR + Maid - (309 SQM)", "1 BR - 871.34 Square Foot",
@@ -921,12 +953,14 @@ class AvailabilityIngestService
     {
         $value = trim($value);
 
-        if (preg_match('/\b(\d{1,2})\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)\b/i', $value, $m)) {
-            return (int) $m[1];
+        // Studio first: a "Studio" written into the Bedrooms column outranks a
+        // stray number next to it, and 0 is how a studio is stored.
+        if ($this->mentionsStudio($value)) {
+            return 0;
         }
 
-        if (preg_match('/\bstudio\b/i', $value)) {
-            return 0;
+        if (preg_match('/\b(\d{1,2})\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)\b/i', $value, $m)) {
+            return (int) $m[1];
         }
 
         if (preg_match('/^\s*(\d{1,2})\s*$/', $value, $m)) {
@@ -1052,6 +1086,8 @@ class AvailabilityIngestService
             return 'shop';
         }
 
+        // "Studio" is a size, not a category - it stays an apartment and is
+        // carried by bedrooms = 0 (see bedroomCount()/featuresFromRaw()).
         return 'apartment';
     }
 
@@ -1059,22 +1095,27 @@ class AvailabilityIngestService
      * Derive bedrooms / area / furnishing / a readable one-line summary from a
      * free-text features column such as "4 BR + Maids room 352 Sq Mtr / 3744 Sq Foot".
      *
-     * @return array{bedrooms: ?int, square_footage: ?int, furnishing: ?string, summary: string}
+     * @return array{bedrooms: ?int, is_studio: bool, square_footage: ?int, furnishing: ?string, summary: string}
      */
     protected function featuresFromRaw(string $raw): array
     {
         $raw = trim($raw);
         $summary = preg_replace('/\s{2,}/', ' ', $raw) ?: $raw;
 
+        // A PM sheet says "Studio" in the Unit Type column and then quite often
+        // puts 1 in Bedrooms. The unit type is the intent, so a studio is read
+        // before any bedroom number - and wins over $data['bedrooms'].
+        $isStudio = $this->mentionsStudio($raw);
+
         $bedrooms = null;
-        if (preg_match('/\b(\d+)\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)/i', $raw, $m)) {
+        if ($isStudio) {
+            $bedrooms = 0;
+        } elseif (preg_match('/\b(\d+)\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)/i', $raw, $m)) {
             $bedrooms = (int) $m[1];
         } elseif (preg_match('/\b(\d+)\s*PH(?:[\/+.\s-]|$)/i', $raw, $m)) {
             $bedrooms = (int) $m[1];
         } elseif (preg_match('/\b(\d+)\s*\+/i', $raw, $m)) {
             $bedrooms = (int) $m[1];
-        } elseif (preg_match('/\bstudio\b/i', $raw)) {
-            $bedrooms = 0;
         }
 
         $squareFootage = $this->areaNumeric($raw);
@@ -1082,6 +1123,7 @@ class AvailabilityIngestService
 
         return [
             'bedrooms' => $bedrooms,
+            'is_studio' => $isStudio,
             'square_footage' => $squareFootage,
             'furnishing' => $furnishing,
             'summary' => $summary,
@@ -1090,15 +1132,13 @@ class AvailabilityIngestService
 
     protected function buildMarketingTitle(?int $bedrooms, string $category, string $building): string
     {
-        $bed = match (true) {
-            $bedrooms === null => '',
-            $bedrooms === 0 => 'Studio ',
-            $bedrooms === 1 => '1BR ',
-            default => $bedrooms.'BR ',
-        };
         $label = Property::CATEGORIES[$category] ?? ucwords(str_replace('_', ' ', $category));
 
-        return trim("{$bed}{$label} for Rent in {$building}");
+        // Read the size through the same helper the UI uses, so an imported
+        // title and a computed one can never disagree ("3BR" vs "3 BR").
+        $bed = (new Property)->forceFill(['bedrooms' => $bedrooms])->bedroomLabel();
+
+        return trim(($bed !== '' ? $bed.' ' : '')."{$label} for Rent in {$building}");
     }
 
     protected function normalizedStatusMap(array $statusMap): array

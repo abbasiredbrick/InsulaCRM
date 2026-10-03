@@ -22,6 +22,109 @@ use Illuminate\Support\Facades\Storage;
 
 class DealController extends Controller
 {
+    /**
+     * Table (list) view of deals — a findable alternative to the kanban board.
+     * Each row links to the deal detail page so the user can open a deal and
+     * take further action (upload documents, generate offer letters, ...).
+     */
+    public function index(Request $request)
+    {
+        $this->authorize('viewAny', Deal::class);
+
+        $query = Deal::with(['lead.property', 'lease', 'agent']);
+
+        if (auth()->user()->isAgent()) {
+            $query->where('agent_id', auth()->id());
+        }
+
+        // Deal type filter: rent (leasing) / sale / all.
+        // Legacy deals have a NULL type and are treated as sales.
+        if ($request->filled('deal_type')) {
+            $dealType = in_array($request->deal_type, ['rent', 'sale'], true) ? $request->deal_type : null;
+            if ($dealType) {
+                $query->where($dealType === 'rent'
+                    ? fn ($q) => $q->where('deal_type', 'rent')
+                    : fn ($q) => $q->where('deal_type', 'sale')->orWhereNull('deal_type'));
+            }
+        }
+
+        $validStages = array_keys(Deal::stages());
+        if ($request->filled('stage') && in_array($request->stage, $validStages, true)) {
+            $query->where('stage', $request->stage);
+        }
+
+        if ($request->filled('agent')) {
+            $query->where('agent_id', $request->agent);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhereHas('lead', function ($lq) use ($search) {
+                        $lq->where(function ($inner) use ($search) {
+                            $inner->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%")
+                                ->orWhere('reference', 'like', "%{$search}%");
+                        });
+                    })
+                    ->orWhereHas('lead.property', function ($pq) use ($search) {
+                        $pq->where('address', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Lead "tags" — temperature / source filters (mirrors the board).
+        if ($request->filled('temp') && in_array($request->temp, ['hot', 'warm', 'cold'], true)) {
+            $query->whereHas('lead', fn ($q) => $q->where('temperature', $request->temp));
+        }
+
+        if ($request->filled('source')) {
+            $query->whereHas('lead', fn ($q) => $q->where('lead_source', $request->source));
+        }
+
+        // Sorting (whitelist — never sort directly on user input).
+        $sortable = [
+            'title' => 'title',
+            'deal_type' => 'deal_type',
+            'stage' => 'stage',
+            'contract_price' => 'contract_price',
+            'fee' => auth()->user()->tenant->business_mode === 'realestate' ? 'total_commission' : 'assignment_fee',
+            'agent' => 'agent_id',
+            'created_at' => 'created_at',
+            'updated_at' => 'updated_at',
+        ];
+        $sort = $request->input('sort', 'updated_at');
+        $sort = array_key_exists($sort, $sortable) ? $sort : 'updated_at';
+        $direction = strtolower((string) $request->input('direction', 'desc'));
+        $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'desc';
+
+        $deals = $query
+            ->orderBy($sortable[$sort], $direction)
+            ->orderBy('id', 'desc')
+            ->paginate((int) ($request->input('per_page', 25) ?: 25))
+            ->withQueryString();
+
+        // Agents for filter dropdown (admin only).
+        $agents = collect();
+        if (auth()->user()->isAdmin()) {
+            $agents = \App\Models\User::where('tenant_id', auth()->user()->tenant_id)
+                ->whereHas('role', fn ($q) => $q->whereIn('name', ['owner', 'admin', 'agent', 'acquisition_agent', 'disposition_agent', 'listing_agent', 'buyers_agent']))
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
+
+        $businessMode = auth()->user()->tenant->business_mode ?? 'wholesale';
+        $modeTerms = \App\Services\BusinessModeService::getTerminology(auth()->user()->tenant);
+        $feeField = $businessMode === 'realestate' ? 'total_commission' : 'assignment_fee';
+        $stageLabels = Deal::stageLabels();
+
+        return view('deals.index', compact(
+            'deals', 'agents', 'businessMode', 'modeTerms', 'feeField', 'stageLabels'
+        ));
+    }
+
     public function pipeline(Request $request)
     {
         $this->authorize('viewAny', Deal::class);
@@ -64,14 +167,29 @@ class DealController extends Controller
             });
         }
 
-        $deals = $query->get()->groupBy('stage');
+        // Lead "tags" — temperature / source filters so the board focuses on
+        // the leads worth chasing instead of everything.
+        if ($request->filled('temp') && in_array($request->temp, ['hot', 'warm', 'cold'], true)) {
+            $query->whereHas('lead', fn ($q) => $q->where('temperature', $request->temp));
+        }
 
-        // Lease and sale pipelines share no stage keys, so a merged board is safe.
+        if ($request->filled('source')) {
+            $query->whereHas('lead', fn ($q) => $q->where('lead_source', $request->source));
+        }
+
+        $deals = $query->get();
+
+        // Pipeline for the active tab only — never the merged "everything" board.
         $stages = $dealType
-            ? \App\Models\Deal::stagesForType($dealType)
-            : (\App\Models\Deal::leasingStages() + \App\Models\Deal::saleStages());
+            ? Deal::stagesForType($dealType)
+            : (Deal::leasingStages() + Deal::saleStages());
 
         $stageLabels = array_map(fn ($t) => __($t), $stages);
+
+        $stageProbs = [];
+        foreach ($stages as $key => $label) {
+            $stageProbs[$key] = Deal::stageProbability($key);
+        }
 
         // Agents for filter dropdown (admin only)
         $agents = collect();
@@ -82,7 +200,7 @@ class DealController extends Controller
                 ->get(['id', 'name']);
         }
 
-        $countQuery = \App\Models\Deal::where('tenant_id', auth()->user()->tenant_id);
+        $countQuery = Deal::where('tenant_id', auth()->user()->tenant_id);
         if (auth()->user()->isAgent()) {
             $countQuery->where('agent_id', auth()->id());
         }
@@ -92,7 +210,51 @@ class DealController extends Controller
             'sale' => (clone $countQuery)->where(fn ($q) => $q->where('deal_type', 'sale')->orWhereNull('deal_type'))->count(),
         ];
 
-        return view('deals.pipeline', compact('deals', 'stages', 'stageLabels', 'agents', 'dealType', 'counts'));
+        $businessMode = auth()->user()->tenant->business_mode ?? 'wholesale';
+        $modeTerms = \App\Services\BusinessModeService::getTerminology(auth()->user()->tenant);
+        $feeField = $businessMode === 'realestate' ? 'total_commission' : 'assignment_fee';
+
+        // Per-column aggregates (count, Σ value, Σ fees, weighted forecast).
+        $grouped = $deals->groupBy('stage');
+        $columns = [];
+        foreach ($stages as $key => $label) {
+            $stageDeals = $grouped[$key] ?? collect();
+            $columns[$key] = [
+                'label' => $stageLabels[$key],
+                'deals' => $stageDeals,
+                'count' => $stageDeals->count(),
+                'value' => round((float) $stageDeals->sum('contract_price'), 2),
+                'fees' => round((float) $stageDeals->sum($feeField), 2),
+                'forecast' => round($stageDeals->sum(fn ($d) => (float) $d->contract_price * Deal::stageProbability($key)), 2),
+                'stale' => $stageDeals->filter(fn ($d) => $d->stage_changed_at && (int) now()->diffInDays($d->stage_changed_at, true) > 5)->count(),
+            ];
+        }
+
+        // Summary strip — answers "business generated" vs "upcoming business".
+        $openDeals = $deals->filter(fn ($d) => ! in_array($d->stage, ['closed_won', 'closed_lost'], true));
+        $wonDeals = $deals->filter(fn ($d) => $d->stage === 'closed_won');
+        $lostDeals = $deals->filter(fn ($d) => $d->stage === 'closed_lost');
+        $decided = $wonDeals->count() + $lostDeals->count();
+
+        $wonThisMonth = $wonDeals->filter(fn ($d) => $d->stage_changed_at && $d->stage_changed_at->gte(now()->startOfMonth()));
+
+        $summary = [
+            'open_count' => $openDeals->count(),
+            'pipeline_value' => round($openDeals->sum('contract_price'), 2),
+            'forecast' => round($openDeals->sum(fn ($d) => (float) $d->contract_price * Deal::stageProbability($d->stage)), 2),
+            'generated' => round($wonThisMonth->sum($feeField), 2),
+            'generated_alltime' => round($wonDeals->sum($feeField), 2),
+            'generated_value_month' => round($wonThisMonth->sum('contract_price'), 2),
+            'won_count' => $wonDeals->count(),
+            'won_count_month' => $wonThisMonth->count(),
+            'win_rate' => $decided > 0 ? round($wonDeals->count() / $decided * 100) : null,
+            'avg_deal' => $wonDeals->count() > 0 ? round($wonDeals->sum('contract_price') / $wonDeals->count(), 2) : 0,
+        ];
+
+        return view('deals.pipeline', compact(
+            'deals', 'stages', 'stageLabels', 'agents', 'dealType', 'counts',
+            'businessMode', 'modeTerms', 'feeField', 'columns', 'summary', 'stageProbs'
+        ));
     }
 
     public function updateStage(Request $request, Deal $deal)
@@ -118,11 +280,6 @@ class DealController extends Controller
             'stage' => $request->stage,
             'stage_changed_at' => now(),
         ];
-
-        // Auto-calculate due_diligence_end_date when moving to under_contract
-        if ($request->stage === 'under_contract' && $deal->contract_date && $deal->inspection_period_days > 0) {
-            $updateData['due_diligence_end_date'] = $deal->contract_date->copy()->addDays($deal->inspection_period_days);
-        }
 
         $deal->update($updateData);
 
@@ -226,11 +383,11 @@ class DealController extends Controller
         $deal->load(['lead.property', 'agent', 'documents', 'buyerMatches.buyer', 'activities.agent']);
 
         if (\App\Services\BusinessModeService::isRealEstate()) {
-            $deal->load(['offers', 'checklistItems', 'offerLetters.discountApprover']);
+            $deal->load(['offers', 'checklistItems', 'offerLetters.discountApprover', 'offerLetters.approver']);
         }
 
         if (request()->ajax()) {
-            return response()->json($deal);
+            return response()->json($deal->append(['is_leasing', 'due_diligence_applies']));
         }
 
         return view('deals.show', compact('deal'));
@@ -242,14 +399,7 @@ class DealController extends Controller
 
         $deal->update($request->validated());
 
-        // Recalculate due_diligence_end_date if relevant fields changed
-        if ($deal->contract_date && $deal->inspection_period_days > 0 && $deal->stage === 'under_contract') {
-            $deal->update([
-                'due_diligence_end_date' => $deal->contract_date->copy()->addDays($deal->inspection_period_days),
-            ]);
-        }
-
-        return response()->json(['success' => true, 'deal' => $deal->fresh()]);
+        return response()->json(['success' => true, 'deal' => $deal->fresh()->append(['is_leasing', 'due_diligence_applies'])]);
     }
 
     public function uploadDocument(Request $request, Deal $deal)

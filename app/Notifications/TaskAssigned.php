@@ -13,8 +13,8 @@ use Illuminate\Notifications\Notification;
 
 class TaskAssigned extends Notification implements ShouldQueue
 {
-    use Queueable;
     use DigestAwareNotification;
+    use Queueable;
 
     public function __construct(
         protected Task $task,
@@ -40,10 +40,10 @@ class TaskAssigned extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $tenantName = $this->tenant->name;
+        $leadName = $this->task->lead?->full_name ?? 'N/A';
 
         return (new MailMessage)
-            ->subject("[{$tenantName}] Task assigned to you: {$this->task->title}")
+            ->subject("[Keystone] Task assigned to you: {$leadName} — {$this->task->title}")
             ->greeting("Hello {$notifiable->name},")
             ->line(__('A task has been assigned to you.'))
             ->line("**{$this->task->title}**")

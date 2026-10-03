@@ -8,12 +8,19 @@ use App\Models\Lead;
  * Aggregates closed lease metrics (rental leads that reached status closed_won).
  *
  * In real estate mode a lease is "closed" when the lead reaches status closed_won
- * with deal_type rent. The associated revenue is the admin_fee collected on the
- * linked rental unit(s). There is no Deal row for a closed lease, so the deals
- * table cannot represent it — hence these metrics.
+ * with deal_type rent. The associated revenue is the standard agency commission
+ * carried by the linked transaction (deal.total_commission), which is computed
+ * automatically when the lead is closed as Won. There can be no Deal row such a
+ * lease maps to, so the reports read the linked deals' commission directly.
  */
 class DashboardMetricsService
 {
+    /**
+     * The timestamp column that records when a lease was closed. Kept on its
+     * own so callers can band it to a month consistently.
+     */
+    public const CLOSED_AT_COLUMN = 'status_changed_at';
+
     /**
      * Base query for closed rental leases.
      */
@@ -39,12 +46,13 @@ class DashboardMetricsService
         [$from, $to] = self::rangeForMonth($month);
 
         return self::closedLeasesQuery($agentId)
-            ->whereBetween('updated_at', [$from, $to])
+            ->whereBetween(self::CLOSED_AT_COLUMN, [$from, $to])
             ->count();
     }
 
     /**
-     * Total admin_fee collected from closed leases during a given month.
+     * Total standard commission collected from closed leases during a given
+     * month (sum of the linked transactions' total_commission).
      */
     public static function closedLeasesFees(?int $agentId = null, ?string $month = null): float
     {
@@ -55,11 +63,10 @@ class DashboardMetricsService
         [$from, $to] = self::rangeForMonth($month);
 
         return (float) self::closedLeasesQuery($agentId)
-            ->whereBetween('updated_at', [$from, $to])
-            ->with('properties:id,admin_fee')
+            ->whereBetween(self::CLOSED_AT_COLUMN, [$from, $to])
+            ->withSum('deals', 'total_commission')
             ->get()
-            ->flatMap(fn ($lead) => $lead->properties->pluck('admin_fee'))
-            ->sum();
+            ->sum('deals_sum_total_commission');
     }
 
     /**
@@ -80,14 +87,14 @@ class DashboardMetricsService
             $monthKey = $date->format('Y-m');
 
             $monthLeads = self::closedLeasesQuery($agentId)
-                ->whereYear('updated_at', $date->year)
-                ->whereMonth('updated_at', $date->month)
-                ->with('properties:id,admin_fee')
+                ->whereYear(self::CLOSED_AT_COLUMN, $date->year)
+                ->whereMonth(self::CLOSED_AT_COLUMN, $date->month)
+                ->withSum('deals', 'total_commission')
                 ->get();
 
             $out[$monthKey] = [
                 'count' => $monthLeads->count(),
-                'fees' => (float) $monthLeads->flatMap(fn ($lead) => $lead->properties->pluck('admin_fee'))->sum(),
+                'fees' => (float) $monthLeads->sum('deals_sum_total_commission'),
             ];
         }
 

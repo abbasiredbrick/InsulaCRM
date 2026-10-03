@@ -11,6 +11,26 @@ class PortalPayloadNormalizer
             unset($data['lead']);
         }
 
+        // Property Finder webhook envelope: {id, type: "lead.created",
+        // entity: {id, type}, payload: {...}} — the lead id lives on the
+        // entity (the envelope id is a per-event uuid, useless for dedup).
+        if (is_array($data['payload'] ?? null) && is_string($data['type'] ?? null) && str_starts_with($data['type'], 'lead.')) {
+            $entityId = $data['entity']['id'] ?? null;
+
+            $data = array_merge($data, $data['payload']);
+
+            if ($entityId !== null) {
+                $data['id'] = $entityId;
+            }
+
+            unset($data['payload'], $data['entity'], $data['type'], $data['timestamp']);
+        }
+
+        // Property Finder puts the enquirer in `sender.name` + `sender.contacts[]`.
+        if (! isset($data['enquirer']) && is_array($data['sender'] ?? null)) {
+            $data['enquirer'] = $data['sender'];
+        }
+
         $enquirer = is_array($data['enquirer'] ?? null) ? $data['enquirer'] : $data;
         $listing = is_array($data['listing'] ?? null) ? $data['listing'] : [];
 
@@ -26,46 +46,51 @@ class PortalPayloadNormalizer
 
         $name = $enquirer['name']
             ?? $customerName
-            ?? ($firstName !== '' || $lastName !== '' ? $firstName . ($lastName !== '' ? ' ' . $lastName : '') : '')
+            ?? ($firstName !== '' || $lastName !== '' ? $firstName.($lastName !== '' ? ' '.$lastName : '') : '')
             ?? '';
 
         $email = $data['email']
             ?? $data['customerEmail']
             ?? (is_string($enquirer['email'] ?? null) ? $enquirer['email'] : null)
+            ?? $this->contactValue($enquirer['contacts'] ?? [], 'email')
             ?? null;
 
         return [
-            'id'           => $data['id']
+            'id' => $data['id']
                 ?? $data['leadId']
                 ?? $data['chat_id']
                 ?? ($enquirer['id'] ?? null),
-            'name'         => is_string($name) ? $name : '',
-            'phone'        => $enquirer['phone_number']
+            'name' => is_string($name) ? $name : '',
+            'phone' => $this->contactValue($enquirer['contacts'] ?? [], 'phone')
+                ?? $this->contactValue($enquirer['contacts'] ?? [], 'whatsappUsername')
+                ?? $enquirer['phone_number']
                 ?? $enquirer['phone']
                 ?? $data['phone']
                 ?? $data['mobile']
                 ?? $data['phoneNumber']
                 ?? null,
-            'email'        => is_string($email) ? $email : null,
-            'message'      => $data['message']
+            'email' => is_string($email) ? $email : null,
+            'message' => $data['message']
                 ?? $data['inquiry']
                 ?? $data['query']
                 ?? ($enquirer['message'] ?? null),
-            'reference'    => $listing['reference']
+            'reference' => $listing['reference']
                 ?? $data['listingReference']
                 ?? $data['propertyReference']
                 ?? $data['reference']
                 ?? null,
-            'url'          => $listing['url']
+            'url' => $listing['url']
                 ?? $data['listingUrl']
                 ?? $data['listing_url']
+                ?? $data['responseLink']
                 ?? $data['url']
                 ?? null,
             'contact_link' => $enquirer['contact_link']
                 ?? $data['contact_link']
                 ?? $data['contactLink']
+                ?? $data['responseLink']
                 ?? null,
-            'received_at'  => $listing['received_at']
+            'received_at' => $listing['received_at']
                 ?? $data['received_at']
                 ?? $data['receivedAt']
                 ?? $data['created_at']
@@ -77,5 +102,20 @@ class PortalPayloadNormalizer
     public function normalizeMultiple(string $portal, array $payloads): array
     {
         return array_map(fn ($payload) => $this->normalize($portal, $payload), $payloads);
+    }
+
+    /**
+     * Pull the value of the first contact with the given type (email, phone,
+     * whatsappUsername) from a Property Finder contacts array.
+     */
+    protected function contactValue(array $contacts, string $type): ?string
+    {
+        foreach ($contacts as $contact) {
+            if (is_array($contact) && ($contact['type'] ?? null) === $type && is_string($contact['value'] ?? null) && trim($contact['value']) !== '') {
+                return trim($contact['value']);
+            }
+        }
+
+        return null;
     }
 }

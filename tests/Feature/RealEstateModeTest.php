@@ -112,13 +112,25 @@ class RealEstateModeTest extends TestCase
         $response->assertSee('Transaction Checklist');
     }
 
-    public function test_realestate_deal_shows_offers_section(): void
+    public function test_realestate_sale_deal_shows_sales_offers_section_only(): void
     {
         $this->actingAsAdmin(['business_mode' => 'realestate']);
-        $deal = $this->createDeal(['stage' => 'offer_received']);
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_received']);
 
         $response = $this->get("/pipeline/{$deal->id}");
         $response->assertStatus(200);
-        $response->assertSee('Offers');
+        $response->assertSee('Sales Offers');
+        $response->assertDontSee('Leasing Offer Letters');
+    }
+
+    public function test_realestate_rent_deal_shows_leasing_offer_letters_section_only(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate']);
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+
+        $response = $this->get("/pipeline/{$deal->id}");
+        $response->assertStatus(200);
+        $response->assertSee('Leasing Offer Letters');
+        $response->assertDontSee('Sales Offers');
     }
 }

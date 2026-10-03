@@ -9,8 +9,12 @@ class NotificationController extends Controller
     /**
      * Get recent notifications for the bell dropdown (AJAX).
      */
-    public function recent()
+    public function recent(Request $request)
     {
+        if (! $request->wantsJson()) {
+            return redirect()->route('notifications.index');
+        }
+
         $notifications = auth()->user()
             ->notifications()
             ->latest()
@@ -43,13 +47,14 @@ class NotificationController extends Controller
 
         if ($filter === 'unread') {
             $query = auth()->user()->unreadNotifications();
-        } elseif (in_array($filter, ['leads', 'deals', 'tasks', 'team', 'availability'])) {
+        } elseif (in_array($filter, ['leads', 'deals', 'tasks', 'team', 'availability', 'chat'])) {
             $typeMap = [
                 'leads' => ['App\\Notifications\\LeadAssigned', 'App\\Notifications\\BuyerMatchFound', 'App\\Notifications\\LeadLostForReview', 'App\\Notifications\\LeadReassigned'],
                 'deals' => ['App\\Notifications\\DealStageChanged', 'App\\Notifications\\DueDiligenceWarning'],
                 'tasks' => ['App\\Notifications\\SequenceStepEmail', 'App\\Notifications\\TaskAssigned', 'App\\Notifications\\TaskActivityNotification', 'App\\Notifications\\ScheduleFeedbackNotification'],
                 'team' => ['App\\Notifications\\TeamMemberInvited', 'App\\Notifications\\TeamLeadActivity'],
                 'availability' => ['App\\Notifications\\AvailabilityConflictAlert'],
+                'chat' => ['App\\Notifications\\NewChatMessage'],
             ];
             if (isset($typeMap[$filter])) {
                 $query->whereIn('type', $typeMap[$filter]);

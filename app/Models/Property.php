@@ -130,6 +130,7 @@ class Property extends Model
         'view',
         'availability',
         'assigned_agent_id',
+        'assign_leads_to_owner',
         'owner_name',
         'owner_phone',
         'owner_email',
@@ -173,9 +174,11 @@ class Property extends Model
             'sold_at' => 'date',
             'handover_date' => 'date',
             'available_from' => 'date',
-            'bayut_listed_at' => 'date',
-            'dubizzle_listed_at' => 'date',
-            'propertyfinder_listed_at' => 'date',
+            'bayut_listed_at' => 'datetime',
+            'dubizzle_listed_at' => 'datetime',
+            'propertyfinder_listed_at' => 'datetime',
+            'availability_synced_at' => 'datetime',
+            'assign_leads_to_owner' => 'boolean',
         ];
     }
 
@@ -300,15 +303,13 @@ class Property extends Model
      */
     public function optionLabel(): string
     {
-        $bits = [
-            $this->display_name,
-            $this->community ?: null,
-        ];
+        // unitLabel() already carries the size, the intent and the location, so
+        // only the baths half and the price are worth adding here — repeating
+        // them would print "2BR for Rent in Marina Gate, Dubai — Dubai — 2BR".
+        $bits = [$this->unitLabel()];
 
-        if ($this->bedrooms || $this->bathrooms) {
-            $bed = $this->bedrooms ? $this->bedrooms.' '.__('BR') : null;
-            $bath = $this->bathrooms ? $this->bathrooms.' '.__('BA') : null;
-            $bits[] = trim(implode(' / ', array_filter([$bed, $bath])));
+        if ($this->bathrooms) {
+            $bits[] = $this->bathrooms.' '.__('BA');
         }
 
         $bits[] = $this->price_line;
@@ -316,30 +317,97 @@ class Property extends Model
         return trim(implode(' — ', array_filter($bits)));
     }
 
+    /**
+     * "Studio" for a zero-bedroom unit, "2BR" otherwise, "" when unrecorded.
+     *
+     * Studio sits on the *size* axis (studio / 1BR / 2BR / 3BR), not the
+     * category axis - a studio is still an apartment. It is stored as
+     * bedrooms = 0, which is FALSY in PHP, so every plain
+     * `$property->bedrooms ? … : null` silently dropped studios from labels and
+     * the inventory showed "0 bd". Render bedrooms through this instead.
+     */
+    public function bedroomLabel(): string
+    {
+        if ($this->isStudio()) {
+            return __('Studio');
+        }
+
+        if ($this->bedrooms === null) {
+            return '';
+        }
+
+        // No space: "2BR". This is the canonical size format — it matches the
+        // marketing titles written at import time
+        // (AvailabilityIngestService::buildMarketingTitle) and the client share
+        // links, so every surface prints the same thing. Spacing here used to
+        // disagree with the stored titles, which made the inventory list show
+        // "3BR" and "3 BR" side by side.
+        return $this->bedrooms.__('BR');
+    }
+
+    public function isStudio(): bool
+    {
+        if ($this->bedrooms !== null && (int) $this->bedrooms === 0) {
+            return true;
+        }
+
+        // Tolerated for rows written while Studio briefly existed as a
+        // category, so those still read as Studio rather than "1 BR Apartment".
+        return $this->property_category === 'studio';
+    }
+
     public function getDisplayNameAttribute(): string
     {
-        if ($this->marketing_title) {
-            return $this->marketing_title;
+        return $this->unitLabel();
+    }
+
+    /**
+     * The unit label used everywhere in the UI and on printed documents:
+     *
+     *   "3BR for Rent in Reem Hills, Yas Island"
+     *   "Studio for Rent in Bloom Towers B, Bloom Towers"
+     *   "2BR for Sale in Yas Island"           (no sub-community on file)
+     *   "for Rent in Reem Hills, Yas Island"   (size simply not recorded)
+     *
+     * Deliberately NOT marketing_title: that is the agent's portal copy and it
+     * reads as a headline, not as a list label. It is still published to the
+     * portals and the XML feed through listingTitle().
+     *
+     * An unrecorded size prints nothing rather than a guessed number - "null
+     * must never read as a studio" applies here too.
+     */
+    public function unitLabel(): string
+    {
+        $place = $this->sub_community ?: $this->community;
+
+        if ($place === '') {
+            // Nothing to locate it by, so the best remaining label wins.
+            return $this->marketing_title ?: $this->address ?: '#'.$this->id;
         }
 
-        $parts = [];
-        if ($this->bedrooms) {
-            $parts[] = $this->bedrooms.' '.__('BR');
-        }
-        if ($this->property_category) {
-            $parts[] = __(self::CATEGORIES[$this->property_category] ?? ucwords(str_replace('_', ' ', $this->property_category)));
-        }
-        if ($this->sub_community) {
-            $parts[] = $this->sub_community;
-        } elseif ($this->community) {
-            $parts[] = $this->community;
-        }
+        $where = $this->sub_community && $this->community && $this->community !== $this->sub_community
+            ? "{$this->sub_community}, {$this->community}"
+            : $place;
 
-        if ($parts) {
-            return implode(' ', $parts);
-        }
+        $size = $this->bedroomLabel();
+        $intent = match ($this->intent) {
+            'sale' => __('Sale'),
+            'both' => __('Rent / Sale'),
+            default => __('Rent'),
+        };
 
-        return $this->address ?: '#'.$this->id;
+        return trim(($size !== '' ? $size.' ' : '')."for {$intent} in {$where}");
+    }
+
+    /**
+     * The title to PUBLISH: the agent's own marketing copy when there is one,
+     * otherwise the generated unit label. The portals, the XML feed and the
+     * CSV export go through here so this CRM relabel never rewrites live
+     * listing copy.
+     */
+    public function listingTitle(): string
+    {
+        return $this->marketing_title ?: $this->unitLabel();
     }
 
     /**

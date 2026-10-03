@@ -87,6 +87,51 @@ function checkForAppUpdate() {
     });
 }
 
+// Full client-side reset: check the worker for a new build, drop every
+// keystone cache, then reload so the fresh worker controls the page.
+window.hardResetApp = function() {
+    var setStatus = function(text) {
+        document.querySelectorAll('.keystone-reset-status').forEach(function(el) {
+            el.textContent = text;
+        });
+    };
+    setStatus('Resetting…');
+    var jobs = [];
+    if ('serviceWorker' in navigator) {
+        jobs.push(
+            navigator.serviceWorker.getRegistration().then(function(reg) {
+                return reg ? reg.update() : null;
+            }).catch(function() {})
+        );
+    }
+    if (window.caches) {
+        jobs.push(
+            caches.keys().then(function(keys) {
+                return Promise.all(keys.map(function(key) {
+                    return key.indexOf('keystone') === 0 ? caches.delete(key) : null;
+                }));
+            }).catch(function() {})
+        );
+    }
+    Promise.all(jobs).then(function() {
+        if ('serviceWorker' in navigator) {
+            return navigator.serviceWorker.getRegistrations()
+                .then(function(regs) {
+                    return Promise.all(regs.map(function(reg) { return reg.unregister(); }));
+                })
+                .catch(function() {});
+        }
+    }).then(function() {
+        if (window.caches) {
+            return caches.keys().then(function(keys) {
+                return Promise.all(keys.map(function(key) { return caches.delete(key); }));
+            }).catch(function() {});
+        }
+    }).then(function() {
+        window.location.reload();
+    });
+};
+
 // Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {

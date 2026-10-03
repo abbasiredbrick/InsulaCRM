@@ -4,16 +4,16 @@ namespace App\Notifications;
 
 use App\Models\Deal;
 use App\Models\Tenant;
+use App\Traits\DigestAwareNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Traits\DigestAwareNotification;
 
 class StaleDealAlert extends Notification implements ShouldQueue
 {
-    use Queueable;
     use DigestAwareNotification;
+    use Queueable;
 
     public function __construct(
         protected Deal $deal,
@@ -41,9 +41,11 @@ class StaleDealAlert extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $stageLabel = Deal::stageLabel($this->deal->stage);
+        $deal = $this->deal;
+        $leadName = $deal->lead ? "{$deal->lead->first_name} {$deal->lead->last_name}" : 'Unknown';
 
         return (new MailMessage)
-            ->subject("[{$this->tenant->name}] Stale Deal Alert: {$this->deal->title}")
+            ->subject("[Keystone] Stale Deal Alert: {$leadName} — {$deal->title}")
             ->greeting("Deal Stuck for {$this->daysStuck} Days")
             ->line("The deal \"{$this->deal->title}\" has been in the {$stageLabel} stage for {$this->daysStuck} days.")
             ->line('**AI Recommendation:**')

@@ -11,14 +11,25 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        then: function (): void {
+            Illuminate\Support\Facades\Broadcast::routes(['middleware' => ['web']]);
+        },
     )
     ->withSchedule(function (Schedule $schedule): void {
+        // The portal lead pulls are the only jobs that walk a paginated remote
+        // API, so they are the ones that overlap: without withoutOverlapping a
+        // slow pull and the next tick fight over the same leads_last_synced_at
+        // cursor. onOneServer needs a shared cache lock store - on a single box
+        // it is a no-op, and on more than one it stops the duplicate.
+        $schedule->command('portals:pull-bayut-leads')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('portals:pull-propertyfinder-leads')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+
         $schedule->command('calendar:send-reminders')->everyMinute();
         $schedule->command('sequences:process')->daily();
         $schedule->command('deals:check-due-diligence')->daily();
         $schedule->command('leads:assign-unclaimed')->everyMinute();
-        $schedule->command('portals:pull-bayut-leads')->everyThirtyMinutes();
         $schedule->command('portals:sync-listing-status')->dailyAt('04:30');
         $schedule->command('backup:clean')->daily()->at('01:00');
         $schedule->command('ai:pipeline-digest')->dailyAt('07:00');
@@ -46,6 +57,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->prependToGroup('web', \App\Http\Middleware\CheckInstalled::class);
+        // Safety net for hosts with no working cron: keeps portal leads syncing
+        // from ordinary page views. Throttled by a cache marker, and a no-op
+        // whenever the scheduled command is doing its job.
+        $middleware->appendToGroup('web', \App\Http\Middleware\CatchUpPortalLeads::class);
 
         $middleware->validateCsrfTokens(except: [
             'portal/webhooks/*',

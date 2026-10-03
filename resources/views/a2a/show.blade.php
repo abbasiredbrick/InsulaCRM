@@ -114,7 +114,7 @@
                 @if($contract->terms)
                 <div class="mt-3">
                     <div class="text-secondary text-uppercase fw-bold mb-1" style="font-size:0.75rem;">{{ __('Terms') }}</div>
-                    <div style="white-space:pre-line;">{{ $contract->terms }}</div>
+                    <x-linkified :text="$contract->terms" />
                 </div>
                 @endif
             </div>

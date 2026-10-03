@@ -283,6 +283,8 @@ class ClientShareController extends Controller
             $lead->id => ['relation_type' => 'interest'],
         ]);
 
+        app(\App\Services\UnitLeadAssignmentService::class)->assignToUnitOwnerIfRequired($lead->fresh() ?? $lead, $property);
+
         AuditLog::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,
             'user_id' => null,

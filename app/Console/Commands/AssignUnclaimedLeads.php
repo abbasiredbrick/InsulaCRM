@@ -36,13 +36,18 @@ class AssignUnclaimedLeads extends Command
                 continue;
             }
 
+            // The claim window is over, so fall back to the same routing pool the
+            // tenant's distribution formula uses - including its receives_leads
+            // opt-out, so a member who left the rotation is not handed a lead
+            // here after everyone else declined it.
             $agents = $tenant->users()
-                ->where('is_active', true)
+                ->receivingLeads()
                 ->orderBy('id')
                 ->get();
 
             if ($agents->isEmpty()) {
                 $this->warn("Tenant [{$tenant->name}] has no active agents — skipping.");
+
                 continue;
             }
 
