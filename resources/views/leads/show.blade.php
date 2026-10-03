@@ -4,12 +4,12 @@
 @section('page-title', $lead->full_name)
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'table' ? route('leads.table') : route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'kanban' ? route('leads.kanban') : route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ $lead->full_name }}</li>
 @endsection
 
 @section('page-actions')
-<x-back-link :fallback="session('leads.view') === 'table' ? route('leads.table') : route('leads.index')" :force="true" />
+<x-back-link :fallback="session('leads.view') === 'kanban' ? route('leads.kanban') : route('leads.index')" :force="true" />
 @endsection
 
 @section('content')

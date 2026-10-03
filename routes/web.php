@@ -452,9 +452,10 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         Route::get('/my-commissions', [\App\Http\Controllers\CommissionController::class, 'mine'])->name('commissions.mine');
         Route::patch('/commissions/{commission}/status', [\App\Http\Controllers\CommissionController::class, 'updateStatus'])->name('commissions.status');
-        Route::get('/leads', [LeadKanbanController::class, 'index'])->name('leads.index');
+        Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
         Route::get('/leads/table', [LeadController::class, 'index'])->name('leads.table');
-        Route::redirect('/leads/kanban', '/leads');
+        Route::get('/leads/kanban', [LeadKanbanController::class, 'index'])->name('leads.kanban');
+        Route::redirect('/leads/kanban/old', '/leads/kanban');
         Route::post('/leads/bulk-action', [LeadController::class, 'bulkAction'])->name('leads.bulkAction');
         Route::resource('leads', LeadController::class)->except(['index']);
         Route::get('/leads/{lead}/chat', [ChatController::class, 'leadChat'])->name('leads.chat');
