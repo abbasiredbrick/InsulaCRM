@@ -367,6 +367,11 @@
                             </h2>
                         </div>
                         <div class="col-auto ms-auto d-flex align-items-center gap-2">
+                            @hasSection('page-actions')
+                            <div class="d-flex align-items-center gap-1">
+                                @yield('page-actions')
+                            </div>
+                            @endif
 
                             <!-- Global Search -->
                             <div class="position-relative" id="global-search-wrap" style="width: 260px;">

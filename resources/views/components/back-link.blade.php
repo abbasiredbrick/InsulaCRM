@@ -1,9 +1,22 @@
-@props(['fallback' => route('dashboard')])
+@props(['fallback' => null, 'force' => false])
+
+@php
+    $fallbackUrl = $fallback;
+    if (empty($fallbackUrl)) {
+        $fallbackUrl = route('dashboard');
+    }
+    // Ensure it's a string URL
+    if (!is_string($fallbackUrl)) {
+        $fallbackUrl = route('dashboard');
+    }
+@endphp
 
 <button
     type="button"
     x-data="{
         canGoBack: false,
+        force: {{ $force ? 'true' : 'false' }},
+        fallbackUrl: @js($fallbackUrl),
         init() {
             this.update();
             window.addEventListener('pageshow', () => this.update());
@@ -11,16 +24,16 @@
         },
         update() {
             try {
-                this.canGoBack = window.history.length > 1;
+                this.canGoBack = this.force || window.history.length > 1;
             } catch (e) {
-                this.canGoBack = false;
+                this.canGoBack = this.force;
             }
         },
         goBack() {
-            if (window.history.length > 1) {
+            if (!this.force && window.history.length > 1) {
                 window.history.back();
             } else {
-                window.location.href = '{{ is_string($fallback) && Str::startsWith($fallback, ['http://', 'https://', '/']) ? $fallback : route('dashboard') }}';
+                window.location.href = this.fallbackUrl;
             }
         }
     }"

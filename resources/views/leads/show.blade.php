@@ -8,6 +8,10 @@
 <li class="breadcrumb-item active" aria-current="page">{{ $lead->full_name }}</li>
 @endsection
 
+@section('page-actions')
+<x-back-link :fallback="session('leads.view') === 'table' ? route('leads.table') : route('leads.index')" :force="true" />
+@endsection
+
 @section('content')
 <div class="row">
     <div class="col-md-8">
