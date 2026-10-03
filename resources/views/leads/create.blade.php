@@ -4,7 +4,7 @@
 @section('page-title', __('Add New Lead'))
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'table' ? route('leads.table') : route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ __('Add New Lead') }}</li>
 @endsection
 

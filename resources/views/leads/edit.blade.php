@@ -4,7 +4,7 @@
 @section('page-title', __('Edit Lead') . ': ' . $lead->full_name)
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'table' ? route('leads.table') : route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item"><a href="{{ route('leads.show', $lead) }}">{{ $lead->full_name }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ __('Edit') }}</li>
 @endsection

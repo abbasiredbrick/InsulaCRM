@@ -4,7 +4,7 @@
 @section('page-title', $lead->full_name)
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'table' ? route('leads.table') : route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ $lead->full_name }}</li>
 @endsection
 
@@ -60,6 +60,18 @@
                         {{ __('Create A2A') }}
                     </a>
                     @endif
+                    @php
+                        $leadChatUnread = \App\Models\Conversation::where('lead_id', $lead->id)
+                            ->get()
+                            ->sum(fn ($c) => $c->unreadCountFor(auth()->user()));
+                    @endphp
+                    <a href="{{ route('leads.chat', $lead) }}" class="btn btn-outline-cyan btn-sm me-1 position-relative" title="{{ __('Team chat about this lead') }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M21 14l-3 -3h-7a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h9a1 1 0 0 1 1 1v10"/><path d="M14 15v-2a2 2 0 0 0 -2 -2h-7l-3 3v11l2.5 -2.5"/></svg>
+                        {{ __('Chat') }}
+                        @if($leadChatUnread)
+                        <span class="badge bg-red badge-pill chat-unread" data-lead-chat-unread="{{ $leadChatUnread }}" style="position:absolute; top:-6px; right:-6px; font-size:10px;">{{ min($leadChatUnread, 99) }}</span>
+                        @endif
+                    </a>
                     @if($canReassign)
                     <button type="button" class="btn btn-outline-warning btn-sm me-1" data-bs-toggle="modal" data-bs-target="#reassignModal">
                         {{ __('Reassign') }}
@@ -289,31 +301,84 @@
                 @if($lead->notes)
                 <div class="mt-3">
                     <h4>{{ __('Notes') }}</h4>
-                    <p>{{ $lead->notes }}</p>
+                    <x-linkified :text="$lead->notes" />
                 </div>
                 @endif
 
                 @php
                     $customFieldDefs = \App\Models\CustomFieldDefinition::forEntity('lead');
                     $cfValues = $lead->custom_fields ?? [];
+
+                    // Portal leads carry their origin in custom_fields, but the
+                    // portal URLs are only rendered above if the tenant happens
+                    // to have defined matching custom fields - which almost
+                    // nobody does. Surface them explicitly so an imported
+                    // Bayut/Property Finder enquiry is one click from both the
+                    // listing and the conversation about it.
+                    //
+                    // Two genuinely different destinations: listing_url opens
+                    // the property page, contact_link opens the agent's message
+                    // thread. Both are shown when they differ; if PF could not
+                    // resolve a property page yet, the same URL would land in
+                    // both slots and printing it twice is pure noise.
+                    $seenPortalUrls = [];
+                    $portalFields = collect([
+                        'listing_url' => __('Listing'),
+                        'contact_link' => __('WhatsApp conversation'),
+                    ])->filter(function ($label, $key) use ($cfValues, &$seenPortalUrls) {
+                        $url = trim((string) ($cfValues[$key] ?? ''));
+
+                        if ($url === '' || in_array($url, $seenPortalUrls, true)) {
+                            return false;
+                        }
+
+                        $seenPortalUrls[] = $url;
+
+                        return true;
+                    });
                 @endphp
+
+                @if($portalFields->isNotEmpty())
+                <div class="mt-3">
+                    <h4>{{ __('Portal Links') }}</h4>
+                    <div class="datagrid">
+                        @foreach($portalFields as $portalKey => $portalLabel)
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">{{ $portalLabel }}</div>
+                            <div class="datagrid-content">
+                                <x-linkified :text="$cfValues[$portalKey]" :newlines="false" />
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
                 @if($customFieldDefs->count() && !empty($cfValues))
                 <div class="mt-3">
                     <h4>{{ __('Additional Information') }}</h4>
                     <div class="datagrid">
                         @foreach($customFieldDefs as $cfd)
-                            @if(isset($cfValues[$cfd->slug]) && $cfValues[$cfd->slug] !== '' && $cfValues[$cfd->slug] !== '0')
+                            @if(
+                                ! isset($cfValues[$cfd->slug])
+                                || $cfValues[$cfd->slug] === ''
+                                || $cfValues[$cfd->slug] === '0'
+                                || in_array($cfd->slug, $portalFields->keys()->all(), true)
+                            )
+                                @continue
+                            @endif
                             <div class="datagrid-item">
                                 <div class="datagrid-title">{{ __($cfd->name) }}</div>
                                 <div class="datagrid-content">
                                     @if($cfd->field_type === 'checkbox')
                                         {{ $cfValues[$cfd->slug] ? __('Yes') : __('No') }}
+                                    @elseif(is_string($cfValues[$cfd->slug]))
+                                        <x-linkified :text="$cfValues[$cfd->slug]" :newlines="false" />
                                     @else
                                         {{ $cfValues[$cfd->slug] }}
                                     @endif
                                 </div>
                             </div>
-                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -525,7 +590,7 @@
                                 <div class="activity-view" id="activity-view-{{ $activity->id }}">
                                     <div class="text-truncate">
                                         <strong>{{ __(ucwords(str_replace('_', ' ', $activity->type))) }}</strong>
-                                        @if($activity->subject) - {{ $activity->subject }} @endif
+                                        @if($activity->subject) - <x-linkified :text="$activity->subject" :newlines="false" /> @endif
                                         @if($activity->subject_type === \App\Models\Showing::class && $activity->subject_id)
                                         <a href="{{ route('showings.show', $activity->subject_id) }}" class="text-decoration-none ms-1 small">{{ __('Open viewing') }} &rarr;</a>
                                         @elseif($activity->subject_type === \App\Models\Task::class && $activity->subject_id)
@@ -535,7 +600,7 @@
                                         @endif
                                     </div>
                                     @if($activity->body)
-                                    <div class="text-secondary" style="white-space:pre-line;font-size:13px;">{{ $activity->body }}</div>
+                                    <div class="text-secondary" style="font-size:13px;"><x-linkified :text="$activity->body" /></div>
                                     @endif
                                     <div class="text-secondary small">
                                         {{ $activity->agent->name ?? '' }} &middot; {{ $activity->logged_at ? $activity->logged_at->diffForHumans() : $activity->created_at->diffForHumans() }}
@@ -835,7 +900,7 @@
                             <div class="list-group-item py-2 px-2">
                                 <div class="d-flex align-items-start">
                                     <div class="flex-fill">
-                                        <div style="font-size:13px;">{{ $_activity->body }}</div>
+                                        <div style="font-size:13px;"><x-linkified :text="$_activity->body" /></div>
                                         <small class="text-secondary">
                                             {{ $_activity->agent?->name ?? __('System') }} &middot; {{ $_activity->created_at?->diffForHumans() }}
                                         </small>
@@ -968,12 +1033,12 @@
                                 @endif
                             </small>
                             @if($meeting->notes)
-                            <div class="small text-secondary mt-1">{{ $meeting->notes }}</div>
+                            <div class="small text-secondary mt-1"><x-linkified :text="$meeting->notes" /></div>
                             @endif
                             @if($meeting->feedback)
                             <div class="small text-secondary mt-1">
                                 <span class="badge bg-purple-lt me-1">{{ __('Feedback') }}</span>
-                                <span style="white-space:pre-line;">{{ $meeting->feedback }}</span>
+                                <x-linkified :text="$meeting->feedback" />
                             </div>
                             @endif
                         </div>

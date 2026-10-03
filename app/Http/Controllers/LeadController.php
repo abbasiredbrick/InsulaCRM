@@ -92,6 +92,7 @@ class LeadController extends Controller
 
         $showAgentPicker = ! $user->isAgent() || $user->isManager();
         $agents = $showAgentPicker ? $this->getAgents() : collect();
+        $request->session()->put('leads.view', 'table');
 
         return view('leads.index', compact('leads', 'agents'));
     }
@@ -508,6 +509,8 @@ class LeadController extends Controller
         app(MotivationScoreService::class)->recalculate($lead);
         $lead->refresh();
 
+        // A lead that reached a revenue stage must surface in the pipeline.
+        app(\App\Services\PipelineSyncService::class)->syncForLead($lead);
 
         // Closing won syncs the linked pipeline deals and applies the standard
         // commission + company/agent split.
@@ -563,6 +566,8 @@ class LeadController extends Controller
 
         $lead->properties()->syncWithoutDetaching([$property->id]);
 
+        app(\App\Services\UnitLeadAssignmentService::class)->assignToUnitOwnerIfRequired($lead, $property);
+
         AuditLog::log('lead.property_linked', $lead, ['property_id' => $property->id]);
 
         return back()->with('success', __('Unit linked to this lead.'));
@@ -612,6 +617,8 @@ class LeadController extends Controller
             ->all();
 
         $lead->properties()->sync($propertyIds);
+
+        app(\App\Services\UnitLeadAssignmentService::class)->reassignToUnitOwnerIfAnyLinkedRequiresIt($lead);
     }
 
     public function updateStatus(Request $request, Lead $lead)
