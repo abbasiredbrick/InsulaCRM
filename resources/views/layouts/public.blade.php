@@ -34,6 +34,9 @@
 </head>
 <body class="d-flex flex-column">
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js" defer></script>
+    <div class="container-xl d-flex align-items-center pt-3">
+        <x-back-link />
+    </div>
     @yield('content')
     @stack('scripts')
 </body>

@@ -203,7 +203,7 @@
                         @endif
 
                         @unless(auth()->user()->isFieldScout())
-                        <li class="nav-item {{ request()->is('pipeline*') ? 'active' : '' }}">
+                        <li class="nav-item {{ request()->is('pipeline*') || request()->is('deals*') ? 'active' : '' }}">
                             <a class="nav-link" href="{{ route('pipeline') }}">
                                 <span class="nav-link-icon">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
@@ -352,23 +352,6 @@
                             </a>
                         </li>
                     </ul>
-                    {{-- ── Mode Indicator ──────────────────────── --}}
-                    <div class="px-3 py-2 mt-2" style="border-top: 1px solid rgba(255,255,255,0.08);">
-                        @php $isRE = ($businessMode ?? 'wholesale') === 'realestate'; @endphp
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="avatar avatar-xs {{ $isRE ? 'bg-teal' : 'bg-blue' }} text-white" style="width: 22px; height: 22px; font-size: 0.6rem;">
-                                @if($isRE)
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0"/><path d="M5 21v-14l8 -4v18"/><path d="M19 21v-10l-6 -4"/><path d="M9 9l0 .01"/><path d="M9 12l0 .01"/><path d="M9 15l0 .01"/><path d="M9 18l0 .01"/></svg>
-                                @else
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0"/><path d="M9 8l1 0"/><path d="M9 12l1 0"/><path d="M9 16l1 0"/><path d="M14 8l1 0"/><path d="M14 12l1 0"/><path d="M14 16l1 0"/><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16"/></svg>
-                                @endif
-                            </span>
-                            <div style="line-height: 1.2;">
-                                <div class="text-white" style="font-size: 0.7rem; font-weight: 600;">{{ $isRE ? __('Real Estate Agent') : __('Wholesale') }}</div>
-                                <div style="font-size: 0.6rem; color: rgba(255,255,255,0.5);">{{ __('Mode') }}</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </aside>
@@ -377,8 +360,9 @@
             <div class="page-header d-print-none">
                 <div class="container-xl">
                     <div class="row g-2 align-items-center">
-                        <div class="col">
-                            <h2 class="page-title">
+                        <div class="col d-flex align-items-center gap-2">
+                            <x-back-link />
+                            <h2 class="page-title mb-0">
                                 @yield('page-title', __('Dashboard'))
                             </h2>
                         </div>
@@ -445,6 +429,7 @@
                                     <a class="dropdown-item" href="{{ route('settings.index') }}">{{ __('Settings') }}</a>
                                     @endif
                                     <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#about-keystone-modal">{{ __('About Keystone') }} <span class="text-muted ms-1">v{{ config('app.version') }}</span></a>
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="dropdown-item text-danger">{{ __('Logout') }}</button>
@@ -528,6 +513,7 @@
             'user-check': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 11l2 2 4-4"/></svg>',
             'checklist': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M9.615 20H7a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v8"/><path d="M14 19l2 2l4-4"/></svg>',
             'activity': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M3 12h4l3 8l4-16l3 8h4"/></svg>',
+            'messages': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M21 14l-3 -3h-7a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h9a1 1 0 0 1 1 1v10"/><path d="M14 15v-2a2 2 0 0 0 -2 -2h-7l-3 3v11l2.5 -2.5"/></svg>',
             'bell': '<svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 5a2 2 0 014 0 7 7 0 014 6v3a4 4 0 002 3H4a4 4 0 002-3v-3a7 7 0 014-6"/><path d="M9 17v1a3 3 0 006 0v-1"/></svg>'
         };
 
@@ -537,7 +523,7 @@
         };
 
         function loadNotifications() {
-            fetch('{{ route('notifications.recent') }}')
+            fetch('{{ route('notifications.recent') }}', { headers: { 'Accept': 'application/json' } })
                 .then(r => r.json())
                 .then(data => {
                     if (data.unread_count > 0) {
@@ -803,15 +789,98 @@
             </div>
         </div>
     </div>
+    <div class="modal modal-blur fade" id="about-keystone-modal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">{{ __('About Keystone') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @include('partials.about-keystone')
+                </div>
+            </div>
+        </div>
+    </div>
     <style>
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
     .notif-unread { background: var(--tblr-bg-surface-secondary, #f0f6ff); border-left: 3px solid var(--tblr-primary, #206bc4); }
+
+    /* ── Processing overlay ──────────────────────────────────────────────────
+       Shown while a task (import, sync, save) is running. The backdrop swallows
+       clicks so a task cannot be started twice, and the whole page reports
+       `data-processing-active` so CSS can switch the cursor to "progress". */
+    #keystone-processing-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(248, 250, 252, .72);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        cursor: progress;
+    }
+    [data-processing-active] #keystone-processing-overlay { display: flex; }
+    #keystone-processing-overlay .keystone-processing__panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        padding: 28px 34px;
+        min-width: 220px;
+        background: var(--tblr-bg-surface, #fff);
+        border-radius: 12px;
+        box-shadow: 0 12px 40px rgba(24, 36, 51, .18);
+        text-align: center;
+    }
+    #keystone-processing-overlay .keystone-processing__logo {
+        width: 56px;
+        height: 56px;
+        object-fit: contain;
+        animation: keystoneProcessingPulse 1.4s ease-in-out infinite;
+    }
+    #keystone-processing-overlay .keystone-processing__bar {
+        width: 180px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--tblr-border, #e6ebf1);
+        overflow: hidden;
+    }
+    #keystone-processing-overlay .keystone-processing__bar > span {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--tblr-primary, #206bc4);
+        animation: keystoneProcessingSlide 1.1s ease-in-out infinite;
+    }
+    #keystone-processing-overlay .keystone-processing__label {
+        font-size: .9rem;
+        font-weight: 600;
+        color: var(--tblr-body-color, #1a2b3c);
+    }
+    @keyframes keystoneProcessingPulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(.9); opacity: .75; }
+    }
+    @keyframes keystoneProcessingSlide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+    }
+    html[data-processing-active], html[data-processing-active] body { cursor: progress !important; }
     </style>
+    <script>
+        window.__keystoneProcessingLogo = @json(asset('images/logo.png'));
+        window.__keystoneProcessingLabel = @json(__('Processing…'));
+    </script>
     <script src="{{ asset('js/searchable-dropdowns.js') . '?v=' . config('app.version') }}"></script>
     <script src="{{ asset('js/live-filter.js') . '?v=' . config('app.version') }}"></script>
+    <script src="{{ asset('js/processing-overlay.js') . '?v=' . config('app.version') }}"></script>
     <script src="{{ asset('js/mobile-app.js') . '?v=' . config('app.version') }}"></script>
     @include('layouts._broadcasting')
 </body>
