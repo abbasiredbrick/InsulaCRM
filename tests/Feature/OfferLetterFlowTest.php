@@ -1118,4 +1118,358 @@ class OfferLetterFlowTest extends TestCase
         $this->assertStringContainsString('max="'.now()->format('Y-m-d').'"', $html);
         $this->assertStringContainsString('value="'.now()->format('Y-m-d').'"', $html);
     }
+
+    public function test_the_offered_unit_is_chosen_from_the_units_the_client_has_viewed(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $viewed = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'marketing_title' => 'Marina Gate 1402',
+            'rent_price' => 120000,
+            'rent_period' => 'year',
+            'deposit_amount' => 10000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+        ]);
+        $other = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'marketing_title' => 'JVC Garden 802',
+            'rent_price' => 90000,
+            'rent_period' => 'year',
+            'deposit_amount' => 7500,
+            'admin_fee' => 1750,
+            'contract_fee' => 350,
+        ]);
+
+        // Viewed units arrive by two different routes: the agent's linked-units
+        // list, and a viewing booked against the lead.
+        $deal->lead->properties()->attach($viewed->id);
+        $deal->lead->showings()->create([
+            'tenant_id' => $this->tenant->id,
+            'agent_id' => $this->adminUser->id,
+            'showing_date' => now()->addDays(3),
+            'showing_time' => '11:00',
+            'status' => 'scheduled',
+            'property_id' => $other->id,
+        ]);
+
+        $html = $this->get(route('deals.show', $deal))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-offer-unit', $html, 'The unit picker must be offered.');
+        $this->assertStringContainsString('value="'.$viewed->id.'"', $html);
+        $this->assertStringContainsString('value="'.$other->id.'"', $html);
+
+        // Picking the viewing's unit pulls that unit's figures, not the other one's.
+        $json = $this->getJson(route('deal.offers.unitDefaults', $deal).'?unit_id='.$other->id);
+        $json->assertOk();
+
+        $this->assertEquals(90000.0, (float) $json->json('original_amount'));
+        $this->assertEquals(7500.0, (float) $json->json('security_deposit'));
+        $this->assertEquals(1750.0, (float) $json->json('admin_fee'));
+        $this->assertEquals(350.0, (float) $json->json('contract_fee'));
+    }
+
+    public function test_choosing_a_unit_stamps_it_onto_the_deal_so_a_later_letter_prices_off_that_unit(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $unit = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'rent_price' => 120000,
+            'rent_period' => 'year',
+            'deposit_amount' => 10000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+        ]);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'unit_id' => $unit->id,
+            'original_amount' => 120000,
+            'security_deposit' => 10000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+        ])->assertRedirect();
+
+        $this->assertSame($unit->id, $deal->fresh()->property_id);
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals(2500.0, (float) $offer->admin_fee);
+        $this->assertEquals(500.0, (float) $offer->contract_fee);
+        $this->assertEquals(10000.0, (float) $offer->security_deposit);
+    }
+
+    public function test_a_unit_from_another_tenant_cannot_be_used_for_an_offer(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+        $originalUnit = $deal->fresh()->property_id;
+
+        $otherTenant = \App\Models\Tenant::create([
+            'name' => 'Rival Agency',
+            'slug' => 'rival-agency',
+            'email' => 'admin@rival.test',
+            'status' => 'active',
+            'currency' => 'USD',
+            'country' => 'US',
+            'locale' => 'en',
+            'distribution_method' => 'round_robin',
+        ]);
+        $foreign = \App\Models\Property::factory()->create([
+            'tenant_id' => $otherTenant->id,
+            'rent_price' => 5000000,
+        ]);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'unit_id' => $foreign->id,
+            'original_amount' => 120000,
+        ])->assertStatus(422);
+
+        $this->assertSame($originalUnit, $deal->fresh()->property_id);
+        $this->assertSame(0, $deal->offerLetters()->count());
+    }
+
+    public function test_the_end_date_is_derived_from_the_start_date_and_the_contract_period(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'contract_start_date' => '2027-03-01',
+            'contract_years' => 2,
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        // Two years from 1 March 2027 ends on 28 Feb 2029: the -1 day is what
+        // makes a tenancy end the day before its anniversary, not a year later.
+        $this->assertSame('2027-03-01', $offer->contract_start_date->format('Y-m-d'));
+        $this->assertSame('2029-02-28', $offer->contract_end_date->format('Y-m-d'));
+        $this->assertSame(2, $offer->contract_years);
+    }
+
+    public function test_a_single_year_term_ends_the_day_before_its_anniversary(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'contract_start_date' => '2028-03-01',
+            'contract_years' => 1,
+        ])->assertRedirect();
+
+        // 2029-02-28, not 2028-02-29: a "one year" term spans start .. start+1yr-1day,
+        // so the client occupies all twelve months. addYears() moves the month and
+        // day rather than re-deriving them, so this is not a leap-day special case.
+        $this->assertSame('2029-02-28', $deal->offerLetters()->first()->contract_end_date->format('Y-m-d'));
+    }
+
+    public function test_the_contract_period_must_be_a_sane_number_of_years(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'contract_years' => 0,
+        ])->assertSessionHasErrors('contract_years');
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'contract_years' => 40,
+        ])->assertSessionHasErrors('contract_years');
+    }
+
+    public function test_the_letter_prints_the_contract_period_in_years(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'contract_start_date' => '2027-03-01',
+            'contract_years' => 3,
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+        $html = $this->get(route('deal.offers.print', $offer))->getContent();
+
+        $this->assertStringContainsString('(3 Years)', $html);
+    }
+
+    public function test_no_of_payments_is_a_number_from_one_to_twelve(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $html = $this->get(route('deals.show', $deal))->assertOk()->getContent();
+
+        $this->assertStringContainsString(__('No. of Payments'), $html);
+        $this->assertStringContainsString('name="payment_period"', $html);
+        $this->assertStringNotContainsString(__('Payment Period'), $html);
+
+        // All twelve options present, and nothing outside the range.
+        for ($n = 1; $n <= 12; $n++) {
+            $this->assertStringContainsString('<option value="'.$n.'"', $html);
+        }
+        $this->assertStringNotContainsString('<option value="0"', $html);
+        $this->assertStringNotContainsString('<option value="13"', $html);
+    }
+
+    public function test_the_number_of_payments_is_stored_as_a_count_and_printed_as_a_phrase(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'payment_period' => 4,
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('4', $offer->payment_period);
+        $this->assertSame('4 Payments', $offer->paymentPeriodLabel());
+        $this->assertStringContainsString('— 4 Payments', $this->get(route('deal.offers.print', $offer))->getContent());
+    }
+
+    public function test_one_payment_reads_singular(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'payment_period' => 1,
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('1 Payment', $offer->paymentPeriodLabel());
+    }
+
+    public function test_the_number_of_payments_is_capped_at_twelve(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'payment_period' => 13,
+        ])->assertSessionHasErrors('payment_period');
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'payment_period' => 0,
+        ])->assertSessionHasErrors('payment_period');
+    }
+
+    public function test_a_legacy_free_text_payment_period_still_prints_verbatim(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000]);
+        $offer = $deal->offerLetters()->first();
+
+        // Letters written before the field became a count hold phrases like this.
+        // Numeric suffixing would render "1 Payment Payments".
+        $offer->update(['payment_period' => '2 Cheques']);
+        $this->assertSame('2 Cheques', $offer->paymentPeriodLabel());
+
+        $offer->update(['payment_period' => '1 Payment']);
+        $this->assertSame('1 Payment', $offer->paymentPeriodLabel());
+
+        $offer->update(['payment_period' => null]);
+        $this->assertNull($offer->paymentPeriodLabel());
+    }
+
+    public function test_the_offered_unit_drives_both_the_price_and_the_fees_not_the_leads_unit(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $leadUnit = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'rent_price' => 100000, 'rent_period' => 'year',
+            'deposit_amount' => 1000, 'admin_fee' => 1000, 'contract_fee' => 1000,
+        ]);
+        $offered = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'rent_price' => 120000, 'rent_period' => 'year',
+            'deposit_amount' => 10000, 'admin_fee' => 2500, 'contract_fee' => 500,
+        ]);
+
+        // The lead still points at the first unit; the agent writes the offer on
+        // the second. Price and fees must both come from the second, or the
+        // letter quotes one unit's rent against the other unit's deposit.
+        $deal->lead->properties()->attach($leadUnit->id);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'unit_id' => $offered->id,
+            'original_amount' => 120000,
+            'security_deposit' => 10000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals(120000.0, (float) $offer->original_amount, 'Listed price must follow the offered unit.');
+        $this->assertEquals(2500.0, (float) $offer->admin_fee);
+        $this->assertEquals(500.0, (float) $offer->contract_fee);
+        $this->assertEquals(10000.0, (float) $offer->security_deposit);
+        $this->assertNotEquals(1000.0, (float) $offer->admin_fee, 'Must not fall back to the lead\'s unit.');
+    }
+
+    public function test_a_deal_with_no_offered_unit_still_prices_off_the_leads_unit(): void
+    {
+        $this->reAdmin();
+
+        $leadUnit = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'rent_price' => 96000, 'rent_period' => 'year',
+        ]);
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+        $deal->lead->properties()->attach($leadUnit->id);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 96000])
+            ->assertRedirect();
+
+        // No unit chosen, so the lead's unit remains the fallback rather than
+        // leaving the letter with no price source at all.
+        $this->assertEquals(96000.0, (float) $deal->offerLetters()->first()->original_amount);
+    }
 }

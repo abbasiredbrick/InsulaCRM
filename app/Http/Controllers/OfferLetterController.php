@@ -41,6 +41,24 @@ class OfferLetterController extends Controller
     }
 
     /**
+     * The money and term figures a chosen unit implies, for the picker to fill in.
+     *
+     * Authorised on the deal, like the rest of the letter, and scoped to the
+     * tenant inside the service, so this cannot be used to read another agency's
+     * inventory or to price a deal the viewer cannot edit.
+     */
+    public function unitDefaults(Request $request, Deal $deal)
+    {
+        $this->authorize('update', $deal);
+
+        $validated = $request->validate([
+            'unit_id' => 'required|integer',
+        ]);
+
+        return response()->json($this->offers->defaultsForUnit($deal, $validated['unit_id']));
+    }
+
+    /**
      * Issue a new offer letter for the deal. Every offer letter requires
      * manager/admin approval and its status reflects that (pending_approval /
      * issued) depending on who created it.
@@ -235,7 +253,15 @@ class OfferLetterController extends Controller
             'valid_until' => 'nullable|date',
             'contract_start_date' => 'nullable|date',
             'contract_end_date' => 'nullable|date',
-            'payment_period' => 'nullable|string|max:100',
+            // The term in whole years, which derives the end date. Bounded because
+            // a "term" of 0 or 40 years is a typo, not a lease.
+            'contract_years' => 'nullable|integer|min:1|max:20',
+            // How many payments the rent is split into. 1-12: monthly is the
+            // ceiling, and a single upfront payment is the floor.
+            'payment_period' => 'nullable|integer|min:1|max:12',
+            // The unit the offer is written on, chosen from the ones this client
+            // has been shown. Scoped to the tenant in applyChosenUnit().
+            'unit_id' => 'nullable|integer',
             'documents_required' => 'nullable|string',
             // Unit price as listed.
             'original_amount' => 'required|numeric|min:0',

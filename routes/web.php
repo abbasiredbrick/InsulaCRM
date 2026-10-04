@@ -540,6 +540,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         // Offer Letters (real estate mode)
         Route::get('/pipeline/{deal}/offer-letters/create', [OfferLetterController::class, 'create'])->name('deal.offers.create');
+        Route::get('/pipeline/{deal}/offer-letters/unit-defaults', [OfferLetterController::class, 'unitDefaults'])->name('deal.offers.unitDefaults');
         Route::post('/pipeline/{deal}/offer-letters', [OfferLetterController::class, 'store'])->name('deal.offers.store');
         Route::get('/offer-letters/{offerLetter}/print', [OfferLetterController::class, 'print'])->name('deal.offers.print');
         Route::get('/offer-letters/{offerLetter}/download-signed', [OfferLetterController::class, 'downloadSigned'])->name('deal.offers.downloadSigned');

@@ -18,9 +18,36 @@
     $currency = strtoupper($deal->tenant?->currency ?? 'AED');
     $vatRate = (float) ($d['commission_vat_pct'] ?? 0);
     $vatRegistered = (float) $deal->tenant?->effectiveVatRate() > 0;
+    $units = app(\App\Services\OfferLetterService::class)->viewedUnits($deal);
 @endphp
 
 <div class="row g-2">
+    {{-- Choosing the unit fills the listed price, the three fees and the deposit
+         from inventory. It is the one input that steers the whole letter, so it
+         sits at the top; the server re-stamps it rather than trusting these
+         figures. --}}
+    <div class="col-12">
+        <label class="form-label">{{ __('Offered Unit') }}</label>
+        @if($units->isNotEmpty())
+            <select name="unit_id" class="form-select form-select-sm" data-offer-unit
+                    data-unit-defaults="{{ route('deal.offers.unitDefaults', $deal) }}">
+                <option value="">{{ __('— choose a unit the client has viewed —') }}</option>
+                @foreach($units as $unit)
+                    <option value="{{ $unit->id }}"
+                            data-rate="{{ $unit->admin_fee ?? 0 }}"
+                            @selected((int) ($d['unit_id'] ?? $deal->property_id) === $unit->id)>
+                        {{ $unit->optionLabel() }}
+                    </option>
+                @endforeach
+            </select>
+            <small class="form-hint">{{ __('Listed price, contract fee, admin fee and security deposit are filled in from the unit you pick.') }}</small>
+        @else
+            <p class="form-hint mb-0">
+                {{ __('No units are linked to this client yet. Link the units they viewed on the lead, or type the figures in by hand.') }}
+            </p>
+        @endif
+    </div>
+
     <div class="col-md-4">
         <label class="form-label">{{ __('Offer No.') }}</label>
         <input type="text" name="offer_no" class="form-control form-control-sm" value="{{ $d['offer_no'] }}">
@@ -40,11 +67,19 @@
     </div>
     <div class="col-md-4">
         <label class="form-label">{{ __('Start Date') }}</label>
-        <input type="date" name="contract_start_date" class="form-control form-control-sm" value="{{ optional($d['contract_start_date'])->format('Y-m-d') }}">
+        <input type="date" name="contract_start_date" class="form-control form-control-sm" data-offer-start value="{{ optional($d['contract_start_date'])->format('Y-m-d') }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">{{ __('Contract Period (Years)') }}</label>
+        <input type="number" name="contract_years" class="form-control form-control-sm" data-offer-years
+               min="1" max="20" step="1" value="{{ $d['contract_years'] ?? 1 }}">
     </div>
     <div class="col-md-4">
         <label class="form-label">{{ __('End Date') }}</label>
-        <input type="date" name="contract_end_date" class="form-control form-control-sm" value="{{ optional($d['contract_end_date'])->format('Y-m-d') }}">
+        {{-- Filled from the start date and the term. Stays editable because a
+             tenancy can be agreed to end part-way through the term. --}}
+        <input type="date" name="contract_end_date" class="form-control form-control-sm" data-offer-end value="{{ optional($d['contract_end_date'])->format('Y-m-d') }}">
+        <small class="form-hint">{{ __('Filled from the start date and the period. Adjust if the lease ends sooner.') }}</small>
     </div>
 
     <div class="col-12"><hr class="my-1"></div>
@@ -123,8 +158,15 @@
         <input type="number" name="security_deposit" class="form-control form-control-sm" step="0.01" min="0" value="{{ $d['security_deposit'] ?? '' }}">
     </div>
     <div class="col-md-3">
-        <label class="form-label">{{ __('Payment Period') }}</label>
-        <input type="text" name="payment_period" class="form-control form-control-sm" value="{{ $d['payment_period'] ?? '1 Payment' }}">
+        <label class="form-label">{{ __('No. of Payments') }}</label>
+        <select name="payment_period" class="form-select form-select-sm">
+            @for($n = 1; $n <= 12; $n++)
+                <option value="{{ $n }}" @selected((string) ($d['payment_period'] ?? '1') === (string) $n)>
+                    {{ $n }} {{ $n == 1 ? __('Payment') : __('Payments') }}
+                </option>
+            @endfor
+        </select>
+        <small class="form-hint">{{ __('How many payments the rent is split into.') }}</small>
     </div>
 
     <div class="col-md-6">

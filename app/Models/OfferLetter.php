@@ -42,6 +42,7 @@ class OfferLetter extends Model
         'contract_start_date',
         'contract_end_date',
         'payment_period',
+        'contract_years',
         'documents_required',
         'original_amount',
         'discount_amount',
@@ -79,6 +80,7 @@ class OfferLetter extends Model
             'valid_until' => 'date',
             'contract_start_date' => 'date',
             'contract_end_date' => 'date',
+            'contract_years' => 'integer',
             'original_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'approved_amount' => 'decimal:2',
@@ -223,6 +225,29 @@ class OfferLetter extends Model
     public function isEditable(): bool
     {
         return in_array($this->status, ['draft', 'pending_approval'], true);
+    }
+
+    /**
+     * "1 Payment" / "4 Payments" for the printed letter.
+     *
+     * `payment_period` used to be a free-text box, so real letters hold values
+     * like "1 Payment" or "2 Cheques". A plain numeric suffix on those would
+     * read "1 Payment Payments", so anything that is not a bare 1-12 is printed
+     * exactly as it was typed.
+     */
+    public function paymentPeriodLabel(): ?string
+    {
+        $raw = trim((string) $this->payment_period);
+
+        if ($raw === '') {
+            return null;
+        }
+
+        if (ctype_digit($raw) && $raw >= 1 && $raw <= 12) {
+            return $raw.' '.($raw == 1 ? __('Payment') : __('Payments'));
+        }
+
+        return $raw;
     }
 
     public function canWithdraw(): bool

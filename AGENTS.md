@@ -199,6 +199,46 @@ Also part of this contract:
   involved user but no link. `--dry-run` first. Run it after any fix that
   could have silently skipped syncs.
 
+## Offer letters — the offered unit, the term, and the payment count
+
+Three traps in `OfferLetterService`, all of which produced a letter that
+looked fine and was priced off the wrong thing.
+
+**`Deal::property()` is not `Deal::unit()`.** They are *not* two names for
+`deals.property_id`:
+
+- `Deal::unit()` → `belongsTo(Property, 'property_id')` — the unit the offer
+  was written on, the authoritative one.
+- `Deal::property()` → `hasOneThrough(Lead)` — the **lead's** default unit.
+
+`Deal::dealUnit()` (`unit() ?: property()`) is the only correct way to ask
+"which unit is this about". `DealCommissionService::propertyFor()` used to
+read `property()` directly, so the agent's chosen unit drove the *fees* (via
+`buildDefaults` → `dealUnit()`) while the *price and commission rate* came
+from the lead's unit. A letter could quote one unit's rent against another
+unit's deposit. `propertyFor()` must call `dealUnit()`. The unit is stamped
+server-side by `applyChosenUnit()` (tenant-scoped, aborts 422 otherwise) —
+never taken from the posted money figures.
+
+**The end date is start + term − 1 day.** `resolveContractDates()` and the
+form's `syncEndDate()` must agree: a "one year" tenancy starting 1 Mar 2028
+ends **28 Feb 2029**, so the client occupies all twelve months. Note
+`addYears()` moves month+day rather than re-deriving them, so
+`2028-02-29 + 1y = 2029-02-28`, not a leap-day clamp. The JS builds at UTC
+noon so a DST shift cannot walk the date. Only applied when the request
+carries `contract_years`, so callers posting an explicit start/end keep them.
+
+**`payment_period` is a count, 1–12, but the column is `string(100)`.**
+Letters written before it became a `<select>` hold free text like
+"2 Cheques". Always print via `OfferLetter::paymentPeriodLabel()`: a bare
+integer 1–12 gets a "Payment"/"Payments" suffix, anything else is returned
+verbatim. Numeric suffixing on legacy rows renders "1 Payment Payments".
+
+Also: `deals.show` renders the letter form inline (a collapse), and only for
+**rent** deals — a sale deal gets the wholesale `_offers` panel. The
+registered `deal.offers.create` route points at `offers.create`, a view that
+does not exist and 500s; do not build on it.
+
 ## Commands
 
 - Run the whole suite: `php -d memory_limit=1G vendor/bin/phpunit`

@@ -263,6 +263,66 @@
         document.querySelectorAll('.offer-letter-form').forEach(fn);
     }
 
+    // End date = start + term - 1 day, mirroring
+    // OfferLetterService::resolveContractDates(). The -1 day is what makes a
+    // tenancy starting 1 March end on 28 February instead of a full year later.
+    function syncEndDate(form) {
+        var start = form.querySelector('[data-offer-start]');
+        var years = form.querySelector('[data-offer-years]');
+        var end = form.querySelector('[data-offer-end]');
+        if (!start || !end) return;
+
+        var n = parseInt(years ? years.value : '1', 10);
+        if (!isFinite(n) || n < 1) return;
+        if (!start.value) return;
+
+        // Build in UTC noon so a DST shift can never walk the date a day.
+        var d = new Date(start.value + 'T12:00:00Z');
+        if (isNaN(d.getTime())) return;
+        d.setUTCFullYear(d.getUTCFullYear() + n);
+        d.setUTCDate(d.getUTCDate() - 1);
+        end.value = d.toISOString().slice(0, 10);
+    }
+
+    // Choosing a unit replaces the inventory-derived figures. Discount and
+    // commission are left alone on purpose: they belong to the negotiation, and
+    // carrying them across would silently re-price an offer already agreed.
+    function applyUnitDefaults(form, data) {
+        var put = function (name, value) {
+            var el = form.querySelector('[name="' + name + '"]');
+            if (!el) return;
+            if (el.type === 'hidden') return;
+            el.value = (value === null || value === undefined) ? '' : value;
+        };
+
+        put('original_amount', data.original_amount);
+        put('contract_fee', data.contract_fee);
+        put('admin_fee', data.admin_fee);
+        put('security_deposit', data.security_deposit);
+
+        var rate = form.querySelector('[data-offer-rate]');
+        if (rate && data.commission_rate_pct !== null && data.commission_rate_pct !== undefined) {
+            rate.value = data.commission_rate_pct;
+        }
+
+        recalc(form);
+    }
+
+    function loadUnit(form, unitId) {
+        var sel = form.querySelector('[data-offer-unit]');
+        if (!sel) return;
+        if (!unitId) { recalc(form); return; }
+
+        var url = sel.getAttribute('data-unit-defaults') + '?unit_id=' + encodeURIComponent(unitId);
+        fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) { if (data) applyUnitDefaults(form, data); })
+            .catch(function () { /* leave the typed figures alone on a failed lookup */ });
+    }
+
     // Delegated so both the "new letter" and "edit letter" forms recalculate
     // independently, and so it survives the live-filter results swap.
     document.addEventListener('input', function (e) {
@@ -275,12 +335,15 @@
         var form = e.target.closest('.offer-letter-form');
         if (!form) return;
         if (e.target.matches('[data-offer-basis]')) syncBasis(form);
+        if (e.target.matches('[data-offer-unit]')) loadUnit(form, e.target.value);
+        if (e.target.matches('[data-offer-start], [data-offer-years]')) syncEndDate(form);
         if (e.target.matches(FIELDS)) recalc(form);
     });
 
     function init() {
         eachForm(function (form) {
             syncBasis(form);
+            syncEndDate(form);
             recalc(form);
         });
     }

@@ -70,11 +70,13 @@ class DealCommissionService
     public function propertyFor(Lead|Deal $entity): ?Property
     {
         if ($entity instanceof Deal) {
-            if ($entity->property) {
-                return $entity->property;
-            }
-
-            return $entity->lead?->property;
+            // dealUnit() is the unit the offer was actually written on
+            // (deals.property_id), falling back to the lead's own unit. The two
+            // have to agree: reading property() directly here would price the
+            // letter off the lead's unit while the fees came off the unit the
+            // agent chose, which is how a letter ends up quoting one unit's
+            // price against another unit's deposit.
+            return $entity->dealUnit();
         }
 
         if ($entity->property) {

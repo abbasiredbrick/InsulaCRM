@@ -8,6 +8,7 @@ use App\Models\Activity;
 use App\Models\AuditLog;
 use App\Models\Deal;
 use App\Models\OfferLetter;
+use App\Models\Property;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TransactionChecklist;
@@ -16,6 +17,7 @@ use App\Notifications\DealStageChanged as DealStageChangedNotification;
 use App\Notifications\OfferLetterApprovalRequired;
 use App\Notifications\OfferLetterApproved;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
@@ -85,7 +87,8 @@ class OfferLetterService
             'contract_fee' => $contractFee ?: null,
             'contract_fee_vat' => $contractFee ? $deal->tenant->vatOn($contractFee) : null,
             'contract_fee_total' => $contractFee ? round($contractFee + $deal->tenant->vatOn($contractFee), 2) : null,
-            'payment_period' => '1 '.__('Payment'), // "1 Payment Payable to the Landlord"
+            'payment_period' => '1', // "1 Payment Payable to the Landlord"
+            'contract_years' => 1,
             'contract_start_date' => $start,
             'contract_end_date' => $end,
             'documents_required' => 'Passport, Residency Visa & Emirates ID Copy',
@@ -106,6 +109,9 @@ class OfferLetterService
      */
     public function createFromValidated(Deal $deal, User $user, array $v): OfferLetter
     {
+        $this->applyChosenUnit($deal, $v['unit_id'] ?? null);
+        $deal->refresh()->loadMissing(['lead', 'lead.property', 'unit', 'tenant']);
+
         $tenant = $deal->tenant;
         $amounts = $this->buildAmounts($deal, $v);
 
@@ -130,12 +136,10 @@ class OfferLetterService
                 'approved_at' => $approvedAt,
                 'issued_at' => $this->resolveOfferDate($v['issued_at'] ?? null),
                 'valid_until' => $v['valid_until'] ?? now()->addDay()->startOfDay(),
-                'contract_start_date' => $v['contract_start_date'] ?? null,
-                'contract_end_date' => $v['contract_end_date'] ?? null,
                 'payment_period' => $v['payment_period'] ?? null,
                 'documents_required' => $v['documents_required'] ?? null,
                 'notes' => $v['notes'] ?? null,
-            ], $amounts, [
+            ], $this->resolveContractDates($v), $amounts, [
                 'discount_approved_by' => $approvedBy,
                 'discount_approved_at' => $approvedAt,
             ]));
@@ -197,6 +201,7 @@ class OfferLetterService
             'contract_fee_vat' => $offer->contract_fee_vat,
             'contract_fee_total' => $offer->contract_fee_total,
             'payment_period' => $offer->payment_period,
+            'contract_years' => (int) ($offer->contract_years ?? 1),
             'documents_required' => $offer->documents_required,
             'notes' => $offer->notes,
         ];
@@ -287,7 +292,10 @@ class OfferLetterService
             return $this->correctDateOnIssuedOffer($offer, $user, $v);
         }
 
-        $deal = $offer->deal;
+        $this->applyChosenUnit($offer->deal, $v['unit_id'] ?? null);
+
+        $deal = $offer->deal->fresh(['lead', 'lead.property', 'unit', 'tenant']);
+        $offer->deal()->associate($deal);
         $tenant = $offer->tenant;
         $amounts = $this->buildAmounts($deal, $v);
 
@@ -299,15 +307,17 @@ class OfferLetterService
             'offer_no' => (string) ($v['offer_no'] ?? '') ?: $offer->offer_no,
             'issued_at' => $this->resolveOfferDate($v['issued_at'] ?? null, $offer->issued_at),
             'valid_until' => $v['valid_until'] ?? $offer->valid_until,
-            'contract_start_date' => $v['contract_start_date'] ?? null,
-            'contract_end_date' => $v['contract_end_date'] ?? null,
             'payment_period' => $v['payment_period'] ?? null,
             'documents_required' => $v['documents_required'] ?? null,
             'notes' => $v['notes'] ?? null,
             'status' => $canApprove ? 'issued' : 'pending_approval',
             'approved_by' => $approvedBy,
             'approved_at' => $approvedAt,
-        ], $amounts, [
+        ], $this->resolveContractDates($v, [
+            'contract_years' => $offer->contract_years,
+            'contract_start_date' => $offer->contract_start_date,
+            'contract_end_date' => $offer->contract_end_date,
+        ]), $amounts, [
             'discount_approved_by' => $amounts['discount_amount'] > 0 ? $approvedBy : null,
             'discount_approved_at' => $amounts['discount_amount'] > 0 ? $approvedAt : null,
         ]))->save();
@@ -638,6 +648,139 @@ class OfferLetterService
         ]);
 
         return $offer;
+    }
+
+    /**
+     * The units this client has actually been shown, offered as the choice of
+     * unit to write the offer on.
+     *
+     * "Viewed" is assembled from the two places a unit gets attached to a lead:
+     * the linked-units list an agent curates on the lead, and the units with a
+     * viewing against it. Both are needed — an agent often links a unit before
+     * the viewing is booked, and a viewing can exist without the link.
+     *
+     * The unit already stamped on the deal is always included and sorts first,
+     * otherwise a letter being corrected on a unit that has since dropped out of
+     * the list would show a picker that does not contain its own current unit.
+     */
+    public function viewedUnits(Deal $deal): Collection
+    {
+        $deal->loadMissing(['lead.properties', 'lead.showings']);
+
+        $ids = $deal->lead?->properties->pluck('id')
+            ->merge($deal->lead?->showings->whereNotNull('property_id')->pluck('property_id') ?? collect())
+            ->push($deal->property_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $units = Property::query()
+            ->where('tenant_id', $deal->tenant_id)
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        return $ids->map(fn ($id) => $units->get($id))->filter()->values();
+    }
+
+    /**
+     * Stamp the chosen unit onto the deal before anything is priced.
+     *
+     * `Deal::property()` and `Deal::unit()` are two names for the same
+     * `property_id` column, so setting it here steers the listed price, the
+     * commission rate and the three fees together. Doing it inside the request
+     * rather than trusting the posted figures is what stops a hand-crafted POST
+     * from writing one unit's price onto another unit's letter.
+     */
+    public function applyChosenUnit(Deal $deal, mixed $unitId): void
+    {
+        if ($unitId === null || $unitId === '') {
+            return;
+        }
+
+        $unit = Property::query()
+            ->where('tenant_id', $deal->tenant_id)
+            ->find($unitId);
+
+        abort_unless($unit, 422, __('That unit is not available for this offer.'));
+
+        $deal->property_id = $unit->id;
+        $deal->save();
+    }
+
+    /**
+     * The money and term figures a unit implies, for the picker to fill in.
+     *
+     * Discount and commission are deliberately absent: they belong to the
+     * negotiation, not to the inventory row, and carrying them over from the
+     * previous unit would silently re-price an offer the agent had already
+     * negotiated.
+     */
+    public function defaultsForUnit(Deal $deal, mixed $unitId): array
+    {
+        $this->applyChosenUnit($deal, $unitId);
+        $deal->refresh()->loadMissing(['lead', 'lead.property', 'unit', 'tenant']);
+
+        $d = $this->buildDefaults($deal);
+
+        return [
+            'unit_id' => $deal->property_id,
+            'original_amount' => $d['original_amount'],
+            'contract_fee' => $d['contract_fee'],
+            'admin_fee' => $d['admin_fee'],
+            'security_deposit' => $d['security_deposit'],
+            'commission_rate_pct' => $d['commission_rate_pct'],
+            'commission_amount' => $d['commission_amount'],
+            'commission_vat' => $d['commission_vat'],
+            'commission_total' => $d['commission_total'],
+            'admin_fee_vat' => $d['admin_fee_vat'],
+            'contract_fee_vat' => $d['contract_fee_vat'],
+        ];
+    }
+
+    /**
+     * Resolve the contract start/end pair from the term in years.
+     *
+     * The end date is the start plus the term, less a day, so a tenancy beginning
+     * 1 March runs to 28 February rather than ending on the same calendar day a
+     * year later. That -1 day is why `buildDefaults` had it hardcoded to one
+     * year; it is kept here so the picker, the form and the printer all agree.
+     *
+     * Only applied when the request actually carries `contract_years`. Callers
+     * that post a start and an end with no term keep both exactly as given, so
+     * this cannot quietly rewrite an existing letter's dates.
+     *
+     * A start with no term still gets the default one year, and a term with no
+     * start leaves the end date alone — there is nothing to add it to.
+     */
+    protected function resolveContractDates(array $v, array $current = []): array
+    {
+        $start = $v['contract_start_date'] ?? ($current['contract_start_date'] ?? null);
+
+        if ($start) {
+            try {
+                $start = Carbon::parse($start)->startOfDay();
+            } catch (\Throwable $e) {
+                return $current;
+            }
+        }
+
+        $years = null;
+        if (array_key_exists('contract_years', $v)) {
+            $years = max(1, (int) $v['contract_years']);
+        } elseif ($current !== []) {
+            $years = max(1, (int) ($current['contract_years'] ?? 1));
+        }
+
+        if (! $start || ! $years) {
+            return $current;
+        }
+
+        return [
+            'contract_years' => $years,
+            'contract_start_date' => $start,
+            'contract_end_date' => $start->copy()->addYears($years)->subDay(),
+        ];
     }
 
     /**

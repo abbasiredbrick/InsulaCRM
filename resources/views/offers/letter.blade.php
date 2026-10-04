@@ -132,12 +132,13 @@
             <tr><td class="k">{{ __('Occupant Name') }}</td><td class="v">{{ $lead->full_name }}@if($lead->custom_fields['nationality'] ?? null) ({{ $lead->custom_fields['nationality'] }})@endif</td></tr>
             @endif
             @if($deal?->dealType() === 'rent')
+            @php $years = max(1, (int) ($offer->contract_years ?? 1)); @endphp
             <tr><td class="k">{{ __('Tenure of Tenancy') }}</td>
                 <td class="v">
                     @if($offer->contract_start_date && $offer->contract_end_date)
                         {{ $offer->contract_start_date->format('M d, Y') }} {{ __('to') }} {{ $offer->contract_end_date->format('M d, Y') }}
-                        (1 {{ __('Year') }})
-                    @else{{ __('One (1) Year') }}@endif
+                        ({{ $years }} {{ $years == 1 ? __('Year') : __('Years') }})
+                    @else{{ $years == 1 ? __('One (1) Year') : $years.' '.__('Years') }}@endif
                 </td>
             </tr>
             @endif
@@ -182,7 +183,7 @@
                 <tr>
                     <td>
                         {{ $deal?->dealType() === 'rent' ? __('Rental Amount') : __('Sales Amount') }}
-                        @if($deal?->dealType() === 'rent' && $offer->payment_period) — {{ $offer->payment_period }}@endif
+                        @if($deal?->dealType() === 'rent' && $offer->paymentPeriodLabel()) — {{ $offer->paymentPeriodLabel() }}@endif
                         <div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div>
                         @if($offer->hasDiscount())
                         <div class="words">{{ __('After discount of :amount on the listed price.', ['amount' => $money($offer->discount_amount)]) }}</div>
