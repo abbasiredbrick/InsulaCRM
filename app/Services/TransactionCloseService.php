@@ -51,10 +51,13 @@ class TransactionCloseService
      * Synchronise lead status + deal stage and apply the standard commission
      * when the lead/its deal is marked Won.
      *
+     * Called by DealLifecycleService once a deal has reached its win stage, so the
+     * commission is always attached to a deal that actually earned it.
+     *
      * @param  Deal|null  $deal  the deal that was closed; defaults to the lead's
-     *                           most recent deal. Rent deals keep their leasing
-     *                           stage (they have no closed_won) but still carry
-     *                           the commission.
+     *                           most recent deal. A lease wins at deal_won and
+     *                           keeps its leasing stage, but still carries the
+     *                           commission.
      */
     public function closeAsWon(Lead $lead, ?Deal $deal = null, ?User $user = null): void
     {

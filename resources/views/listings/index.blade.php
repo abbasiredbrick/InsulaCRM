@@ -171,11 +171,11 @@
                         <strong>{{ $unit->price_line }}</strong>
                     </td>
                     <td>
-                        @if($unit->deposit_amount || $unit->admin_fee || $unit->tawtheeq_fee)
+                        @if($unit->deposit_amount || $unit->admin_fee || $unit->contract_fee)
                             <div class="text-nowrap">
                                 @if($unit->deposit_amount)<span class="text-muted">{{ __('Dep') }} {{ Fmt::currency($unit->deposit_amount) }}</span>@endif
                                 @if($unit->admin_fee)<span class="text-muted ms-1">{{ __('Adm') }} {{ Fmt::currency($unit->admin_fee) }}</span>@endif
-                                @if($unit->tawtheeq_fee)<span class="text-muted ms-1">{{ __('Taw') }} {{ Fmt::currency($unit->tawtheeq_fee) }}</span>@endif
+                                @if($unit->contract_fee)<span class="text-muted ms-1">{{ __('Contract Fee') }} {{ Fmt::currency($unit->contract_fee) }}</span>@endif
                             </div>
                         @else
                             <span class="text-muted">-</span>

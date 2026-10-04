@@ -357,17 +357,29 @@
 </div>
 
 {{-- Filters --}}
-<div class="pipeline-filters">
+@php
+    $totalDeals = $deals->count();
+    $carriedFilters = array_filter([
+        'deal_type'  => $dealType,
+        'search'     => request('search'),
+        'agent'      => request('agent'),
+        'temp'       => request('temp'),
+        'source'     => request('source'),
+        'show_empty' => request('show_empty'),
+    ], fn ($v) => $v !== null && $v !== '');
+@endphp
+<form method="GET" action="{{ route('pipeline.board') }}" class="pipeline-filters" data-live-filter>
+    <input type="hidden" name="deal_type" value="{{ $dealType }}">
     <div class="input-icon search-wrap">
         <span class="input-icon-addon">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
         </span>
         <label for="pipeline-search" class="visually-hidden">{{ __('Search deals') }}</label>
-        <input type="text" id="pipeline-search" class="form-control" placeholder="{{ __('Search deals...') }}" value="{{ request('search') }}">
+        <input type="text" name="search" id="pipeline-search" class="form-control" placeholder="{{ __('Search deals...') }}" value="{{ request('search') }}">
     </div>
     @if(auth()->user()->isAdmin() && $agents->count() > 1)
     <label for="pipeline-agent-filter" class="visually-hidden">{{ __('Filter by agent') }}</label>
-    <select id="pipeline-agent-filter" class="form-select">
+    <select name="agent" id="pipeline-agent-filter" class="form-select">
         <option value="">{{ __('All Agents') }}</option>
         @foreach($agents as $agent)
             <option value="{{ $agent->id }}" {{ request('agent') == $agent->id ? 'selected' : '' }}>{{ $agent->name }}</option>
@@ -375,43 +387,46 @@
     </select>
     @endif
     <label for="pipeline-temp-filter" class="visually-hidden">{{ __('Filter by temperature') }}</label>
-    <select id="pipeline-temp-filter" class="form-select">
+    <select name="temp" id="pipeline-temp-filter" class="form-select">
         <option value="">{{ __('All temperatures') }}</option>
         @foreach(['hot' => 'Hot', 'warm' => 'Warm', 'cold' => 'Cold'] as $k => $lbl)
             <option value="{{ $k }}" {{ request('temp') === $k ? 'selected' : '' }}>{{ __($lbl) }}</option>
         @endforeach
     </select>
     <label for="pipeline-source-filter" class="visually-hidden">{{ __('Filter by lead source') }}</label>
-    <select id="pipeline-source-filter" class="form-select">
+    <select name="source" id="pipeline-source-filter" class="form-select">
         <option value="">{{ __('All lead sources') }}</option>
         @foreach(\App\Services\CustomFieldService::getOptions('lead_source') as $key => $label)
             <option value="{{ $key }}" {{ request('source') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
         @endforeach
     </select>
+    <label class="form-check form-switch mb-0" style="font-size:0.78rem;" title="{{ __('Show stages that currently have no deals') }}">
+        <input class="form-check-input" type="checkbox" name="show_empty" value="1" id="pipeline-show-empty" {{ (request('show_empty') || $totalDeals === 0) ? 'checked' : '' }}>
+        <span class="form-check-label">{{ __('Show empty stages') }}</span>
+    </label>
+    @if(request()->hasAny(['search', 'agent', 'temp', 'source', 'show_empty']))
+    <a href="{{ route('pipeline.board', $dealType ? ['deal_type' => $dealType] : []) }}" class="btn btn-outline-secondary btn-sm">{{ __('Clear') }}</a>
+    @endif
     <a href="{{ route('deals.export', request()->query()) }}" class="btn btn-outline-secondary btn-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><polyline points="7 11 12 16 17 11"/><line x1="12" y1="4" x2="12" y2="16"/></svg>
         {{ __('Export CSV') }}
     </a>
-    <a href="{{ route('deals.index', request()->only(['search', 'deal_type', 'agent', 'temp', 'source'])) }}" class="btn btn-outline-primary btn-sm" title="{{ __('Switch to the list view') }}">
+    <a href="{{ route('deals.index', $carriedFilters) }}" class="btn btn-outline-primary btn-sm" title="{{ __('Switch to the list view') }}">
         <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
         {{ __('List View') }}
     </a>
     <div class="text-secondary ms-auto" style="font-size: 0.8rem;" id="pipeline-total">
-        @php $totalDeals = $deals->count(); @endphp
         {{ $totalDeals }} {{ Str::plural($modeTerms['deal_label'], $totalDeals) }} {{ __('in pipeline') }}
     </div>
-    <label class="form-check form-switch mb-0" style="font-size:0.78rem;" title="{{ __('Show stages that currently have no deals') }}">
-        <input class="form-check-input" type="checkbox" id="pipeline-show-empty" {{ (request('show_empty') || $totalDeals === 0) ? 'checked' : '' }}>
-        <span class="form-check-label">{{ __('Show empty stages') }}</span>
-    </label>
-</div>
+</form>
 
 {{-- Deal type tabs: All / Leasing / Sales (both modes now) --}}
 <ul class="nav nav-pills mb-3 pipeline-type-tabs">
     @foreach(['all' => 'All', 'rent' => 'Leasing', 'sale' => 'Sales'] as $key => $label)
+    @php $tabFilters = $carriedFilters; unset($tabFilters['deal_type']); if ($key !== 'all') { $tabFilters['deal_type'] = $key; } @endphp
     <li class="nav-item">
         <a class="nav-link {{ ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'active' : '' }}"
-           href="{{ url('/pipeline') . ($key === 'all' ? '' : '?deal_type=' . $key) }}"
+           href="{{ route('pipeline.board', $tabFilters) }}"
            style="{{ (($dealType ?? null) === null && $key === 'all') || ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'font-weight:600' : '' }}">
             {{ __($label) }}
             <span class="badge {{ ($dealType ?? 'all') === ($key === 'all' ? null : $key) ? 'bg-secondary' : 'bg-secondary-lt' }} ms-1">{{ $counts[$key] ?? 0 }}</span>
@@ -422,6 +437,7 @@
 
 <x-saved-views-bar entity-type="deals" />
 
+<div data-live-results>
 {{-- Kanban board --}}
 <div id="pipeline" class="pipeline-board {{ (request('show_empty') || $totalDeals === 0) ? 'show-all' : '' }}">
     @foreach($stageLabels as $stageKey => $stageLabel)
@@ -516,6 +532,7 @@
     </div>
     @endforeach
 </div>
+</div>
 
 <!-- Slide-over Panel -->
 <div class="slide-over-backdrop" id="dealBackdrop"></div>
@@ -564,14 +581,6 @@
         }, 3000);
     }
 
-    // ── Show / hide empty stage columns ─────────────────
-    const board = document.getElementById('pipeline');
-    const showEmpty = document.getElementById('pipeline-show-empty');
-    function applyShowEmpty() {
-        board.classList.toggle('show-all', showEmpty.checked);
-    }
-    showEmpty.addEventListener('change', applyShowEmpty);
-
     // Recompute a column's stats from its cards after a move
     function recomputeColumn(row) {
         const cards = row.querySelectorAll('.stage-cards-grid .deal-card');
@@ -609,109 +618,119 @@
     }
 
     // ── Drag & Drop ──────────────────────────────────────
-    document.querySelectorAll('.deal-card-drag').forEach(handle => {
-        handle.addEventListener('dragstart', e => {
-            const card = handle.closest('.deal-card');
-            const grid = card.closest('.stage-cards-grid');
-            dragDealId = card.dataset.dealId;
-            dragSourceStage = grid.dataset.stage;
-            dragSourceRow = card.closest('.stage-row');
-            e.dataTransfer.setData('text/plain', dragDealId);
-            e.dataTransfer.effectAllowed = 'move';
-            requestAnimationFrame(() => card.classList.add('dragging'));
-        });
+    // Delegated on document so the handlers keep working after the live filter
+    // swaps the board markup (a per-element bind would die on the first swap).
+    function closestOrNull(el, sel) {
+        return el && el.closest ? el.closest(sel) : null;
+    }
 
-        handle.addEventListener('dragend', () => {
-            const card = handle.closest('.deal-card');
-            if (card) card.classList.remove('dragging');
-            document.querySelectorAll('.stage-row.drag-over').forEach(r => r.classList.remove('drag-over'));
-            dragDealId = null;
-            dragSourceStage = null;
-            dragSourceRow = null;
-        });
+    document.addEventListener('dragstart', function(e) {
+        const handle = closestOrNull(e.target, '.deal-card-drag');
+        if (!handle) return;
+        const card = handle.closest('.deal-card');
+        const grid = card.closest('.stage-cards-grid');
+        dragDealId = card.dataset.dealId;
+        dragSourceStage = grid.dataset.stage;
+        dragSourceRow = card.closest('.stage-row');
+        e.dataTransfer.setData('text/plain', dragDealId);
+        e.dataTransfer.effectAllowed = 'move';
+        requestAnimationFrame(() => card.classList.add('dragging'));
     });
 
-    // Each stage column is a drop target
-    document.querySelectorAll('.stage-row').forEach(row => {
+    document.addEventListener('dragend', function(e) {
+        const card = closestOrNull(e.target, '.deal-card');
+        if (card) card.classList.remove('dragging');
+        document.querySelectorAll('.stage-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+        dragDealId = null;
+        dragSourceStage = null;
+        dragSourceRow = null;
+    });
+
+    document.addEventListener('dragover', function(e) {
+        const row = closestOrNull(e.target, '.stage-row');
+        if (!row || !dragDealId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (row.dataset.stage !== dragSourceStage) row.classList.add('drag-over');
+    });
+
+    document.addEventListener('dragleave', function(e) {
+        const row = closestOrNull(e.target, '.stage-row');
+        if (row && !row.contains(e.relatedTarget)) row.classList.remove('drag-over');
+    });
+
+    document.addEventListener('drop', function(e) {
+        const row = closestOrNull(e.target, '.stage-row');
+        if (!row || !dragDealId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        row.classList.remove('drag-over');
+
         const stage = row.dataset.stage;
+        if (stage === dragSourceStage) return;
 
-        row.addEventListener('dragover', e => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (stage !== dragSourceStage && !row.classList.contains('drag-over')) {
-                row.classList.add('drag-over');
+        const dealId = dragDealId;
+        const card = document.querySelector('.deal-card[data-deal-id="' + dealId + '"]');
+        if (!card) return;
+
+        const sourceGrid = document.querySelector('.stage-cards-grid[data-stage="' + dragSourceStage + '"]');
+        const targetGrid = row.querySelector('.stage-cards-grid');
+
+        // Remove empty message from target if present
+        const emptyMsg = targetGrid.querySelector('.stage-empty');
+        if (emptyMsg) emptyMsg.remove();
+
+        targetGrid.appendChild(card);
+        card.classList.remove('dragging');
+
+        // Add empty message to source if now empty
+        if (sourceGrid && !sourceGrid.querySelector('.deal-card')) {
+            sourceGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
+        }
+
+        recomputeColumn(dragSourceRow);
+        recomputeColumn(row);
+        updateTotals();
+
+        // AJAX
+        fetch(baseUrl + '/' + dealId + '/stage', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ stage: stage })
+        }).then(r => {
+            if (!r.ok) {
+                return r.json().then(body => { throw new Error((body && body.message) || 'Failed'); });
             }
-        });
+            return r.json();
+        }).then(data => {
+            if (data.success) {
+                showToast('{{ ($businessMode ?? "wholesale") === "realestate" ? __("Transaction moved to") : __("Deal moved to") }} ' + row.querySelector('.stage-name').textContent, 'success');
 
-        row.addEventListener('dragleave', e => {
-            if (!row.contains(e.relatedTarget)) {
-                row.classList.remove('drag-over');
+                // An automatic promotion (commission received -> deal won, moved in
+                // -> deal locked) lands the card in a different column than the one
+                // it was dropped on. The card was moved optimistically into the drop
+                // target, so reload to let the board show where it actually went.
+                if (data.promoted_to) {
+                    setTimeout(() => location.reload(), 900);
+                }
+            } else {
+                throw new Error((data && data.message) || 'Failed');
             }
-        });
-
-        row.addEventListener('drop', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            row.classList.remove('drag-over');
-
-            const dealId = e.dataTransfer.getData('text/plain');
-            if (!dealId || stage === dragSourceStage) return;
-
-            const card = document.querySelector(`.deal-card[data-deal-id="${dealId}"]`);
-            if (!card) return;
-
-            const sourceGrid = document.querySelector(`.stage-cards-grid[data-stage="${dragSourceStage}"]`);
-            const targetGrid = row.querySelector('.stage-cards-grid');
-
-            // Remove empty message from target if present
-            const emptyMsg = targetGrid.querySelector('.stage-empty');
-            if (emptyMsg) emptyMsg.remove();
-
-            targetGrid.appendChild(card);
-            card.classList.remove('dragging');
-
-            // Add empty message to source if now empty
-            if (sourceGrid && !sourceGrid.querySelector('.deal-card')) {
-                sourceGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
+        }).catch(err => {
+            // Revert
+            showToast(err && err.message && err.message !== 'Failed' ? err.message : '{{ __('Failed to move deal. Please try again.') }}', 'error');
+            if (sourceGrid) { const s = sourceGrid.querySelector('.stage-empty'); if (s) s.remove(); }
+            sourceGrid.appendChild(card);
+            if (!targetGrid.querySelector('.deal-card')) {
+                targetGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
             }
-
             recomputeColumn(dragSourceRow);
             recomputeColumn(row);
             updateTotals();
-
-            // AJAX
-            fetch(baseUrl + '/' + dealId + '/stage', {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ stage: stage })
-            }).then(r => {
-                if (!r.ok) {
-                    return r.json().then(body => { throw new Error((body && body.message) || 'Failed'); });
-                }
-                return r.json();
-            }).then(data => {
-                if (data.success) {
-                    showToast('{{ ($businessMode ?? "wholesale") === "realestate" ? __("Transaction moved to") : __("Deal moved to") }} ' + row.querySelector('.stage-name').textContent, 'success');
-                } else {
-                    throw new Error((data && data.message) || 'Failed');
-                }
-            }).catch(err => {
-                // Revert
-                showToast(err && err.message && err.message !== 'Failed' ? err.message : '{{ __('Failed to move deal. Please try again.') }}', 'error');
-                if (targetGrid) { const t = targetGrid.querySelector('.stage-empty'); if (t) t.remove(); }
-                if (sourceGrid) { const s = sourceGrid.querySelector('.stage-empty'); if (s) s.remove(); }
-                sourceGrid.appendChild(card);
-                if (!targetGrid.querySelector('.deal-card')) {
-                    targetGrid.innerHTML = '<div class="stage-empty">{{ __('No deals in this stage') }}</div>';
-                }
-                recomputeColumn(dragSourceRow);
-                recomputeColumn(row);
-                updateTotals();
-            });
         });
     });
 
@@ -936,66 +955,28 @@
         document.getElementById('dealPanel').classList.remove('open');
     }
 
-    // ── Search & filters ─────────────────────────────────
-    const searchInput = document.getElementById('pipeline-search');
-    const agentFilter = document.getElementById('pipeline-agent-filter');
-    const tempFilter = document.getElementById('pipeline-temp-filter');
-    const sourceFilter = document.getElementById('pipeline-source-filter');
-
-    function buildParams() {
-        const params = new URLSearchParams();
-        const search = searchInput ? searchInput.value.trim() : '';
-        const agent = agentFilter ? agentFilter.value : '';
-        const temp = tempFilter ? tempFilter.value : '';
-        const source = sourceFilter ? sourceFilter.value : '';
-        const dealType = {{ $dealType !== null ? "'".$dealType."'" : "''" }};
-        if (dealType) params.set('deal_type', dealType);
-        if (search) params.set('search', search);
-        if (agent) params.set('agent', agent);
-        if (temp) params.set('temp', temp);
-        if (source) params.set('source', source);
-        if (showEmpty.checked) params.set('show_empty', '1');
-        return params;
-    }
-
-    function applyFilters() {
-        const qs = buildParams().toString();
-        window.location.href = '{{ url("/pipeline") }}' + (qs ? '?' + qs : '');
-    }
-
-    if (searchInput) {
-        searchInput.addEventListener('keydown', e => {
-            if (e.key === 'Enter') { e.preventDefault(); applyFilters(); }
-        });
-    }
-    if (agentFilter) {
-        agentFilter.addEventListener('change', applyFilters);
-    }
-    if (tempFilter) {
-        tempFilter.addEventListener('change', applyFilters);
-    }
-    if (sourceFilter) {
-        sourceFilter.addEventListener('change', applyFilters);
-    }
-
     // ── Move-to dropdown buttons ────────────────────────
-    document.querySelectorAll('.move-deal-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            var dealId = this.dataset.dealId;
-            var stage = this.dataset.stage;
-            fetch(baseUrl + '/' + dealId + '/stage', {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({ stage: stage })
-            }).then(function(r) {
-                if (r.ok) location.reload();
-                else showToast('{{ __("Failed to move deal. Please try again.") }}', 'error');
-            });
+    document.addEventListener('click', function(e) {
+        var btn = closestOrNull(e.target, '.move-deal-btn');
+        if (!btn) return;
+        e.preventDefault();
+        var dealId = btn.dataset.dealId;
+        var stage = btn.dataset.stage;
+        fetch(baseUrl + '/' + dealId + '/stage', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ stage: stage })
+        }).then(function(r) {
+            if (r.ok) location.reload();
+            else r.json().then(body => {
+                // Surface why the move was refused — "set automatically" and
+                // "locked and closed" are both answers the agent needs.
+                showToast((body && body.message) || '{{ __("Failed to move deal. Please try again.") }}', 'error');
+            }).catch(() => showToast('{{ __("Failed to move deal. Please try again.") }}', 'error'));
         });
     });
 

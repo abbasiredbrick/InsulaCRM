@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Activity;
+use App\Models\Deal;
+use App\Models\Lead;
 use App\Models\Meeting;
 use App\Models\Showing;
 use App\Models\Task;
@@ -15,6 +17,155 @@ class FollowupFeedbackTest extends TestCase
     private function reAdmin(array $overrides = []): self
     {
         return $this->actingAsAdmin(array_merge(['business_mode' => 'realestate'], $overrides));
+    }
+
+    private function viewingFor(Lead $lead, ?int $propertyId = null): Showing
+    {
+        return Showing::create([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $propertyId ?? $this->createProperty()->id,
+            'lead_id' => $lead->id,
+            'agent_id' => $this->adminUser->id,
+            'showing_date' => '2026-04-15',
+            'showing_time' => '14:00',
+            'status' => 'completed',
+        ]);
+    }
+
+    // ── Offer Requested: the checkbox that opens the deal ──────────────────
+
+    public function test_offer_requested_checkbox_promotes_the_lead_and_creates_the_deal(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_done']);
+        $showing = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Loved the view, wants to make an offer.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        $this->assertSame('offer_requested', $lead->fresh()->stage);
+        $this->assertSame('offer_requested', $showing->fresh()->outcome);
+
+        $deal = $lead->fresh()->deals()->first();
+        $this->assertNotNull($deal);
+        $this->assertSame('offer_requested', $deal->stage);
+        $this->assertSame($showing->property_id, $deal->property_id);
+    }
+
+    public function test_feedback_without_the_checkbox_does_not_open_a_deal(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_done']);
+        $showing = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Too small, asked to see another unit.',
+        ])->assertRedirect();
+
+        $this->assertSame('viewing_done', $lead->fresh()->stage);
+        $this->assertSame(0, Deal::withoutGlobalScopes()->where('lead_id', $lead->id)->count());
+    }
+
+    /**
+     * A later viewing of a different unit must never drag a lead backwards, and
+     * must never open a second deal.
+     */
+    public function test_a_second_viewing_never_regresses_the_stage_or_duplicates_the_deal(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_done']);
+        $first = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $first), [
+            'feedback' => 'Wants to offer on this one.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        $second = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $second), [
+            'feedback' => 'Liked the second unit too.',
+        ])->assertRedirect();
+
+        $this->assertSame('offer_requested', $lead->fresh()->stage);
+        $this->assertSame(1, Deal::withoutGlobalScopes()->where('lead_id', $lead->id)->count());
+    }
+
+    public function test_re_saving_feedback_does_not_erase_the_offer_requested_outcome(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'viewing_done']);
+        $showing = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'First pass.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Correcting the notes.',
+        ])->assertRedirect();
+
+        $this->assertSame('offer_requested', $showing->fresh()->outcome);
+    }
+
+    public function test_offer_requested_is_forward_only_from_a_leasehold_in_negotiation(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'rent', 'stage' => 'negotiating']);
+        $showing = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Still negotiating on the first unit.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        $this->assertSame('negotiating', $lead->fresh()->stage);
+    }
+
+    public function test_a_sale_lead_is_not_promoted_by_a_viewing(): void
+    {
+        $this->reAdmin();
+
+        $lead = $this->createLead(['deal_type' => 'sale', 'stage' => 'new_lead']);
+        $showing = $this->viewingFor($lead);
+
+        $this->post(route('followups.viewing.feedback', $showing), [
+            'feedback' => 'Asked about an offer.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        $this->assertSame('new_lead', $lead->fresh()->stage);
+        $this->assertSame(0, Deal::withoutGlobalScopes()->where('lead_id', $lead->id)->count());
+    }
+
+    public function test_the_offer_checkbox_is_offered_for_viewings_only(): void
+    {
+        $this->reAdmin();
+
+        $task = Task::create([
+            'tenant_id' => $this->tenant->id,
+            'lead_id' => $this->createLead(['deal_type' => 'rent'])->id,
+            'agent_id' => $this->adminUser->id,
+            'created_by' => $this->adminUser->id,
+            'title' => 'Call the landlord',
+            'due_date' => now()->addDay()->toDateString(),
+        ]);
+
+        $this->post(route('followups.task.feedback', $task), [
+            'feedback' => 'Landlord confirmed the terms.',
+            'offer_requested' => 1,
+        ])->assertRedirect();
+
+        // A task is not a unit viewing, so the flag must be ignored outright.
+        $this->assertSame(0, Deal::withoutGlobalScopes()->where('lead_id', $task->lead_id)->count());
     }
 
     public function test_schedules_hub_shows_tabs_for_all_three(): void

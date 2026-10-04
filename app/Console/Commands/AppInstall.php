@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\InstallerService;
+use App\Support\AppVersion;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -92,7 +93,7 @@ class AppInstall extends Command
         try {
             $result = $installer->installApplication($payload);
         } catch (\Throwable $e) {
-            $this->error('Installation failed: ' . $e->getMessage());
+            $this->error('Installation failed: '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -103,7 +104,7 @@ class AppInstall extends Command
         $this->table(
             ['Item', 'Value'],
             [
-                ['Version', config('app.version', '1.0.0')],
+                ['Version', AppVersion::current()],
                 ['Tenant', $tenant->name],
                 ['Tenant slug', $tenant->slug],
                 ['Admin email', $payload['admin_email']],
@@ -140,6 +141,6 @@ class AppInstall extends Command
 
     private function quoteEnvValue(string $value): string
     {
-        return '"' . addcslashes($value, '"\\') . '"';
+        return '"'.addcslashes($value, '"\\').'"';
     }
 }

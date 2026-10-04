@@ -48,7 +48,7 @@ class TaskController extends Controller
         ]);
 
         AuditLog::log('task.created', $task);
-        $this->calendar->sync($task, auth()->user());
+        $result = $this->calendar->sync($task, auth()->user());
 
         app(ScheduleActivityService::class)->log(
             $lead,
@@ -64,10 +64,12 @@ class TaskController extends Controller
         }
 
         if ($request->expectsJson() || $request->boolean('json')) {
-            return response()->json(['success' => true, 'id' => $task->id]);
+            return response()->json(['success' => true, 'id' => $task->id, 'warning' => $result->failureMessage()]);
         }
 
-        return redirect()->route('leads.show', $lead)->with('success', __('Task created successfully.'));
+        return redirect()->route('leads.show', $lead)
+            ->with('success', __('Task created successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     /**
@@ -117,13 +119,15 @@ class TaskController extends Controller
         }
 
         AuditLog::log('task.updated', $task);
-        $this->calendar->sync($task, auth()->user());
+        $result = $this->calendar->sync($task, auth()->user());
 
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'id' => $task->id]);
+            return response()->json(['success' => true, 'id' => $task->id, 'warning' => $result->failureMessage()]);
         }
 
-        return redirect()->back()->with('success', __('Task updated successfully.'));
+        return redirect()->back()
+            ->with('success', __('Task updated successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     /**
@@ -192,9 +196,9 @@ class TaskController extends Controller
         );
 
         AuditLog::log('task.toggled', $task);
-        $this->calendar->sync($task, auth()->user());
+        $result = $this->calendar->sync($task, auth()->user());
 
-        return response()->json(['success' => true, 'is_completed' => $task->is_completed]);
+        return response()->json(['success' => true, 'is_completed' => $task->is_completed, 'warning' => $result->failureMessage()]);
     }
 
     /**
@@ -204,17 +208,19 @@ class TaskController extends Controller
     {
         $this->authorizeTask($task);
 
-        $this->calendar->removeEvent($task);
+        $result = $this->calendar->removeEvent($task);
         $task->activities()->delete();
         $task->delete();
 
         AuditLog::log('task.deleted', $task);
 
         if (request()->expectsJson()) {
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'warning' => $result->failureMessage()]);
         }
 
-        return redirect()->back()->with('success', __('Task deleted.'));
+        return redirect()->back()
+            ->with('success', __('Task deleted.'))
+            ->with('warning', $result->failureMessage());
     }
 
     /**

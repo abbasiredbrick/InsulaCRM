@@ -232,13 +232,23 @@ class OfferLetterController extends Controller
             'contract_end_date' => 'nullable|date',
             'payment_period' => 'nullable|string|max:100',
             'documents_required' => 'nullable|string',
+            // Unit price as listed.
             'original_amount' => 'required|numeric|min:0',
+            // Discount off the listed price; capped to it in buildAmounts so the
+            // contract value can never go negative.
             'discount_amount' => 'nullable|numeric|min:0',
+            // 'percentage' of the contract value, or a stated 'value'. The two
+            // commission inputs are both accepted because only one is visible at
+            // a time; the service recomputes from the one the basis selects.
+            'commission_basis' => 'nullable|in:percentage,value',
             'commission_rate_pct' => 'nullable|numeric|min:0|max:100',
-            'commission_vat_pct' => 'nullable|numeric|min:0|max:100',
+            'commission_amount' => 'nullable|numeric|min:0',
+            // Deliberately not accepted from the request: the VAT rate is the
+            // tenant's, read from Tenant::effectiveVatRate(). Letting the form
+            // post it back is how a not-registered company ends up charging 5%.
             'security_deposit' => 'nullable|numeric|min:0',
             'admin_fee' => 'nullable|numeric|min:0',
-            'tawtheeq_fee' => 'nullable|numeric|min:0',
+            'contract_fee' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
     }

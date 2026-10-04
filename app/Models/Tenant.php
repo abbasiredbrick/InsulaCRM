@@ -26,6 +26,7 @@ class Tenant extends Model
         'logo_path',
         'timezone',
         'currency',
+        'is_vat_registered',
         'date_format',
         'country',
         'measurement_system',
@@ -249,7 +250,10 @@ class Tenant extends Model
      * residential_lease: % of the annual lease value.
      * commercial_lease: % of the annual lease value.
      * sales: % of the sales value.
-     * vat: VAT percentage applied on top of the commission.
+     *
+     * `vat` is read-only and retained only for existing rows: the applied rate is
+     * now Tenant::VAT_RATE whenever the tenant is registered, so a stale value
+     * here no longer decides any invoice. See effectiveVatRate().
      *
      * @return array{residential_lease: int|float|string, commercial_lease: int|float|string, sales: int|float|string, vat: int|float|string}
      */
@@ -259,6 +263,58 @@ class Tenant extends Model
             \App\Services\DealCommissionService::RATE_DEFAULTS,
             $this->custom_options['commission_rates'] ?? []
         );
+    }
+
+    /**
+     * Whether this company is registered for VAT.
+     *
+     * Absent the registration there is nothing to charge: VAT is a tax the
+     * registered company collects and remits, so an unregistered brokerage
+     * adding 5% to an invoice is simply overcharging the client. Defaults to
+     * false because that fails safe.
+     */
+    public function isVatRegistered(): bool
+    {
+        return (bool) $this->is_vat_registered;
+    }
+
+    /**
+     * The standard VAT rate on agency services in the UAE.
+     *
+     * The residential rent/sale value itself is never VATable, so this rate only
+     * ever applies to our services on top of it. It is a constant, not a
+     * setting: the legal rate is 5% and a tenant that could type a different
+     * number into Settings would just be mis-invoicing clients.
+     */
+    public const VAT_RATE = 5.0;
+
+    /**
+     * The VAT rate to actually apply, which is zero unless registered.
+     *
+     * This is the single answer to "what VAT goes on this invoice". Call it
+     * rather than reading the tenant's configured rate directly, so an
+     * unregistered tenant can never have VAT applied by a caller that forgot to
+     * check the flag.
+     */
+    public function effectiveVatRate(): float
+    {
+        return $this->isVatRegistered() ? self::VAT_RATE : 0.0;
+    }
+
+    /**
+     * VAT on one service amount (commission, admin fee, contract fee).
+     *
+     * Never pass a residential lease or sale value through here: the rent and
+     * the sale price themselves are not VATable, only our services on top of
+     * them are.
+     */
+    public function vatOn(float $serviceAmount): float
+    {
+        if ($serviceAmount <= 0) {
+            return 0.0;
+        }
+
+        return round($serviceAmount * ($this->effectiveVatRate() / 100), 2);
     }
 
     public function isRealEstate(): bool

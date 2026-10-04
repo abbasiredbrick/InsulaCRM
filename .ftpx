@@ -1,0 +1,36 @@
+#!/bin/bash
+# Thin lftp wrapper. Credentials are read from PROD-DEPLOY.md so the secret
+# never has to be typed (or printed) on a command line.
+#
+# Usage: ftpx <lftp command...>
+#   ftpx "cls -la /public_html/insulacrm/app/Services/Portals"
+
+set -euo pipefail
+cd "$(dirname "$0")"
+
+DOC=PROD-DEPLOY.md
+
+HOST=$(grep -oE 'ftp://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' "$DOC" | head -1 | sed 's|ftp://||')
+USER=$(grep -oE 'User: `[^`]+`' "$DOC" | head -1 | sed 's|User: `||; s|`||')
+PASS=$(grep -oE 'Pass: `[^`]+`' "$DOC" | head -1 | sed 's|Pass: `||; s|`||')
+PORT=$(grep -oE 'Port: \*\*[0-9]+\*\*' "$DOC" | head -1 | grep -oE '[0-9]+')
+
+if [[ -z "$HOST" || -z "$USER" || -z "$PASS" || -z "$PORT" ]]; then
+  echo "Could not parse connection details from $DOC" >&2
+  exit 1
+fi
+
+# The IPv4 address is required: the hostname resolves to IPv6 first and the
+# TLS handshake then hangs until retries exhaust.
+export FTPS_HOST="$HOST" FTPS_USER="$USER" FTPS_PASS="$PASS" FTPS_PORT="$PORT"
+
+exec lftp -u "$FTPS_USER:$FTPS_PASS" -p "$FTPS_PORT" "ftp://$FTPS_HOST" -e "
+set ftp:ssl-force true;
+set ftp:ssl-auth TLS;
+set ftp:ssl-protect-data true;
+set ssl:verify-certificate no;
+set net:timeout 30;
+set net:max-retries 3;
+$*;
+quit
+"

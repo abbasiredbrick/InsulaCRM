@@ -20,7 +20,11 @@ class LeadFactory extends Factory
             'phone' => fake()->phoneNumber(),
             'email' => fake()->safeEmail(),
             'lead_source' => fake()->randomElement(['cold_call', 'direct_mail', 'website', 'referral', 'driving_for_dollars', 'list_import', 'other']),
-            'status' => fake()->randomElement(CustomFieldService::getValidSlugs('lead_status')),
+            // Assignable statuses only. A fresh lead is never closed_won or
+            // closed_lost — those are set by DealLifecycleService when a deal
+            // closes — and a random closed lead made unrelated status assertions
+            // pass or fail depending on the seed.
+            'status' => fake()->randomElement(CustomFieldService::getAssignableStatusSlugs()),
             'temperature' => fake()->randomElement(['hot', 'warm', 'cold']),
             'motivation_score' => fake()->numberBetween(0, 100),
             'do_not_contact' => fake()->boolean(5),

@@ -22,30 +22,40 @@ class CustomFieldService
     ];
 
     /**
+     * Lead statuses that only automation may set.
+     *
+     * closed_won follows a deal reaching deal_won (a lease) or closed_won (a
+     * sale); closed_lost follows a deal reaching closed_lost. Both arrive with
+     * the commission, the split and the client conversion attached, so a manual
+     * pick is guaranteed to skip some of it.
+     */
+    public const AUTOMATED_STATUSES = ['closed_won', 'closed_lost'];
+
+    /**
      * Get all options for a field type (defaults + tenant custom).
      */
     public static function getOptions(string $fieldType, ?Tenant $tenant = null): array
     {
-        if (!$tenant) {
+        if (! $tenant) {
             $tenant = auth()->check() ? auth()->user()->tenant : null;
         }
 
         $defaults = self::getSystemDefaults($fieldType, $tenant);
 
-        if (!$tenant) {
-            return array_map(fn($label) => __($label), $defaults);
+        if (! $tenant) {
+            return array_map(fn ($label) => __($label), $defaults);
         }
 
         $customOptions = $tenant->custom_options[$fieldType] ?? [];
 
         // Also merge legacy custom_lead_sources for backward compat
-        if ($fieldType === 'lead_source' && !empty($tenant->custom_lead_sources)) {
+        if ($fieldType === 'lead_source' && ! empty($tenant->custom_lead_sources)) {
             foreach ($tenant->custom_lead_sources as $source) {
                 $customOptions[$source['slug']] = $source['name'];
             }
         }
 
-        return array_map(fn($label) => __($label), array_merge($defaults, $customOptions));
+        return array_map(fn ($label) => __($label), array_merge($defaults, $customOptions));
     }
 
     /**
@@ -53,7 +63,7 @@ class CustomFieldService
      */
     public static function getDefaults(string $fieldType, ?Tenant $tenant = null): array
     {
-        return array_map(fn($label) => __($label), self::getSystemDefaults($fieldType, $tenant));
+        return array_map(fn ($label) => __($label), self::getSystemDefaults($fieldType, $tenant));
     }
 
     /**
@@ -61,18 +71,18 @@ class CustomFieldService
      */
     public static function getCustomOptions(string $fieldType, ?Tenant $tenant = null): array
     {
-        if (!$tenant) {
+        if (! $tenant) {
             $tenant = auth()->check() ? auth()->user()->tenant : null;
         }
 
-        if (!$tenant) {
+        if (! $tenant) {
             return [];
         }
 
         $custom = $tenant->custom_options[$fieldType] ?? [];
 
         // Legacy compat for lead sources
-        if ($fieldType === 'lead_source' && !empty($tenant->custom_lead_sources)) {
+        if ($fieldType === 'lead_source' && ! empty($tenant->custom_lead_sources)) {
             foreach ($tenant->custom_lead_sources as $source) {
                 $custom[$source['slug']] = $source['name'];
             }
@@ -140,7 +150,40 @@ class CustomFieldService
     }
 
     /**
-     * Get the supported field types and their labels.
+     * Statuses an agent may pick by hand.
+     *
+     * closed_won and closed_lost are consequences of a deal's stage, not a
+     * judgement call — DealLifecycleService sets them. Offering them in the
+     * dropdown is how a lead ends up closed_won with no commission on the deal,
+     * which is exactly the drift the leasing ladder exists to prevent.
+     *
+     * @return array<int, string>
+     */
+    public static function getAssignableStatusSlugs(?Tenant $tenant = null): array
+    {
+        return array_values(array_diff(self::getValidSlugs('lead_status', $tenant), self::AUTOMATED_STATUSES));
+    }
+
+    /**
+     * Options for a dropdown an agent picks from, minus the automated statuses.
+     * The filter dropdowns on the lead list keep them, because a manager still
+     * needs to filter a list down to closed-won.
+     *
+     * @return array<string, string>
+     */
+    public static function getAssignableOptions(string $fieldType, ?Tenant $tenant = null): array
+    {
+        $options = self::getOptions($fieldType, $tenant);
+
+        if ($fieldType === 'lead_status') {
+            $options = array_diff_key($options, array_flip(self::AUTOMATED_STATUSES));
+        }
+
+        return $options;
+    }
+
+    /**
+     * The supported field types and their labels.
      */
     public static function getFieldTypes(?Tenant $tenant = null): array
     {

@@ -52,9 +52,11 @@ class MeetingController extends Controller
         );
 
         AuditLog::log('meeting.created', $meeting, ['lead_id' => $lead->id, 'scheduled_at' => $meeting->scheduled_at->toDateTimeString()]);
-        $this->calendar->sync($meeting, auth()->user());
+        $result = $this->calendar->sync($meeting, auth()->user());
 
-        return redirect()->route('leads.show', $lead)->with('success', __('Meeting scheduled successfully.'));
+        return redirect()->route('leads.show', $lead)
+            ->with('success', __('Meeting scheduled successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     public function update(Request $request, Meeting $meeting)
@@ -92,30 +94,34 @@ class MeetingController extends Controller
         }
 
         AuditLog::log('meeting.updated', $meeting, $data);
-        $this->calendar->sync($meeting, auth()->user());
+        $result = $this->calendar->sync($meeting, auth()->user());
 
         if ($request->expectsJson()) {
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'warning' => $result->failureMessage()]);
         }
 
-        return redirect()->back()->with('success', __('Meeting updated successfully.'));
+        return redirect()->back()
+            ->with('success', __('Meeting updated successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     public function destroy(Meeting $meeting)
     {
         $this->authorizeMeeting($meeting);
 
-        $this->calendar->removeEvent($meeting);
+        $result = $this->calendar->removeEvent($meeting);
         $leadId = $meeting->lead_id;
         $meeting->delete();
 
         AuditLog::log('meeting.deleted', $meeting);
 
         if (request()->expectsJson()) {
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'warning' => $result->failureMessage()]);
         }
 
-        return redirect()->route('leads.show', $leadId)->with('success', __('Meeting deleted.'));
+        return redirect()->route('leads.show', $leadId)
+            ->with('success', __('Meeting deleted.'))
+            ->with('warning', $result->failureMessage());
     }
 
     protected function authorizeMeeting(Meeting $meeting): void

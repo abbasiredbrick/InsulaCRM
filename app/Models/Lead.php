@@ -29,13 +29,22 @@ class Lead extends Model
         'viewing_requested' => 'Viewing Requested',
         'viewing_scheduled' => 'Viewing Scheduled (Owner Confirmed)',
         'viewing_done' => 'Unit Viewed',
+        'offer_requested' => 'Offer Requested',
         'offer_sent' => 'Offer Sent',
         'negotiating' => 'Negotiating (Price / Payments / Deposit or PDC)',
         'offer_signed' => 'Offer Signed',
-        'deposit_collected' => 'Deposit / First Payment & Commission',
+        'deposit_received' => 'Deposit / First Payment Received (Landlord)',
+        'commission_received' => 'Commission Received (Broker)',
+        'deal_won' => 'Deal Won (Money In)',
+        'rent_paid' => 'Rent / PDC Paid',
         'tawtheeq_ejari' => 'Tawtheeq (ADGM/DARI) / Ejari (DLD)',
         'move_in_permit' => 'Move-In Permit Issued',
         'moved_in' => 'Moved In / Settled',
+        'deal_locked' => 'Deal Locked (Closed — Do Not Modify)',
+        // A lease can die at any point before the money lands. The sale ladder
+        // ends with closed_lost for the same reason, and without it here a lost
+        // lease has no stage to move to and the lead can only be closed by hand.
+        'closed_lost' => 'Closed Lost',
     ];
 
     /**
@@ -293,13 +302,14 @@ class Lead extends Model
     }
 
     /**
-     * Total commission earned across deals that reached closed_won. Used as the
-     * auto-prefill basis for the lead's commission amount.
+     * Total commission earned across won deals (deal_won for a lease,
+     * closed_won for a sale). Used as the auto-prefill basis for the lead's
+     * commission amount.
      */
     public function closedDealsCommissionTotal(): ?float
     {
         $total = $this->deals()
-            ->where('stage', 'closed_won')
+            ->won()
             ->whereNotNull('total_commission')
             ->sum('total_commission');
 

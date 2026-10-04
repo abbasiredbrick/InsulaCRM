@@ -174,7 +174,11 @@ class LeadManagementTest extends TestCase
         $response->assertSee('ManagerSee');
         $response->assertSee('TeamAgentSee');
         $response->assertDontSee('OutsideSee');
-        $response->assertSee('kanban-agent');
+
+        // /leads carries no default view, so the board is requested explicitly.
+        $this->get('/leads/kanban')
+            ->assertStatus(200)
+            ->assertSee('kanban-agent');
     }
 
     public function test_manager_can_filter_by_a_team_agent(): void
@@ -209,7 +213,8 @@ class LeadManagementTest extends TestCase
     {
         $this->actingAsAdmin();
 
-        $response = $this->get('/leads');
+        // The board is an explicit destination: /leads itself has no default.
+        $response = $this->get('/leads/kanban');
 
         $response->assertOk();
         $response->assertSee('data-live-filter', false);

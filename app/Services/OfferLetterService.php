@@ -40,13 +40,17 @@ class OfferLetterService
      */
     public function buildDefaults(Deal $deal): array
     {
-        $deal->loadMissing(['lead', 'lead.property', 'tenant']);
+        $deal->loadMissing(['lead', 'lead.property', 'unit', 'tenant']);
 
         $commission = app(DealCommissionService::class);
+        // The advertised price, not the negotiated one — the letter discounts it.
+        $listed = $commission->listedPriceFor($deal);
         $gross = $commission->grossFor($deal);
         $rate = $commission->rateFor($deal);
         $tenants = $commission->rates($deal->tenant);
-        $property = $deal->property ?: $deal->lead?->property;
+        // The offered unit wins: the client regularly asks for an offer on a unit that
+        // is not the one linked on the lead.
+        $property = $deal->dealUnit();
         $lead = $deal->lead;
 
         $start = $lead?->expected_move_in_date;
@@ -58,18 +62,28 @@ class OfferLetterService
             $securityDeposit = round($gross * 0.05, 2);
         }
 
+        $adminFee = (float) ($property?->admin_fee ?? 0);
+        $contractFee = (float) ($property?->contract_fee ?? 0);
+
         return [
             'deal_type' => $deal->dealType(),
-            'original_amount' => $gross,
-            'approved_amount' => $gross,
+            // Unit price as listed.
+            'original_amount' => $listed,
+            // Contract value: the listed price, less whatever discount is typed in.
+            'approved_amount' => $listed,
+            'commission_basis' => 'percentage',
             'commission_rate_pct' => $rate,
-            'commission_vat_pct' => (float) $tenants['vat'],
-            'commission_amount' => $commission->commissionFor($deal, $gross),
-            'commission_vat' => $commission->vatFor($deal, $commission->commissionFor($deal, $gross), $deal->tenant),
-            'commission_total' => $commission->commissionFor($deal, $gross) + $commission->vatFor($deal, $commission->commissionFor($deal, $gross), $deal->tenant),
+            'commission_vat_pct' => $deal->tenant->effectiveVatRate(),
+            'commission_amount' => $commission->commissionFor($deal, $listed),
+            'commission_vat' => $deal->tenant->vatOn($commission->commissionFor($deal, $listed)),
+            'commission_total' => round($commission->commissionFor($deal, $listed) + $deal->tenant->vatOn($commission->commissionFor($deal, $listed)), 2),
             'security_deposit' => $securityDeposit ?: null,
-            'admin_fee' => $property?->admin_fee,
-            'tawtheeq_fee' => $property?->tawtheeq_fee,
+            'admin_fee' => $adminFee ?: null,
+            'admin_fee_vat' => $adminFee ? $deal->tenant->vatOn($adminFee) : null,
+            'admin_fee_total' => $adminFee ? round($adminFee + $deal->tenant->vatOn($adminFee), 2) : null,
+            'contract_fee' => $contractFee ?: null,
+            'contract_fee_vat' => $contractFee ? $deal->tenant->vatOn($contractFee) : null,
+            'contract_fee_total' => $contractFee ? round($contractFee + $deal->tenant->vatOn($contractFee), 2) : null,
             'payment_period' => '1 '.__('Payment'), // "1 Payment Payable to the Landlord"
             'contract_start_date' => $start,
             'contract_end_date' => $end,
@@ -166,6 +180,7 @@ class OfferLetterService
             'original_amount' => (float) $offer->original_amount,
             'discount_amount' => (float) $offer->discount_amount,
             'approved_amount' => (float) $offer->approved_amount,
+            'commission_basis' => $offer->commission_basis ?: 'percentage',
             'commission_rate_pct' => (float) $offer->commission_rate_pct,
             'commission_vat_pct' => (float) $offer->commission_vat_pct,
             'commission_amount' => (float) $offer->commission_amount,
@@ -173,7 +188,11 @@ class OfferLetterService
             'commission_total' => (float) $offer->commission_total,
             'security_deposit' => $offer->security_deposit,
             'admin_fee' => $offer->admin_fee,
-            'tawtheeq_fee' => $offer->tawtheeq_fee,
+            'admin_fee_vat' => $offer->admin_fee_vat,
+            'admin_fee_total' => $offer->admin_fee_total,
+            'contract_fee' => $offer->contract_fee,
+            'contract_fee_vat' => $offer->contract_fee_vat,
+            'contract_fee_total' => $offer->contract_fee_total,
             'payment_period' => $offer->payment_period,
             'documents_required' => $offer->documents_required,
             'notes' => $offer->notes,
@@ -190,29 +209,53 @@ class OfferLetterService
         $tenant = $deal->tenant;
         $commission = app(DealCommissionService::class);
 
-        $original = (float) $v['original_amount'];
-        $discount = max(0.0, (float) ($v['discount_amount'] ?? 0));
-        $approved = max(0.0, round($original - $discount, 2));
+        // Unit price as listed, then the discount off it, then the contract value
+        // the client actually signs for. The discount is what makes the three
+        // figures worth printing separately.
+        $listed = (float) $v['original_amount'];
+        $discount = min(max(0.0, (float) ($v['discount_amount'] ?? 0)), $listed);
+        $contractValue = max(0.0, round($listed - $discount, 2));
 
+        $basis = ($v['commission_basis'] ?? 'percentage') === 'value' ? 'value' : 'percentage';
         $rate = (float) ($v['commission_rate_pct'] ?? $commission->rateFor($deal));
-        $gross = $approved > 0 ? $approved : $original;
 
-        $commissionNet = round($gross * ($rate / 100), 2);
-        $vatPct = (float) ($v['commission_vat_pct'] ?? $tenant->commissionRateSettings()['vat']);
-        $vat = round($commissionNet * ($vatPct / 100), 2);
+        // A stated commission value is taken as given; a percentage is taken off
+        // the contract value, falling back to the listed price when a discount
+        // has consumed the whole contract value.
+        if ($basis === 'value') {
+            $commissionNet = max(0.0, round((float) ($v['commission_amount'] ?? 0), 2));
+        } else {
+            $commissionNet = round(($contractValue > 0 ? $contractValue : $listed) * ($rate / 100), 2);
+        }
+
+        // VAT belongs to the tenant, not to the form, and it attaches only to our
+        // services. The residential lease or sale value is never VATable, so it
+        // deliberately has no VAT line above it.
+        $vatPct = $tenant->effectiveVatRate();
+        $commissionVat = $tenant->vatOn($commissionNet);
+
+        $adminFee = max(0.0, (float) ($v['admin_fee'] ?? 0));
+        $contractFee = max(0.0, (float) ($v['contract_fee'] ?? 0));
+        $adminFeeVat = $tenant->vatOn($adminFee);
+        $contractFeeVat = $tenant->vatOn($contractFee);
 
         return [
-            'original_amount' => $original,
+            'original_amount' => $listed,
             'discount_amount' => $discount,
-            'approved_amount' => $approved,
+            'approved_amount' => $contractValue,
+            'commission_basis' => $basis,
             'commission_rate_pct' => $rate,
             'commission_vat_pct' => $vatPct,
             'commission_amount' => $commissionNet,
-            'commission_vat' => $vat,
-            'commission_total' => $commissionNet + $vat,
+            'commission_vat' => $commissionVat,
+            'commission_total' => round($commissionNet + $commissionVat, 2),
             'security_deposit' => $v['security_deposit'] ?? null,
-            'admin_fee' => $v['admin_fee'] ?? null,
-            'tawtheeq_fee' => $v['tawtheeq_fee'] ?? null,
+            'admin_fee' => $adminFee ?: null,
+            'admin_fee_vat' => $adminFee ? $adminFeeVat : null,
+            'admin_fee_total' => $adminFee ? round($adminFee + $adminFeeVat, 2) : null,
+            'contract_fee' => $contractFee ?: null,
+            'contract_fee_vat' => $contractFee ? $contractFeeVat : null,
+            'contract_fee_total' => $contractFee ? round($contractFee + $contractFeeVat, 2) : null,
         ];
     }
 
@@ -477,15 +520,18 @@ class OfferLetterService
 
     /**
      * Auto-advance a deal whose offer letter was just signed: rent deals move
-     * to 'deposit_collected', sale deals to 'under_contract'. Only ever moves
+     * to 'deposit_received', sale deals to 'under_contract'. Only ever moves
      * forward — a deal already past the target stage (e.g. moved_in) stays put.
+     *
+     * A signature moves the deal to deposit_received, never to deal_won: the
+     * signature is what makes the deal binding, not what makes it revenue.
      */
     protected function advanceDealAfterSigned(OfferLetter $offer, ?User $user = null): void
     {
         $deal = $offer->deal;
         $dealType = $deal->dealType();
         $stages = Deal::stagesForType($dealType);
-        $target = $dealType === 'rent' ? 'deposit_collected' : 'under_contract';
+        $target = $dealType === 'rent' ? 'deposit_received' : 'under_contract';
 
         if (! array_key_exists($target, $stages)) {
             return;

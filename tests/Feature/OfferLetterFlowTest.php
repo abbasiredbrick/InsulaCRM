@@ -104,10 +104,175 @@ class OfferLetterFlowTest extends TestCase
         $this->assertEquals(500000.0, (float) $offer->original_amount);
         $this->assertEquals(500000.0, (float) $offer->approved_amount);
         $this->assertEquals(10000.0, (float) $offer->commission_amount, '2% sales commission.');
-        $this->assertEquals(500.0, (float) $offer->commission_vat, '5% VAT on the commission.');
-        $this->assertEquals(10500.0, (float) $offer->commission_total);
+        // This tenant is not VAT registered, so the 5% rate sitting in settings
+        // is deliberately not applied.
+        $this->assertEquals(0.0, (float) $offer->commission_vat);
+        $this->assertEquals(10000.0, (float) $offer->commission_total);
         $this->assertStringContainsString('OL-', $offer->offer_no);
         $this->assertDatabaseHas('activities', ['lead_id' => $deal->lead_id, 'subject' => 'Offer letter issued']);
+    }
+
+    public function test_vat_is_added_to_every_service_when_the_company_is_registered(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate', 'is_vat_registered' => true]);
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'discount_amount' => 50000,
+            'security_deposit' => 10000,
+            'admin_fee' => 5250,
+            'contract_fee' => 2200,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        // Contract value is the discounted figure; the sale value itself carries
+        // no VAT at all.
+        $this->assertEquals(500000.0, (float) $offer->original_amount);
+        $this->assertEquals(50000.0, (float) $offer->discount_amount);
+        $this->assertEquals(450000.0, (float) $offer->approved_amount);
+
+        // Commission is 2% of the contract value, not of the listed price.
+        $this->assertEquals(9000.0, (float) $offer->commission_amount);
+        $this->assertEquals(450.0, (float) $offer->commission_vat);
+        $this->assertEquals(9450.0, (float) $offer->commission_total);
+
+        // Admin fee and contract fee are services too, so they carry VAT.
+        $this->assertEquals(5250.0, (float) $offer->admin_fee);
+        $this->assertEquals(262.5, (float) $offer->admin_fee_vat);
+        $this->assertEquals(5512.5, (float) $offer->admin_fee_total);
+        $this->assertEquals(2200.0, (float) $offer->contract_fee);
+        $this->assertEquals(110.0, (float) $offer->contract_fee_vat);
+        $this->assertEquals(2310.0, (float) $offer->contract_fee_total);
+
+        $this->assertEquals(5.0, (float) $offer->vatRate());
+        $this->assertTrue($offer->chargesVat());
+        $this->assertEquals(822.5, $offer->totalVat());
+    }
+
+    public function test_no_vat_is_added_to_the_fees_when_the_company_is_not_registered(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'admin_fee' => 5250,
+            'contract_fee' => 2200,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals(5250.0, (float) $offer->admin_fee);
+        $this->assertEquals(0.0, (float) $offer->admin_fee_vat);
+        $this->assertEquals(5250.0, (float) $offer->admin_fee_total);
+        $this->assertEquals(2200.0, (float) $offer->contract_fee);
+        $this->assertEquals(0.0, (float) $offer->contract_fee_vat);
+        $this->assertEquals(2200.0, (float) $offer->contract_fee_total);
+        $this->assertEquals(0.0, (float) $offer->commission_vat);
+        $this->assertFalse($offer->chargesVat());
+        $this->assertEquals(0.0, $offer->totalVat());
+    }
+
+    public function test_a_discount_cannot_exceed_the_listed_price(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'discount_amount' => 900000,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        // Clamped, not rejected: a contract value below zero would make the
+        // commission negative and the letter nonsensical.
+        $this->assertEquals(500000.0, (float) $offer->discount_amount);
+        $this->assertEquals(0.0, (float) $offer->approved_amount);
+        // The commission falls back to the listed price rather than to zero: a
+        // 100% discount must not quietly make the agency fee vanish.
+        $this->assertEquals(10000.0, (float) $offer->commission_amount);
+    }
+
+    public function test_commission_can_be_entered_as_a_stated_value(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        // A negotiated flat fee: the percentage would say 10,000 on a 500k sale.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'commission_basis' => 'value',
+            'commission_rate_pct' => 2,
+            'commission_amount' => 7500,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals('value', $offer->commission_basis);
+        $this->assertTrue($offer->isCommissionOnValue());
+        $this->assertEquals(7500.0, (float) $offer->commission_amount);
+        $this->assertEquals(7500.0, (float) $offer->commission_total, 'No VAT: tenant not registered.');
+    }
+
+    public function test_the_posted_vat_rate_is_ignored(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        // A forged form post tries to add 5% VAT to an unregistered company.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'commission_vat_pct' => 5,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals(0.0, (float) $offer->commission_vat_pct);
+        $this->assertEquals(0.0, (float) $offer->commission_vat);
+    }
+
+    public function test_the_offer_letter_prints_the_three_price_tiers_and_no_vat_on_the_value(): void
+    {
+        $this->actingAsAdmin(['business_mode' => 'realestate', 'is_vat_registered' => true]);
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed', 'contract_price' => 120000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 120000,
+            'discount_amount' => 10000,
+            'admin_fee' => 5250,
+            'contract_fee' => 2200,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $html = $this->get(route('deal.offers.print', $offer))->assertOk()->getContent();
+
+        $this->assertStringContainsString('Unit Price (as listed)', $html);
+        $this->assertStringContainsString('Discount Value', $html);
+        $this->assertStringContainsString('Contract Value', $html);
+        $this->assertStringContainsString('Contract Fee', $html);
+        $this->assertStringContainsString('Admin Fee', $html);
+        $this->assertStringContainsString('VAT @ 5%', $html);
+        $this->assertStringContainsString('Agency Services', $html);
+
+        // The old wording is gone.
+        $this->assertStringNotContainsString('Tawtheeq Fee', $html);
+        $this->assertStringNotContainsString('Admin Fee + VAT', $html);
     }
 
     public function test_offer_with_discount_from_agent_goes_pending_until_manager_approves(): void
@@ -180,7 +345,7 @@ class OfferLetterFlowTest extends TestCase
         $this->assertEquals('closed_won', $deal->lead->fresh()->status, 'Lead status stays in sync.');
     }
 
-    public function test_update_status_is_gated_and_closes_after_signing(): void
+    public function test_a_sale_is_gated_and_closes_after_signing(): void
     {
         $this->reAdmin();
 
@@ -188,20 +353,24 @@ class OfferLetterFlowTest extends TestCase
         $lead = $deal->lead;
         $offer = $this->issueOffer($deal);
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_won'])
-            ->assertStatus(422);
+        // No signed offer yet, so the win is refused rather than half-applied.
+        $this->patchJson(route('deals.updateStage', $deal), ['stage' => 'closed_won'])
+            ->assertStatus(422)
+            ->assertJsonFragment(['message' => 'The deal cannot be closed as Won until a signed offer letter has been uploaded. Generate the offer letter, print it for the client, then upload the signed copy.']);
+
+        $this->assertNotEquals('closed_won', $deal->fresh()->stage);
 
         $this->signOffer($offer);
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_won'])
+        $this->patchJson(route('deals.updateStage', $deal), ['stage' => 'closed_won'])
             ->assertJson(['success' => true]);
 
         $this->assertEquals('closed_won', $lead->fresh()->status);
-        $this->assertEquals('closed_won', $deal->fresh()->stage, 'The sale deal follows the lead to Won.');
+        $this->assertEquals('closed_won', $deal->fresh()->stage);
         $this->assertEquals(10000.0, (float) $deal->fresh()->total_commission);
     }
 
-    public function test_rent_lead_close_keeps_leasing_stage_and_applies_commission(): void
+    public function test_a_won_lease_closes_the_lead_and_applies_the_commission(): void
     {
         $this->reAdmin();
 
@@ -211,13 +380,29 @@ class OfferLetterFlowTest extends TestCase
         $this->issueOffer($deal);
         $this->signOffer($deal->offerLetters()->first());
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_won'])
+        // Winning is a deal-stage event now, not a lead status an agent types.
+        $this->patchJson(route('deals.updateStage', $deal), ['stage' => 'commission_received'])
             ->assertJson(['success' => true]);
 
-        $lead = $lead->fresh();
-        $this->assertEquals('closed_won', $lead->status);
-        $this->assertEquals('moved_in', $deal->fresh()->stage, 'Renting has no closed_won stage — it stays settled.');
+        $this->assertEquals('closed_won', $lead->fresh()->status);
+        $this->assertEquals('deal_won', $deal->fresh()->stage);
         $this->assertEquals(6000.0, (float) $deal->fresh()->total_commission, '5% of 120k annual rent.');
+    }
+
+    public function test_a_lease_lead_cannot_be_closed_won_by_hand(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->rentDeal(120000);
+        $this->issueOffer($deal);
+        $this->signOffer($deal->offerLetters()->first());
+
+        // A non-JSON post redirects with the validation error rather than 422.
+        $this->patch(route('leads.updateStatus', $deal->lead), ['status' => 'closed_won'])
+            ->assertSessionHasErrors('status');
+
+        $this->assertNotEquals('closed_won', $deal->lead->fresh()->status);
+        $this->assertEquals(0.0, (float) $deal->fresh()->total_commission);
     }
 
     public function test_print_renders_the_offer_letter(): void
@@ -355,7 +540,7 @@ class OfferLetterFlowTest extends TestCase
         $this->get(route('deal.offers.print', $offer))->assertForbidden();
     }
 
-    public function test_signed_rent_offer_auto_advances_deal_to_deposit_collected(): void
+    public function test_signed_rent_offer_auto_advances_deal_to_deposit_received(): void
     {
         $this->reAdmin();
 
@@ -371,7 +556,7 @@ class OfferLetterFlowTest extends TestCase
 
         $this->signOffer($offer);
 
-        $this->assertEquals('deposit_collected', $deal->fresh()->stage);
+        $this->assertEquals('deposit_received', $deal->fresh()->stage);
         $this->assertDatabaseHas('activities', ['deal_id' => $deal->id, 'subject' => 'Deal stage changed']);
     }
 

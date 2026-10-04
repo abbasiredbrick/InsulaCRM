@@ -2,6 +2,7 @@
 
 namespace App\Services\Cloud;
 
+use App\Models\CalendarEventLink;
 use App\Models\Meeting;
 use App\Models\Showing;
 use App\Models\Task;
@@ -158,34 +159,89 @@ class CloudCalendarService
 
     /**
      * Create/update/delete the external calendar events for a record. Best
-     * effort – never fails the underlying business request.
+     * effort – never fails the underlying business request, but it always
+     * reports what it managed to do.
      *
      * Events are pushed to every involved user's own connected calendar
      * (assigned agent, creator and lead owner) and tracked per user in
      * calendar_event_links.
      */
-    public function sync(Model $record, ?User $actingUser = null): void
+    public function sync(Model $record, ?User $actingUser = null): CalendarSyncResult
     {
         if (! $this->integrationEnabled($record, $actingUser)) {
-            return;
+            return CalendarSyncResult::disabled();
         }
 
         if ($this->shouldRemove($record)) {
-            $this->removeEvent($record);
-
-            return;
+            return $this->removeEvent($record);
         }
+
+        $result = new CalendarSyncResult;
 
         foreach ($this->involvedUsers($record) as $user) {
             $connection = $user->calendarConnections()->latest()->first();
 
-            if ($connection) {
-                $this->syncLink($record, $user, $connection);
+            if (! $connection) {
+                $result->recordUnconnected((int) $user->id);
+
+                continue;
             }
+
+            $error = $this->syncLink($record, $user, $connection);
+
+            if ($error === null) {
+                $result->recordSuccess((int) $user->id);
+            } else {
+                $result->recordFailure((int) $user->id, (string) $user->name, $error);
+            }
+        }
+
+        $this->stampLegacyEventColumns($record);
+
+        return $result;
+    }
+
+    /**
+     * Mirror the "assigned" and "main" external event ids onto the showings
+     * row's legacy calendar_provider/calendar_event_id columns. The dual-target
+     * calendar_event_links table is the source of truth; these columns are what
+     * the reminder job and older reports still read, so leaving them null made a
+     * successful sync look like no sync had ever happened.
+     */
+    protected function stampLegacyEventColumns(Model $record): void
+    {
+        if (! $record instanceof Showing || ! $record->exists) {
+            return;
+        }
+
+        $links = CalendarEventLink::query()
+            ->where('eventable_type', $record::class)
+            ->where('eventable_id', $record->getKey())
+            ->get()
+            ->keyBy('user_id');
+
+        $assignedId = (int) $record->getAttribute('agent_id');
+        $assigned = $links->get($assignedId);
+
+        $mainId = (int) ($record->lead?->getAttribute('agent_id') ?: 0);
+        $main = $mainId && $mainId !== $assignedId ? $links->get($mainId) : null;
+
+        $record->forceFill([
+            'calendar_provider' => $assigned?->provider,
+            'calendar_event_id' => $assigned?->event_id,
+            'main_calendar_provider' => $main?->provider,
+            'main_calendar_event_id' => $main?->event_id,
+        ]);
+
+        if ($record->isDirty()) {
+            $record->saveQuietly();
         }
     }
 
-    protected function syncLink(Model $record, User $user, UserCloudConnection $connection): void
+    /**
+     * @return string|null The failure reason, or null when the event is in sync.
+     */
+    protected function syncLink(Model $record, User $user, UserCloudConnection $connection): ?string
     {
         try {
             $provider = $this->factory->make($connection->provider, $connection);
@@ -200,7 +256,7 @@ class CloudCalendarService
             if ($link && $link->provider === $connection->provider) {
                 $provider->updateCalendarEvent((string) $link->event_id, $payload);
 
-                return;
+                return null;
             }
 
             if ($link) {
@@ -216,7 +272,7 @@ class CloudCalendarService
 
             $eventId = $provider->createCalendarEvent($payload);
 
-            \App\Models\CalendarEventLink::create([
+            CalendarEventLink::create([
                 'tenant_id' => $record->getAttribute('tenant_id'),
                 'eventable_type' => $record::class,
                 'eventable_id' => $record->getKey(),
@@ -224,6 +280,8 @@ class CloudCalendarService
                 'provider' => $connection->provider,
                 'event_id' => $eventId,
             ]);
+
+            return null;
         } catch (\Throwable $e) {
             Log::warning('CloudCalendarService sync failed', [
                 'record' => get_class($record),
@@ -231,6 +289,8 @@ class CloudCalendarService
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
+
+            return $e->getMessage();
         }
     }
 
@@ -238,13 +298,15 @@ class CloudCalendarService
      * Remove the external events for a record from every involved user's
      * calendar (cancelled/completed records) and drop the tracked links.
      */
-    public function removeEvent(Model $record): void
+    public function removeEvent(Model $record): CalendarSyncResult
     {
+        $result = CalendarSyncResult::removed();
+
         if (! $this->integrationEnabled($record)) {
-            return;
+            return CalendarSyncResult::disabled();
         }
 
-        $links = \App\Models\CalendarEventLink::query()
+        $links = CalendarEventLink::query()
             ->where('eventable_type', $record::class)
             ->where('eventable_id', $record->getKey())
             ->get();
@@ -259,27 +321,57 @@ class CloudCalendarService
                 try {
                     $this->factory->make($connection->provider, $connection)
                         ->deleteCalendarEvent((string) $link->event_id);
+                    $result->recordSuccess((int) $link->user_id);
                 } catch (\Throwable $e) {
                     Log::warning('CloudCalendarService delete failed', ['error' => $e->getMessage()]);
+                    $result->recordFailure((int) $link->user_id, '', $e->getMessage());
                 }
             }
 
             $link->delete();
         }
+
+        if ($record instanceof Showing && $record->exists) {
+            $this->clearLegacyEventColumns($record);
+        }
+
+        return $result;
     }
 
+    /**
+     * A withdrawn event must not leave a stale id behind on the legacy columns.
+     */
+    protected function clearLegacyEventColumns(Model $record): void
+    {
+        $record->forceFill([
+            'calendar_provider' => null,
+            'calendar_event_id' => null,
+            'main_calendar_provider' => null,
+            'main_calendar_event_id' => null,
+        ]);
+
+        if ($record->isDirty()) {
+            $record->saveQuietly();
+        }
+    }
+
+    /**
+     * Whether the record's external event should be withdrawn rather than
+     * pushed. Only an explicit terminal status withdraws it: a blank status is
+     * an unpopulated attribute, never a cancellation.
+     */
     protected function shouldRemove(Model $record): bool
     {
         if ($record instanceof Showing) {
-            return $record->status !== 'scheduled';
+            return filled($record->status) && $record->status !== 'scheduled';
         }
 
         if ($record instanceof Task) {
-            return $record->status === 'completed' || $record->status === 'cancelled';
+            return in_array($record->status, ['completed', 'cancelled'], true);
         }
 
         if ($record instanceof Meeting) {
-            return $record->status !== 'scheduled';
+            return filled($record->status) && $record->status !== 'scheduled';
         }
 
         return false;

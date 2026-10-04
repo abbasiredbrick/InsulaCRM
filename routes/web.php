@@ -452,7 +452,9 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         Route::get('/my-commissions', [\App\Http\Controllers\CommissionController::class, 'mine'])->name('commissions.mine');
         Route::patch('/commissions/{commission}/status', [\App\Http\Controllers\CommissionController::class, 'updateStatus'])->name('commissions.status');
-        Route::get('/leads', [LeadController::class, 'index'])->name('leads.index');
+        // /leads dispatches to the member's chosen view; /leads/table and
+        // /leads/kanban are the two explicit destinations that record it.
+        Route::get('/leads', [LeadController::class, 'view'])->name('leads.index');
         Route::get('/leads/table', [LeadController::class, 'index'])->name('leads.table');
         Route::get('/leads/kanban', [LeadKanbanController::class, 'index'])->name('leads.kanban');
         Route::redirect('/leads/kanban/old', '/leads/kanban');
@@ -511,7 +513,11 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Pipeline / Deals: all except field_scout ─────────────────────
     Route::middleware('role:admin,agent,acquisition_agent,disposition_agent,listing_agent,buyers_agent')->group(function () {
         Route::get('/pipeline/export', [DealController::class, 'export'])->name('deals.export');
-        Route::get('/pipeline', [DealController::class, 'pipeline'])->name('pipeline');
+        // /pipeline dispatches to the member's chosen view; /pipeline/board is
+        // the kanban. Declared before /pipeline/{deal} so 'board' is never
+        // swallowed by the deal-id wildcard.
+        Route::get('/pipeline', [DealController::class, 'view'])->name('pipeline');
+        Route::get('/pipeline/board', [DealController::class, 'pipeline'])->name('pipeline.board');
         Route::get('/deals', [DealController::class, 'index'])->name('deals.index');
         Route::get('/pipeline/{deal}', [DealController::class, 'show'])->name('deals.show');
         Route::put('/pipeline/{deal}', [DealController::class, 'update'])->name('deals.update');

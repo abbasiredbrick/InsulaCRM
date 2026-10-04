@@ -12,7 +12,7 @@
 
 <script>
 // Deployed app version (mirrors VERSION + service-worker.js APP_ASSET_VERSION)
-window.CRM_APP_VERSION = '{{ config('app.version') }}';
+window.CRM_APP_VERSION = '{{ \App\Support\AppVersion::current() }}';
 
 // Manual update check: proactively calls registration.update() (network-refreshes
 // the service worker script, bypassing caches) and races install/activate of a

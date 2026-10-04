@@ -862,11 +862,26 @@
                             <small class="form-hint">{{ __('% of the sales value') }}</small>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">{{ __('VAT on Commission (%)') }}</label>
-                            <input type="number" name="vat" class="form-control" min="0" max="100" step="0.01" value="{{ $commissionRates['vat'] ?? '5' }}" required>
-                            <small class="form-hint">{{ __('Charged on top of the commission') }}</small>
+                            {{-- The UAE rate is fixed at 5%, so this is stated rather
+                                 than typed: a tenant who could type a different
+                                 number here would be mis-invoicing clients. --}}
+                            <label class="form-label">{{ __('VAT Rate (%)') }}</label>
+                            <input type="text" class="form-control" value="{{ rtrim(rtrim(number_format(\App\Models\Tenant::VAT_RATE, 2, '.', ''), '0'), '.') }}" disabled>
+                            <small class="form-hint">{{ __('Fixed UAE rate, charged on our services only — never on the lease or sale value') }}</small>
                         </div>
                     </div>
+
+                    {{-- VAT is a fact about the company, not a per-letter choice, so
+                         it lives here and the offer letter reads it from here. An
+                         unregistered company adding VAT to a client invoice is
+                         overcharging them, so this fails safe by defaulting off. --}}
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" name="is_vat_registered" value="1"
+                               id="isVatRegistered" @checked(auth()->user()->tenant->isVatRegistered())>
+                        <label class="form-check-label" for="isVatRegistered">{{ __('This company is registered for VAT') }}</label>
+                        <div class="form-hint">{{ __('Leave off if the company is not VAT registered — no VAT will be added to the commission, admin fee or contract fee on any offer letter.') }}</div>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">{{ __('Save Rates') }}</button>
                 </form>
 
@@ -1914,7 +1929,7 @@ Content-Type: application/json</code></pre>
                         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
                             <div>
                                 <h5 class="mb-1">{{ __('About Keystone') }}</h5>
-                                <p class="text-secondary mb-0">{{ __('You are running Keystone v' . config('app.version') . '. If pages or data look out of date, reset the app to clear the cached service worker and load the latest version.') }}</p>
+                                <p class="text-secondary mb-0">{{ __('You are running Keystone v' . \App\Support\AppVersion::current() . '. If pages or data look out of date, reset the app to clear the cached service worker and load the latest version.') }}</p>
                             </div>
                             <button type="button" class="btn btn-primary flex-shrink-0" onclick="window.hardResetApp();">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom;"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/><path d="M5 12l14 0"/></svg>

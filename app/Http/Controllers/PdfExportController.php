@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\Deal;
 use App\Models\Lead;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +23,7 @@ class PdfExportController extends Controller
         $to = $request->get('to', now()->format('Y-m-d'));
 
         $leadQuery = Lead::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59']);
+            ->whereBetween('created_at', [$from, $to.' 23:59:59']);
 
         if (auth()->user()->isAgent()) {
             $leadQuery->where('agent_id', auth()->id());
@@ -65,7 +64,7 @@ class PdfExportController extends Controller
         // Deal stages with counts and values
         $feeColumn = \App\Services\BusinessModeService::getDashboardKpiConfig()['fee_column'];
         $stageData = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
             ->select(
                 'stage',
                 DB::raw('count(*) as deal_count'),
@@ -91,29 +90,29 @@ class PdfExportController extends Controller
 
         // Total pipeline value (excluding closed)
         $totalPipelineValue = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-            ->whereNotIn('stage', ['closed_won', 'closed_lost'])
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
+            ->whereNotIn('stage', Deal::TERMINAL_STAGES)
             ->sum('contract_price');
 
         $totalPipelineFees = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-            ->whereNotIn('stage', ['closed_won', 'closed_lost'])
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
+            ->whereNotIn('stage', Deal::TERMINAL_STAGES)
             ->sum($feeColumn);
 
         // Won/lost summary
         $closedWon = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-            ->where('stage', 'closed_won')
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
+            ->won()
             ->count();
 
         $closedLost = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
             ->where('stage', 'closed_lost')
             ->count();
 
         $totalFeesClosed = Deal::where('tenant_id', $tenantId)
-            ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
-            ->where('stage', 'closed_won')
+            ->whereBetween('created_at', [$from, $to.' 23:59:59'])
+            ->won()
             ->sum($feeColumn);
 
         return view('reports.pdf.pipeline-report', compact(
@@ -139,29 +138,29 @@ class PdfExportController extends Controller
             ->map(function ($agent) use ($from, $to, $tenantId, $feeColumn) {
                 $leadCount = Lead::where('tenant_id', $tenantId)
                     ->where('agent_id', $agent->id)
-                    ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                    ->whereBetween('created_at', [$from, $to.' 23:59:59'])
                     ->count();
 
                 $dealCount = Deal::where('tenant_id', $tenantId)
                     ->where('agent_id', $agent->id)
-                    ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                    ->whereBetween('created_at', [$from, $to.' 23:59:59'])
                     ->count();
 
                 $dealsClosed = Deal::where('tenant_id', $tenantId)
                     ->where('agent_id', $agent->id)
-                    ->where('stage', 'closed_won')
-                    ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
+                    ->won()
+                    ->whereBetween('deals.created_at', [$from, $to.' 23:59:59'])
                     ->count();
 
                 $feesGenerated = Deal::where('tenant_id', $tenantId)
                     ->where('agent_id', $agent->id)
-                    ->where('stage', 'closed_won')
-                    ->whereBetween('deals.created_at', [$from, $to . ' 23:59:59'])
+                    ->won()
+                    ->whereBetween('deals.created_at', [$from, $to.' 23:59:59'])
                     ->sum($feeColumn);
 
                 $activitiesLogged = Activity::where('tenant_id', $tenantId)
                     ->where('agent_id', $agent->id)
-                    ->whereBetween('created_at', [$from, $to . ' 23:59:59'])
+                    ->whereBetween('created_at', [$from, $to.' 23:59:59'])
                     ->count();
 
                 return (object) [

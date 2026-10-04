@@ -30,8 +30,8 @@
             color: #fff !important;
         }
     </style>
-    <link rel="stylesheet" href="{{ asset('css/mobile.css') . '?v=' . config('app.version') }}">
-    <link rel="stylesheet" href="{{ asset('css/mobile-app.css') . '?v=' . config('app.version') }}">
+    <link rel="stylesheet" href="{{ asset('css/mobile.css') . '?v=' . \App\Support\AppVersion::current() }}">
+    <link rel="stylesheet" href="{{ asset('css/mobile-app.css') . '?v=' . \App\Support\AppVersion::current() }}">
     @include('layouts._pwa')
     @stack('styles')
     <script>
@@ -208,7 +208,7 @@
                                 <span class="nav-link-icon">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
                                 </span>
-                                <span class="nav-link-title">{{ ($businessMode ?? 'wholesale') === 'realestate' ? __('Transactions') : __('Pipeline') }}</span>
+                                <span class="nav-link-title">{{ __('Pipeline') }}</span>
                             </a>
                         </li>
                         @endunless
@@ -434,7 +434,7 @@
                                     <a class="dropdown-item" href="{{ route('settings.index') }}">{{ __('Settings') }}</a>
                                     @endif
                                     <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#about-keystone-modal">{{ __('About Keystone') }} <span class="text-muted ms-1">v{{ config('app.version') }}</span></a>
+                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#about-keystone-modal">{{ __('About Keystone') }} <span class="text-muted ms-1">v{{ \App\Support\AppVersion::current() }}</span></a>
                                     <form method="POST" action="{{ route('logout') }}">
                                         @csrf
                                         <button type="submit" class="dropdown-item text-danger">{{ __('Logout') }}</button>
@@ -883,10 +883,10 @@
         window.__keystoneProcessingLogo = @json(asset('images/logo.png'));
         window.__keystoneProcessingLabel = @json(__('Processing…'));
     </script>
-    <script src="{{ asset('js/searchable-dropdowns.js') . '?v=' . config('app.version') }}"></script>
-    <script src="{{ asset('js/live-filter.js') . '?v=' . config('app.version') }}"></script>
-    <script src="{{ asset('js/processing-overlay.js') . '?v=' . config('app.version') }}"></script>
-    <script src="{{ asset('js/mobile-app.js') . '?v=' . config('app.version') }}"></script>
+    <script src="{{ asset('js/searchable-dropdowns.js') . '?v=' . \App\Support\AppVersion::current() }}"></script>
+    <script src="{{ asset('js/live-filter.js') . '?v=' . \App\Support\AppVersion::current() }}"></script>
+    <script src="{{ asset('js/processing-overlay.js') . '?v=' . \App\Support\AppVersion::current() }}"></script>
+    <script src="{{ asset('js/mobile-app.js') . '?v=' . \App\Support\AppVersion::current() }}"></script>
     @include('layouts._broadcasting')
 </body>
 </html>

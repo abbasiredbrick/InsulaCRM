@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CalendarEventLink;
 use App\Models\Lead;
+use App\Models\Property;
 use App\Models\Showing;
 use App\Models\User;
 use App\Models\UserCloudConnection;
@@ -48,6 +49,165 @@ class CalendarDualTargetSyncTest extends TestCase
         $factory->shouldReceive('make')->andReturn($provider);
 
         return new CloudCalendarService($factory);
+    }
+
+    /**
+     * A provider whose every calendar write blows up — the shape of an expired
+     * OAuth refresh token (invalid_grant) or a provider outage.
+     */
+    private function makeFailingService(): CloudCalendarService
+    {
+        $provider = \Mockery::mock(CloudBaseProvider::class);
+        $provider->shouldReceive('createCalendarEvent')
+            ->andThrow(new \RuntimeException('Provider token request failed: invalid_grant'));
+        $provider->shouldReceive('updateCalendarEvent')->andReturn(null);
+        $provider->shouldReceive('deleteCalendarEvent')->andReturn(null);
+
+        $factory = \Mockery::mock(CloudProviderFactory::class);
+        $factory->shouldReceive('make')->andReturn($provider);
+
+        return new CloudCalendarService($factory);
+    }
+
+    private function makeShowing(Lead $lead, Property $property, int $agentId, array $overrides = []): Showing
+    {
+        return Showing::create(array_merge([
+            'tenant_id' => $this->tenant->id,
+            'property_id' => $property->id,
+            'lead_id' => $lead->id,
+            'agent_id' => $agentId,
+            'created_by' => $this->adminUser->id,
+            'showing_date' => now()->addDays(1)->format('Y-m-d'),
+            'showing_time' => '10:00',
+            'status' => 'scheduled',
+        ], $overrides));
+    }
+
+    public function test_sync_reports_every_connected_user_as_synced(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $mainAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($viewingAgent);
+        $this->connectCalendar($mainAgent);
+        $this->connectCalendar($this->adminUser);
+
+        $lead = $this->createLead(['agent_id' => $mainAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $result = $this->makeServiceMockery()->sync($showing, $this->adminUser);
+
+        $this->assertTrue($result->isComplete());
+        $this->assertFalse($result->hasFailures());
+        $this->assertNull($result->failureMessage());
+        // Assigned agent, lead owner and the creating agent each get an entry.
+        $this->assertEqualsCanonicalizing(
+            [$viewingAgent->id, $mainAgent->id, $this->adminUser->id],
+            $result->synced
+        );
+    }
+
+    public function test_provider_failure_is_reported_instead_of_swallowed(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $mainAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($viewingAgent);
+        $this->connectCalendar($mainAgent);
+
+        $lead = $this->createLead(['agent_id' => $mainAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $result = $this->makeFailingService()->sync($showing, $this->adminUser);
+
+        $this->assertTrue($result->hasFailures());
+        $this->assertFalse($result->isComplete());
+        $this->assertNotNull($result->failureMessage());
+
+        // Every connected user is named, so the agent knows whose calendar broke.
+        $this->assertStringContainsString($viewingAgent->name, $result->failureMessage());
+        $this->assertStringContainsString($mainAgent->name, $result->failureMessage());
+
+        $this->assertSame(0, CalendarEventLink::where('eventable_type', Showing::class)->where('eventable_id', $showing->id)->count());
+    }
+
+    public function test_user_without_a_connection_is_not_treated_as_a_failure(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $mainAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($mainAgent);
+
+        $lead = $this->createLead(['agent_id' => $mainAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $result = $this->makeServiceMockery()->sync($showing, $this->adminUser);
+
+        $this->assertFalse($result->hasFailures());
+        $this->assertNull($result->failureMessage());
+        $this->assertContains($viewingAgent->id, $result->unconnected);
+        $this->assertNotContains($viewingAgent->id, $result->synced);
+    }
+
+    public function test_disabled_tenant_integration_reports_disabled_and_pushes_nothing(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($viewingAgent);
+
+        $this->tenant->update(['calendar_sync_enabled' => false]);
+
+        $lead = $this->createLead(['agent_id' => $viewingAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $result = $this->makeServiceMockery()->sync($showing, $this->adminUser);
+
+        $this->assertTrue($result->disabled);
+        $this->assertFalse($result->hasFailures());
+        $this->assertSame(0, CalendarEventLink::where('eventable_type', Showing::class)->where('eventable_id', $showing->id)->count());
+    }
+
+    public function test_legacy_event_id_columns_are_stamped_from_the_links(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $mainAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($viewingAgent);
+        $this->connectCalendar($mainAgent);
+
+        $lead = $this->createLead(['agent_id' => $mainAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $this->makeServiceMockery()->sync($showing, $this->adminUser);
+
+        $showing->refresh();
+
+        $assignedLink = CalendarEventLink::where('eventable_type', Showing::class)
+            ->where('eventable_id', $showing->id)->where('user_id', $viewingAgent->id)->first();
+        $mainLink = CalendarEventLink::where('eventable_type', Showing::class)
+            ->where('eventable_id', $showing->id)->where('user_id', $mainAgent->id)->first();
+
+        $this->assertSame('google', $showing->calendar_provider);
+        $this->assertSame($assignedLink->event_id, $showing->calendar_event_id);
+        $this->assertSame('google', $showing->main_calendar_provider);
+        $this->assertSame($mainLink->event_id, $showing->main_calendar_event_id);
+    }
+
+    public function test_legacy_event_id_columns_are_cleared_when_the_event_is_withdrawn(): void
+    {
+        $viewingAgent = $this->createUserWithRole('agent');
+        $mainAgent = $this->createUserWithRole('agent');
+        $this->connectCalendar($viewingAgent);
+        $this->connectCalendar($mainAgent);
+
+        $lead = $this->createLead(['agent_id' => $mainAgent->id]);
+        $showing = $this->makeShowing($lead, $this->createProperty(['lead_id' => $lead->id]), $viewingAgent->id);
+
+        $service = $this->makeServiceMockery();
+        $service->sync($showing, $this->adminUser);
+        $this->assertNotNull($showing->fresh()->calendar_event_id);
+
+        $showing->update(['status' => 'cancelled']);
+        $service->sync($showing->fresh(), $this->adminUser);
+
+        $showing->refresh();
+        $this->assertNull($showing->calendar_event_id);
+        $this->assertNull($showing->main_calendar_event_id);
     }
 
     public function test_event_created_for_assigned_and_lead_owning_agents(): void

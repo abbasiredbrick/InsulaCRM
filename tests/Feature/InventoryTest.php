@@ -164,12 +164,18 @@ class InventoryTest extends TestCase
 
     public function test_advanced_search_filters_by_rent_range(): void
     {
+        // unitLabel() is built from bedrooms + intent + community, and createProperty()
+        // randomises all three, so two units can render an identical label and
+        // assertDontSee() would trip on the other row's identical text. Pin the
+        // discriminating fields so the assertion tests the filter, not the seed.
         $cheap = $this->createProperty([
             'marketing_title' => 'Cheap Studio',
             'intent' => 'rent',
             'availability' => 'ready_to_list',
             'rent_price' => 60000,
             'rent_period' => 'yearly',
+            'bedrooms' => 0,
+            'community' => 'Budget Community',
         ]);
         $premium = $this->createProperty([
             'marketing_title' => 'Premium 3BR',
@@ -177,6 +183,8 @@ class InventoryTest extends TestCase
             'availability' => 'ready_to_list',
             'rent_price' => 180000,
             'rent_period' => 'yearly',
+            'bedrooms' => 3,
+            'community' => 'Premium Community',
         ]);
 
         $this->get(route('inventory.index').'?rent_min=100000&rent_max=200000')
@@ -187,12 +195,17 @@ class InventoryTest extends TestCase
 
     public function test_index_sorts_by_price(): void
     {
+        // strpos() on an identical label returns the same offset twice, so assertLessThan
+        // cannot discriminate the two rows. Pin bedrooms + community so each
+        // unitLabel() is unique regardless of the random seed.
         $priciest = $this->createProperty([
             'marketing_title' => 'Priciest Penthouse',
             'intent' => 'sale',
             'availability' => 'ready_to_list',
             'list_price' => 2500000,
             'asking_price' => 2500000,
+            'bedrooms' => 5,
+            'community' => 'Priciest Community',
         ]);
         $oldTown = $this->createProperty([
             'marketing_title' => 'Apt in Old Town',
@@ -200,6 +213,8 @@ class InventoryTest extends TestCase
             'availability' => 'ready_to_list',
             'list_price' => 1200000,
             'asking_price' => 1200000,
+            'bedrooms' => 1,
+            'community' => 'Old Town Community',
         ]);
 
         $asc = $this->get(route('inventory.index').'?sort=price&direction=asc')
@@ -389,16 +404,24 @@ class InventoryTest extends TestCase
         $agent = $this->createUserWithRole('agent');
         $pm = $this->createUserWithRole('pm');
 
+        // The sizes and communities are pinned because unitLabel() is built from
+        // bedrooms + intent + community. createProperty() randomises all three, so
+        // two units could render an identical label and assertDontSee() would then
+        // trip on the very row it was meant to prove was filtered out.
         $agentUnit = $this->createProperty([
             'assigned_agent_id' => $agent->id,
             'marketing_title' => 'Agent Assigned Unit',
             'intent' => 'both',
+            'bedrooms' => 2,
+            'community' => 'Agent Assigned Community',
             'availability' => 'listed',
         ]);
         $unassignedUnit = $this->createProperty([
             'assigned_agent_id' => null,
             'marketing_title' => 'Unassigned Unit',
             'intent' => 'both',
+            'bedrooms' => 3,
+            'community' => 'Unassigned Community',
             'availability' => 'listed',
         ]);
 

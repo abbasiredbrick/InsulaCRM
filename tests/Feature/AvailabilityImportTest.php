@@ -537,7 +537,7 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(125000, (int) $u->rent_price);
         $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
         $this->assertSame(1050, (int) $u->admin_fee);
-        $this->assertSame(150, (int) $u->tawtheeq_fee);
+        $this->assertSame(150, (int) $u->contract_fee);
         $this->assertNull($u->available_from); // no date on the sheet
         $this->assertStringContainsString('Balcony: No', $u->marketing_description);
         $this->assertStringContainsString('View: Community view', $u->marketing_description);
@@ -655,7 +655,7 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(125000, (int) $u->rent_price);
         $this->assertSame(6250, (int) $u->deposit_amount); // max(5000, 5%)
         $this->assertSame(1050, (int) $u->admin_fee);
-        $this->assertSame(150, (int) $u->tawtheeq_fee);
+        $this->assertSame(150, (int) $u->contract_fee);
 
         $this->assertSame('upcoming', $units['1703']->availability); // "Upcoming"
         $this->assertSame('2026-09-14', $units['1703']->available_from?->toDateString());
@@ -835,7 +835,7 @@ class AvailabilityImportTest extends TestCase
             ->assertRedirect(route('availability-sources.import', $source));
     }
 
-    public function test_tawtheeq_fee_maps_from_sheet_and_source_defaults(): void
+    public function test_contract_fee_maps_from_sheet_and_source_defaults(): void
     {
         $source = AvailabilitySource::create([
             'tenant_id' => $this->tenant->id,
@@ -870,13 +870,13 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(97000.0, (float) $withColumn->rent_price);
         $this->assertSame(5000.0, (float) $withColumn->deposit_amount);
         $this->assertSame(1050.0, (float) $withColumn->admin_fee);
-        $this->assertSame(150.0, (float) $withColumn->tawtheeq_fee);
+        $this->assertSame(150.0, (float) $withColumn->contract_fee);
 
         $fromDefaults = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
             ->where('source_unit_ref', '1903')->first();
         $this->assertSame(1050.0, (float) $fromDefaults->admin_fee);
-        $this->assertSame(150.0, (float) $fromDefaults->tawtheeq_fee);
-        $this->assertStringContainsString('Tawtheeq: AED 150', $fromDefaults->marketing_description);
+        $this->assertSame(150.0, (float) $fromDefaults->contract_fee);
+        $this->assertStringContainsString('Contract Fee: AED 150', $fromDefaults->marketing_description);
     }
 
     public function test_pre_existing_unlinked_unit_is_linked_and_updated_not_duplicated(): void

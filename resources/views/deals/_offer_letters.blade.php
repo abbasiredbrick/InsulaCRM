@@ -37,7 +37,9 @@
                 $d = app(\App\Services\OfferLetterService::class)->buildDefaults($deal);
                 $canApprove = auth()->user()->isAdmin() || auth()->user()->isManager();
             @endphp
-            <form method="POST" class="offer-letter-form" action="{{ route('deal.offers.store', $deal) }}">
+            <form method="POST" class="offer-letter-form"
+                  data-offer-vat-rate="{{ (float) $deal->tenant->effectiveVatRate() }}"
+                  action="{{ route('deal.offers.store', $deal) }}">
                 @csrf
                 @include('deals._offer_letter_fields', [
                     'd' => $d,
@@ -153,7 +155,9 @@
                         <td colspan="6" class="p-0 border-0">
                             <div class="collapse" id="offer-edit-{{ $offer->id }}">
                                 <div class="p-3 bg-body-tertiary">
-                                    <form method="POST" class="offer-letter-form" action="{{ route('deal.offers.update', $offer) }}">
+                                    <form method="POST" class="offer-letter-form"
+                                          data-offer-vat-rate="{{ $offer->vatRate() }}"
+                                          action="{{ route('deal.offers.update', $offer) }}">
                                         @csrf
                                         @method('PATCH')
                                         @include('deals._offer_letter_fields', [
@@ -180,39 +184,111 @@
 @push('scripts')
 <script>
 (function () {
+    // Mirrors OfferLetterService::buildAmounts so the form shows what will be
+    // saved. It is a preview only: the server recomputes from the posted listed
+    // price and discount, and ignores any contract value the form sends.
+    //
+    // VAT rate is read from a data attribute written by the server from
+    // Tenant::effectiveVatRate(), never from a form input, because VAT is a fact
+    // about the company and only applies to the service lines.
+    var FIELDS = [
+        '[data-offer-listed]', '[data-offer-discount]', '[data-offer-rate]',
+        '[data-offer-commission-value]', '[data-offer-contract-fee]', '[data-offer-admin-fee]'
+    ].join(', ');
+
     function fmt(v) {
-        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(v);
+        return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Math.round(v * 100) / 100);
+    }
+
+    function recalc(form) {
+        var q = function (name) { return form.querySelector('[data-offer-' + name + ']'); };
+        var num = function (el) { return el ? (parseFloat(el.value) || 0) : 0; };
+
+        var listed = num(q('listed'));
+        var discount = Math.min(Math.max(0, num(q('discount'))), listed);
+        var contractValue = Math.max(0, listed - discount);
+
+        var vatRate = parseFloat(form.getAttribute('data-offer-vat-rate') || '0') || 0;
+
+        var basis = form.querySelector('[data-offer-basis]:checked');
+        var onValue = basis && basis.value === 'value';
+        var commissionNet = onValue
+            ? Math.max(0, num(q('commission-value')))
+            : contractValue * (num(q('rate')) / 100);
+
+        var contractFee = num(q('contract-fee'));
+        var adminFee = num(q('admin-fee'));
+        var servicesNet = commissionNet + contractFee + adminFee;
+
+        // Rounded per line, exactly as OfferLetterService does server-side, so the
+        // preview is not a few halalas off the figure that actually gets stored.
+        var vatOn = function (amount) {
+            return Math.round(amount * (vatRate / 100) * 100) / 100;
+        };
+        var servicesVat = vatOn(commissionNet) + vatOn(contractFee) + vatOn(adminFee);
+
+        // Contract value is repeated in the field and the footer. The field is an
+        // <input> and the footer is a <strong>, so writing textContent to the
+        // input would silently leave the visible box empty.
+        form.querySelectorAll('[data-offer-contract-value], [data-offer-contract-value-out]').forEach(function (el) {
+            if (el.tagName === 'INPUT') {
+                el.value = fmt(contractValue);
+            } else {
+                el.textContent = fmt(contractValue);
+            }
+        });
+
+        var servicesNetEl = form.querySelector('[data-offer-services-net]');
+        if (servicesNetEl) servicesNetEl.textContent = fmt(servicesNet);
+
+        var servicesVatEl = form.querySelector('[data-offer-services-vat]');
+        if (servicesVatEl) servicesVatEl.textContent = fmt(servicesVat);
+
+        var servicesTotalEl = form.querySelector('[data-offer-services-total]');
+        if (servicesTotalEl) servicesTotalEl.textContent = fmt(servicesNet + servicesVat);
+    }
+
+    // Percentage and value are two ways of stating one figure; only the chosen
+    // one is visible so the form cannot show two disagreeing commissions.
+    function syncBasis(form) {
+        var basis = form.querySelector('[data-offer-basis]:checked');
+        var onValue = basis && basis.value === 'value';
+        var pct = form.querySelector('[data-offer-pct-field]');
+        var val = form.querySelector('[data-offer-value-field]');
+        if (pct) pct.hidden = onValue;
+        if (val) val.hidden = !onValue;
+    }
+
+    function eachForm(fn) {
+        document.querySelectorAll('.offer-letter-form').forEach(fn);
     }
 
     // Delegated so both the "new letter" and "edit letter" forms recalculate
     // independently, and so it survives the live-filter results swap.
     document.addEventListener('input', function (e) {
-        var el = e.target;
-        if (!el.matches('[data-offer-discount], [data-offer-rate], [data-offer-vat-pct], [data-offer-gross]')) return;
-
-        var form = el.closest('.offer-letter-form');
-        if (!form) return;
-
-        var pick = function (name) { return form.querySelector('[data-offer-' + name + ']'); };
-        var grossEl = pick('gross'), discountEl = pick('discount');
-        var rateEl = pick('rate'), vatEl = pick('vat-pct');
-        var netEl = form.querySelector('[data-offer-commission-net]');
-        var vatOutEl = form.querySelector('[data-offer-commission-vat]');
-        var totalEl = form.querySelector('[data-offer-commission-total]');
-        if (!netEl || !vatOutEl || !totalEl || !grossEl || !discountEl) return;
-
-        var gross = parseFloat(grossEl.value) || 0;
-        var discount = parseFloat(discountEl.value) || 0;
-        var approved = Math.max(0, gross - discount);
-        var rate = parseFloat(rateEl ? rateEl.value : 0) || 0;
-        var vat = parseFloat(vatEl ? vatEl.value : 0) || 0;
-
-        var net = approved * rate / 100;
-        var vatAmt = net * vat / 100;
-        netEl.textContent = fmt(net);
-        vatOutEl.textContent = fmt(vatAmt);
-        totalEl.textContent = fmt(net + vatAmt);
+        if (!e.target.matches(FIELDS)) return;
+        var form = e.target.closest('.offer-letter-form');
+        if (form) recalc(form);
     });
+
+    document.addEventListener('change', function (e) {
+        var form = e.target.closest('.offer-letter-form');
+        if (!form) return;
+        if (e.target.matches('[data-offer-basis]')) syncBasis(form);
+        if (e.target.matches(FIELDS)) recalc(form);
+    });
+
+    function init() {
+        eachForm(function (form) {
+            syncBasis(form);
+            recalc(form);
+        });
+    }
+
+    // Covers both a normal load and a region swapped in by live-filter.
+    if (document.readyState !== 'loading') init();
+    else document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('insulacrm:live-updated', init);
 })();
 </script>
 @endpush

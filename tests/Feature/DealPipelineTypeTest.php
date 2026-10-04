@@ -19,7 +19,7 @@ class DealPipelineTypeTest extends TestCase
         $rent = $this->createDeal(['deal_type' => 'rent', 'stage' => 'moved_in']);
         $sale = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing']);
 
-        $response = $this->get('/pipeline');
+        $response = $this->get('/pipeline/board');
 
         $response->assertStatus(200);
         $response->assertSee($rent->lead->full_name);
@@ -58,7 +58,7 @@ class DealPipelineTypeTest extends TestCase
 
         $this->createDeal(['deal_type' => 'rent', 'stage' => 'moved_in']);
 
-        $this->get('/pipeline?deal_type=rent')
+        $this->get('/pipeline/board?deal_type=rent')
             ->assertSee('Moved In / Settled')
             ->assertDontSee('active_listing');
     }
@@ -113,7 +113,7 @@ class DealPipelineTypeTest extends TestCase
         $won = $this->createDeal(['deal_type' => 'sale', 'stage' => 'closed_won', 'contract_price' => 150000, 'assignment_fee' => 8000]);
         $won->update(['stage_changed_at' => now()]);
 
-        $this->get('/pipeline')
+        $this->get('/pipeline/board')
             ->assertSee('Active deals')
             ->assertSee('Pipeline value')
             ->assertSee('$200,000')
@@ -149,5 +149,78 @@ class DealPipelineTypeTest extends TestCase
             ->assertSee('Dispositions')
             ->assertDontSee('active_listing')
             ->assertDontSee('offer_received');
+    }
+
+    public function test_board_uses_live_filter_search_ui(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->get('/pipeline/board');
+
+        $response->assertOk();
+        // Filtering is instant and the board is swapped in place, the same
+        // contract as the leads kanban.
+        $response->assertSee('data-live-filter', false);
+        $response->assertSee('data-live-results', false);
+        $response->assertSee('name="search"', false);
+        $response->assertSee('name="temp"', false);
+        $response->assertSee('name="source"', false);
+        $response->assertSee('name="show_empty"', false);
+        // The form posts to the board itself, not the /pipeline dispatcher, and
+        // the old manual "applyFilters() navigates on Enter" JS is gone.
+        $response->assertSee('action="'.route('pipeline.board').'"', false);
+        $response->assertDontSee('applyFilters', false);
+    }
+
+    public function test_board_filters_are_carried_into_the_list_view_and_type_tabs(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->get('/pipeline/board?search=marina&temp=hot&deal_type=rent');
+
+        $response->assertOk();
+        $html = $response->getContent();
+
+        // Switching to the list must not silently drop the active search.
+        $this->assertMatchesRegularExpression(
+            '/href="[^"]*\/deals\?[^"]*search=marina[^"]*"/', $html
+        );
+
+        // Same for the Leasing/Sales tabs, which keep the other filters.
+        $this->assertMatchesRegularExpression(
+            '/href="[^"]*pipeline\/board\?[^"]*search=marina[^"]*"/', $html
+        );
+        $this->assertMatchesRegularExpression(
+            '/href="[^"]*pipeline\/board\?[^"]*deal_type=sale[^"]*"/', $html
+        );
+    }
+
+    public function test_board_offers_a_clear_link_only_when_filtered(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->get('/pipeline/board')
+            ->assertOk()
+            ->assertDontSee('>'.__('Clear').'<', false);
+
+        $this->get('/pipeline/board?search=marina')
+            ->assertOk()
+            ->assertSee('>'.__('Clear').'<', false);
+    }
+
+    public function test_board_handlers_are_delegated_so_they_survive_a_live_swap(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->get('/pipeline/board');
+
+        $response->assertOk();
+        // The live filter replaces the board markup wholesale, so no handler
+        // may be bound per element inside the results region.
+        $response->assertDontSee("querySelectorAll('.move-deal-btn')", false);
+        $response->assertDontSee("querySelectorAll('.deal-card-drag')", false);
+        $response->assertDontSee("querySelectorAll('.stage-row')", false);
+        $response->assertSee("document.addEventListener('drop'", false);
+        $response->assertSee("document.addEventListener('dragstart'", false);
     }
 }

@@ -40,12 +40,17 @@ class Deal extends Model
         'viewing_requested' => 0.3,
         'viewing_scheduled' => 0.4,
         'viewing_done' => 0.45,
-        'offer_sent' => 0.5,
+        'offer_requested' => 0.5,
+        'offer_sent' => 0.55,
         'offer_signed' => 0.7,
-        'deposit_collected' => 0.8,
-        'tawtheeq_ejari' => 0.9,
-        'move_in_permit' => 0.95,
+        'deposit_received' => 0.8,
+        'commission_received' => 0.9,
+        'deal_won' => 0.95,
+        'rent_paid' => 0.97,
+        'tawtheeq_ejari' => 0.98,
+        'move_in_permit' => 0.99,
         'moved_in' => 1.0,
+        'deal_locked' => 1.0,
         // Wholesale
         'prospecting' => 0.1,
         'contacting' => 0.2,
@@ -70,6 +75,83 @@ class Deal extends Model
     ];
 
     /**
+     * Stages that mean the business was won.
+     *
+     * Leasing wins at `deal_won` — the point the broker's commission actually
+     * lands — and wholesale/sale still win at `closed_won`. Anything that reports
+     * won revenue MUST use isWon()/whereWon() rather than matching 'closed_won',
+     * or rent deals silently drop out of goals, campaigns and commission totals.
+     */
+    public const WON_STAGES = ['closed_won', 'deal_won', 'deal_locked'];
+
+    public const LOST_STAGES = ['closed_lost'];
+
+    /**
+     * Stages that must never be counted as live pipeline: won business is earned,
+     * not upcoming. Everything after the win still belongs here — a lease between
+     * deal_won and deal_locked owes a tawtheeq and a move-in permit, but none of
+     * that is pipeline, and counting it would overstate forecast.
+     */
+    public const TERMINAL_STAGES = ['closed_won', 'deal_won', 'deal_locked', 'closed_lost'];
+
+    /**
+     * Stages the system sets on its own. They are valid and they appear on the
+     * board, but they are not offered in the stage dropdown: `deal_won` is a
+     * consequence of the commission being confirmed and `deal_locked` is a
+     * consequence of the tenant moving in, so letting an agent pick them would let
+     * the board claim money that never arrived.
+     */
+    public const SYSTEM_STAGES = ['deal_won', 'deal_locked'];
+
+    /**
+     * Stage that means the deal is won, for the given deal type. Leasing wins on
+     * money received, not on a signature.
+     */
+    public static function wonStageFor(string $dealType): string
+    {
+        return $dealType === 'rent' ? 'deal_won' : 'closed_won';
+    }
+
+    public function isWon(): bool
+    {
+        return in_array($this->stage, self::WON_STAGES, true);
+    }
+
+    public function isLost(): bool
+    {
+        return in_array($this->stage, self::LOST_STAGES, true);
+    }
+
+    public function isTerminal(): bool
+    {
+        // Won or lost. Deliberately not "SYSTEM_STAGES": deal_won is decided
+        // business even though the lease still owes registration steps, and the
+        // board must not offer it as future revenue.
+        return $this->isWon() || $this->isLost();
+    }
+
+    /**
+     * Apply the won/lost scope to a deal query. The single place won revenue is
+     * defined — do not hand-roll `where('stage','closed_won')`.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeWon($query)
+    {
+        return $query->whereIn('stage', self::WON_STAGES);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<self>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<self>
+     */
+    public function scopeLost($query)
+    {
+        return $query->whereIn('stage', self::LOST_STAGES);
+    }
+
+    /**
      * Leasing stages where the offer validity window is running: the signed
      * offer has not happened yet, so the offer stays valid until the deadline.
      */
@@ -80,7 +162,7 @@ class Deal extends Model
      * (from offer_signed) applies: deposit must be collected and the contract
      * registered before the window lapses.
      */
-    public const RENT_REGISTRATION_STAGES = ['offer_signed', 'deposit_collected', 'tawtheeq_ejari'];
+    public const RENT_REGISTRATION_STAGES = ['offer_signed', 'deposit_received', 'tawtheeq_ejari'];
 
     /**
      * Default offer-validity / registration windows for rental transactions (days).
@@ -163,6 +245,7 @@ class Deal extends Model
         'tenant_id',
         'lead_id',
         'lease_id',
+        'property_id',
         'deal_type',
         'agent_id',
         'title',
@@ -317,6 +400,26 @@ class Deal extends Model
     public function lead()
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    /**
+     * The unit the client asked for an offer on, stamped from the viewing that
+     * promoted the lead. This is the authoritative unit — `property()` below is a
+     * fallback that walks through the lead, and it is frequently a different
+     * unit from the one the offer was made on.
+     */
+    public function unit()
+    {
+        return $this->belongsTo(Property::class, 'property_id');
+    }
+
+    /**
+     * The unit this deal is about: the offered unit when known, otherwise
+     * whatever unit is linked to the lead.
+     */
+    public function dealUnit(): ?Property
+    {
+        return $this->unit ?: $this->property;
     }
 
     public function lease()

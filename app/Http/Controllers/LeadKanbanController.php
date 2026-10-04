@@ -43,9 +43,9 @@ class LeadKanbanController extends Controller
         $leads = $query->get()->groupBy('status');
 
         $agents = (! $user->isAgent() || $user->isManager()) ? $this->getAgents() : collect();
-        $request->session()->put('leads.view', 'kanban');
+        $user->rememberPreferredView('leads', 'kanban');
 
-        return view('leads.kanban', compact('statuses', 'leads', 'agents'));
+        return view('leads.kanban', compact('statuses', 'leads', 'agents') + ['currentView' => 'kanban']);
     }
 
     private function getAgents()

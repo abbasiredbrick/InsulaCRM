@@ -696,8 +696,11 @@ class AvailabilitySourceController extends Controller
             'deposit' => 'Deposit',
             'deposit_amount' => 'Deposit',
             'admin_fee' => 'Admin Fee',
-            'tawtheeq' => 'Tawtheeq Fee',
-            'tawtheeq_fee' => 'Tawtheeq Fee',
+            // Source headings keep their spelling; the target they map into is
+            // contract_fee, which is what the offer letter calls it.
+            'contract_fee' => 'Contract Fee',
+            'tawtheeq' => 'Contract Fee',
+            'tawtheeq_fee' => 'Contract Fee',
             'status' => 'Status',
             'source_status' => 'Status',
             'parking' => 'Parking',
@@ -729,7 +732,7 @@ class AvailabilitySourceController extends Controller
             'rent', 'rent_price' => $row === 1 ? '100000' : '125000',
             'deposit', 'deposit_amount' => $row === 1 ? '5000' : '6250',
             'admin_fee' => '1050',
-            'tawtheeq', 'tawtheeq_fee' => '150',
+            'contract_fee', 'tawtheeq', 'tawtheeq_fee' => '150',
             'status', 'source_status' => $upcoming ? 'Upcoming' : 'Available for viewing',
             'parking' => $row === 1 ? '1' : '2',
             'balcony' => $row === 1 ? 'Yes' : 'No',

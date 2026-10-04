@@ -5,11 +5,12 @@ namespace App\Services;
 use App\Models\SystemSnapshot;
 use App\Models\SystemUpdate;
 use App\Services\Settings\BackupService;
+use App\Support\AppVersion;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use RuntimeException;
 use ZipArchive;
@@ -18,8 +19,7 @@ class UpdateManagerService
 {
     public function __construct(
         private readonly BackupService $backupService,
-    ) {
-    }
+    ) {}
 
     private function beginLongRunningOperation(): void
     {
@@ -39,11 +39,11 @@ class UpdateManagerService
         $this->ensureSchemaReady();
         $this->ensureDirectories();
 
-        $currentVersion = (string) config('app.version', '1.0.0');
+        $currentVersion = $this->installedVersion();
         $packageHash = hash_file('sha256', $file->getRealPath());
         $stageRoot = $this->makeStageRoot();
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($file->getRealPath()) !== true) {
             throw new RuntimeException('Unable to open the uploaded release ZIP.');
         }
@@ -212,7 +212,7 @@ class UpdateManagerService
         }
 
         try {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($snapshotArchivePath) !== true) {
                 throw new RuntimeException('Unable to open the recovery snapshot archive.');
             }
@@ -276,9 +276,9 @@ class UpdateManagerService
                     $this->appendLog($update, "Protective backup rollback failed: {$rollbackException->getMessage()}");
                     throw new RuntimeException(
                         'Recovery snapshot restore failed and the pre-restore database rollback also failed. Original error: '
-                        . $exception->getMessage()
-                        . ' Rollback error: '
-                        . $rollbackException->getMessage(),
+                        .$exception->getMessage()
+                        .' Rollback error: '
+                        .$rollbackException->getMessage(),
                         0,
                         $exception
                     );
@@ -286,7 +286,7 @@ class UpdateManagerService
             }
 
             $message = $reverted
-                ? 'Recovery snapshot restore was aborted before completion. The live CRM was returned to its pre-restore state. Original error: ' . $exception->getMessage()
+                ? 'Recovery snapshot restore was aborted before completion. The live CRM was returned to its pre-restore state. Original error: '.$exception->getMessage()
                 : $exception->getMessage();
 
             $update->forceFill([
@@ -329,7 +329,7 @@ class UpdateManagerService
         $this->ensureSchemaReady();
         $this->ensureDirectories();
 
-        $version = (string) config('app.version', '1.0.0');
+        $version = $this->installedVersion();
 
         $snapshot = SystemSnapshot::create([
             'tenant_id' => $tenantId,
@@ -413,12 +413,13 @@ class UpdateManagerService
                 escapeshellarg('--no-interaction'),
             ]);
 
-            $command = 'powershell -NoProfile -Command "Start-Process -FilePath ' . "'" . $phpBinary . "'" . ' -ArgumentList ' . $arguments . ' -WindowStyle Hidden | Out-Null; Start-Sleep -Milliseconds 300"';
+            $command = 'powershell -NoProfile -Command "Start-Process -FilePath '."'".$phpBinary."'".' -ArgumentList '.$arguments.' -WindowStyle Hidden | Out-Null; Start-Sleep -Milliseconds 300"';
             pclose(popen($command, 'r'));
+
             return;
         }
 
-        $command = escapeshellarg($phpBinary) . ' ' . escapeshellarg($artisan) . ' snapshots:process ' . $snapshotId . ' > /dev/null 2>&1 &';
+        $command = escapeshellarg($phpBinary).' '.escapeshellarg($artisan).' snapshots:process '.$snapshotId.' > /dev/null 2>&1 &';
         exec($command);
     }
 
@@ -451,7 +452,7 @@ class UpdateManagerService
         $protectiveBackupFilename = null;
 
         try {
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open((string) $snapshot->snapshot_archive_path) !== true) {
                 throw new RuntimeException('Unable to open the manual recovery snapshot archive.');
             }
@@ -500,12 +501,12 @@ class UpdateManagerService
 
                 try {
                     $this->restoreDatabaseBackup($protectiveBackupFilename);
-                    $message = 'Manual recovery snapshot restore was aborted before completion. The live CRM was returned to its pre-restore state. Original error: ' . $message;
+                    $message = 'Manual recovery snapshot restore was aborted before completion. The live CRM was returned to its pre-restore state. Original error: '.$message;
                 } catch (\Throwable $rollbackException) {
                     $message = 'Manual recovery snapshot restore failed and the pre-restore database rollback also failed. Original error: '
-                        . $message
-                        . ' Rollback error: '
-                        . $rollbackException->getMessage();
+                        .$message
+                        .' Rollback error: '
+                        .$rollbackException->getMessage();
                 }
             }
 
@@ -617,15 +618,15 @@ class UpdateManagerService
         foreach ([
             $snapshot->snapshot_archive_path,
             $snapshot->snapshot_manifest_path,
-            rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.zip",
-            rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.json",
+            rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.zip",
+            rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.json",
         ] as $path) {
             if (filled($path) && File::exists($path)) {
                 File::delete($path);
             }
         }
 
-        foreach (glob(rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.zip.*") ?: [] as $tempPath) {
+        foreach (glob(rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.zip.*") ?: [] as $tempPath) {
             if (is_file($tempPath)) {
                 @unlink($tempPath);
             }
@@ -662,6 +663,27 @@ class UpdateManagerService
         }
 
         $snapshot->delete();
+    }
+
+    /**
+     * The version currently on disk in the install root.
+     *
+     * The update manager can be pointed at a tree other than base_path()
+     * (UPDATE_MANAGER_INSTALL_ROOT), and it is that tree it stages over and
+     * snapshots, so the upgrade/snapshot bookkeeping must describe *that* tree.
+     */
+    private function installedVersion(): string
+    {
+        $versionFile = rtrim((string) config('update-manager.install_root'), '/\\').DIRECTORY_SEPARATOR.'VERSION';
+
+        if (File::exists($versionFile)) {
+            $contents = trim((string) File::get($versionFile));
+            if ($contents !== '') {
+                return $contents;
+            }
+        }
+
+        return AppVersion::current();
     }
 
     private function ensureDirectories(): void
@@ -716,7 +738,7 @@ class UpdateManagerService
     private function makeStageRoot(): string
     {
         $stageRoot = rtrim((string) config('update-manager.staging_root'), DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . 'update-' . Str::uuid();
+            .DIRECTORY_SEPARATOR.'update-'.Str::uuid();
 
         File::makeDirectory($stageRoot, 0755, true);
 
@@ -726,7 +748,7 @@ class UpdateManagerService
     private function makeRestoreStageRoot(): string
     {
         $restoreRoot = rtrim((string) config('update-manager.staging_root'), DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . 'restore-' . Str::uuid();
+            .DIRECTORY_SEPARATOR.'restore-'.Str::uuid();
 
         File::makeDirectory($restoreRoot, 0755, true);
 
@@ -735,23 +757,23 @@ class UpdateManagerService
 
     private function resolvePackageRoot(string $stageRoot): string
     {
-        if (File::exists($stageRoot . DIRECTORY_SEPARATOR . 'VERSION')) {
+        if (File::exists($stageRoot.DIRECTORY_SEPARATOR.'VERSION')) {
             return $stageRoot;
         }
 
         $directories = File::directories($stageRoot);
         foreach ($directories as $directory) {
-            if (File::exists($directory . DIRECTORY_SEPARATOR . 'VERSION')) {
+            if (File::exists($directory.DIRECTORY_SEPARATOR.'VERSION')) {
                 return $directory;
             }
         }
 
-        throw new RuntimeException('The release ZIP does not contain a valid ' . config('app.name') . ' package root.');
+        throw new RuntimeException('The release ZIP does not contain a valid '.config('app.name').' package root.');
     }
 
     private function readPackageVersion(string $packageRoot): string
     {
-        $versionFile = $packageRoot . DIRECTORY_SEPARATOR . 'VERSION';
+        $versionFile = $packageRoot.DIRECTORY_SEPARATOR.'VERSION';
         if (! File::exists($versionFile)) {
             throw new RuntimeException('The uploaded package is missing its VERSION file.');
         }
@@ -768,13 +790,13 @@ class UpdateManagerService
     {
         $required = [
             'artisan',
-            'bootstrap' . DIRECTORY_SEPARATOR . 'app.php',
-            'config' . DIRECTORY_SEPARATOR . 'app.php',
+            'bootstrap'.DIRECTORY_SEPARATOR.'app.php',
+            'config'.DIRECTORY_SEPARATOR.'app.php',
             'VERSION',
         ];
 
         foreach ($required as $path) {
-            if (! File::exists($packageRoot . DIRECTORY_SEPARATOR . $path)) {
+            if (! File::exists($packageRoot.DIRECTORY_SEPARATOR.$path)) {
                 throw new RuntimeException("The uploaded package is missing required file {$path}.");
             }
         }
@@ -783,14 +805,14 @@ class UpdateManagerService
     private function buildWarnings(string $targetVersion): array
     {
         $warnings = [
-            "This updater preserves .env, storage/, public/storage, and plugins/ during patching.",
+            'This updater preserves .env, storage/, public/storage, and plugins/ during patching.',
             'A fresh database backup will be created automatically before any files are replaced.',
             'A recovery snapshot is created immediately before patching so you can restore the last known-good state if the upgrade fails badly.',
             'Use recovery snapshots only when necessary. Restoring a snapshot overwrites newer code and database changes created after the snapshot time.',
         ];
 
         $pluginDirectories = array_values(array_filter(
-            File::directories($this->installRoot() . DIRECTORY_SEPARATOR . 'plugins'),
+            File::directories($this->installRoot().DIRECTORY_SEPARATOR.'plugins'),
             fn (string $directory) => basename($directory) !== '.gitkeep'
         ));
 
@@ -819,13 +841,13 @@ class UpdateManagerService
 
     private function snapshotEnv(SystemUpdate $update): ?string
     {
-        $envPath = $this->installRoot() . DIRECTORY_SEPARATOR . '.env';
+        $envPath = $this->installRoot().DIRECTORY_SEPARATOR.'.env';
         if (! File::exists($envPath)) {
             return null;
         }
 
         $snapshotPath = rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . "update-{$update->id}.env";
+            .DIRECTORY_SEPARATOR."update-{$update->id}.env";
 
         File::copy($envPath, $snapshotPath);
 
@@ -837,8 +859,8 @@ class UpdateManagerService
         $snapshotRoot = rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR);
         File::ensureDirectoryExists($snapshotRoot);
 
-        $archivePath = $snapshotRoot . DIRECTORY_SEPARATOR . "update-{$update->id}-snapshot.zip";
-        $manifestPath = $snapshotRoot . DIRECTORY_SEPARATOR . "update-{$update->id}-snapshot.json";
+        $archivePath = $snapshotRoot.DIRECTORY_SEPARATOR."update-{$update->id}-snapshot.zip";
+        $manifestPath = $snapshotRoot.DIRECTORY_SEPARATOR."update-{$update->id}-snapshot.json";
         $installRoot = $this->installRoot();
 
         $paths = $this->snapshotPaths();
@@ -850,20 +872,21 @@ class UpdateManagerService
             'paths' => $paths,
         ];
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($archivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to create the recovery snapshot archive.');
         }
 
         foreach ($paths as $relativePath) {
-            $absolutePath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $absolutePath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
             if (File::isFile($absolutePath)) {
-                $zip->addFile($absolutePath, 'insulacrm/' . $relativePath);
+                $zip->addFile($absolutePath, 'insulacrm/'.$relativePath);
+
                 continue;
             }
 
             if (File::isDirectory($absolutePath)) {
-                $this->addDirectoryToZip($zip, $absolutePath, 'insulacrm/' . $relativePath);
+                $this->addDirectoryToZip($zip, $absolutePath, 'insulacrm/'.$relativePath);
             }
         }
 
@@ -880,8 +903,8 @@ class UpdateManagerService
         $snapshotRoot = rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR);
         File::ensureDirectoryExists($snapshotRoot);
 
-        $archivePath = $snapshotRoot . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.zip";
-        $manifestPath = $snapshotRoot . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.json";
+        $archivePath = $snapshotRoot.DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.zip";
+        $manifestPath = $snapshotRoot.DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.json";
         $installRoot = $this->installRoot();
         $paths = $this->snapshotPaths();
         $manifest = [
@@ -892,20 +915,21 @@ class UpdateManagerService
             'paths' => $paths,
         ];
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($archivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             throw new RuntimeException('Unable to create the manual recovery snapshot archive.');
         }
 
         foreach ($paths as $relativePath) {
-            $absolutePath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $absolutePath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
             if (File::isFile($absolutePath)) {
-                $zip->addFile($absolutePath, 'insulacrm/' . $relativePath);
+                $zip->addFile($absolutePath, 'insulacrm/'.$relativePath);
+
                 continue;
             }
 
             if (File::isDirectory($absolutePath)) {
-                $this->addDirectoryToZip($zip, $absolutePath, 'insulacrm/' . $relativePath);
+                $this->addDirectoryToZip($zip, $absolutePath, 'insulacrm/'.$relativePath);
             }
         }
 
@@ -937,7 +961,7 @@ class UpdateManagerService
                 continue;
             }
 
-            $nestedArchiveDirectory = trim($archiveDirectory . '/' . str_replace('\\', '/', $relativeDirectory), '/');
+            $nestedArchiveDirectory = trim($archiveDirectory.'/'.str_replace('\\', '/', $relativeDirectory), '/');
             $logicalDirectory = rtrim(Str::after($nestedArchiveDirectory, 'insulacrm/'), '/');
 
             if ($logicalDirectory !== '' && $this->isProtectedPath($logicalDirectory)) {
@@ -949,7 +973,7 @@ class UpdateManagerService
 
         foreach (File::allFiles($sourceDirectory, true) as $file) {
             $relativePath = ltrim(Str::after($file->getPathname(), $sourceDirectory), DIRECTORY_SEPARATOR);
-            $archivePath = trim($archiveDirectory . '/' . str_replace('\\', '/', $relativePath), '/');
+            $archivePath = trim($archiveDirectory.'/'.str_replace('\\', '/', $relativePath), '/');
             $logicalPath = Str::after($archivePath, 'insulacrm/');
 
             if ($this->isProtectedPath($logicalPath)) {
@@ -968,6 +992,7 @@ class UpdateManagerService
             $zip->addFile($realPath, $archivePath);
         }
     }
+
     private function restoreDatabaseBackup(string $backupFilename): void
     {
         $exitCode = Artisan::call('backup:restore', [
@@ -1009,7 +1034,7 @@ class UpdateManagerService
                 $this->restoreInstallStateFromRollback($rollbackManifest, $installRoot, $rollbackRoot);
                 $this->assertCriticalPathsRestored($installRoot);
                 throw new RuntimeException(
-                    'Restoring from ' . $contextLabel . ' was aborted before completion. The live application files were restored to their pre-restore state. Original error: ' . $exception->getMessage(),
+                    'Restoring from '.$contextLabel.' was aborted before completion. The live application files were restored to their pre-restore state. Original error: '.$exception->getMessage(),
                     0,
                     $exception
                 );
@@ -1019,10 +1044,10 @@ class UpdateManagerService
                 }
 
                 throw new RuntimeException(
-                    'Restoring from ' . $contextLabel . ' failed and the live files could not be rolled back automatically. Original error: '
-                    . $exception->getMessage()
-                    . ' Rollback error: '
-                    . $rollbackException->getMessage(),
+                    'Restoring from '.$contextLabel.' failed and the live files could not be rolled back automatically. Original error: '
+                    .$exception->getMessage()
+                    .' Rollback error: '
+                    .$rollbackException->getMessage(),
                     0,
                     $exception
                 );
@@ -1035,8 +1060,8 @@ class UpdateManagerService
     private function replaceInstallPathsFromSource(string $snapshotRoot, array $paths, string $installRoot, string $contextLabel): void
     {
         foreach ($paths as $relativePath) {
-            $sourcePath = $snapshotRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-            $targetPath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $sourcePath = $snapshotRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $targetPath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
 
             if (File::isDirectory($sourcePath)) {
                 $this->syncDirectoryFromSource($sourcePath, $targetPath, $relativePath, $contextLabel);
@@ -1054,12 +1079,13 @@ class UpdateManagerService
         $manifest = [];
 
         foreach ($paths as $relativePath) {
-            $targetPath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-            $rollbackPath = $rollbackRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $targetPath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $rollbackPath = $rollbackRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
 
             if (File::isDirectory($targetPath)) {
                 $this->copyDirectoryTreeSkippingProtected($targetPath, $rollbackPath, $relativePath);
                 $manifest[$relativePath] = 'directory';
+
                 continue;
             }
 
@@ -1069,6 +1095,7 @@ class UpdateManagerService
                     throw new RuntimeException("Failed to capture the current file {$relativePath} before restore.");
                 }
                 $manifest[$relativePath] = 'file';
+
                 continue;
             }
 
@@ -1081,8 +1108,8 @@ class UpdateManagerService
     private function restoreInstallStateFromRollback(array $manifest, string $installRoot, string $rollbackRoot): void
     {
         foreach ($manifest as $relativePath => $type) {
-            $targetPath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
-            $rollbackPath = $rollbackRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $targetPath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $rollbackPath = $rollbackRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
 
             if ($type === 'directory') {
                 $this->syncDirectoryFromSource($rollbackPath, $targetPath, $relativePath, 'the pre-restore application state');
@@ -1116,12 +1143,12 @@ class UpdateManagerService
                 continue;
             }
 
-            $logicalPath = trim($logicalRoot . '/' . str_replace('\\', '/', $relativeDirectory), '/');
+            $logicalPath = trim($logicalRoot.'/'.str_replace('\\', '/', $relativeDirectory), '/');
             if ($this->isProtectedPath($logicalPath)) {
                 continue;
             }
 
-            File::ensureDirectoryExists($targetDirectory . DIRECTORY_SEPARATOR . $relativeDirectory);
+            File::ensureDirectoryExists($targetDirectory.DIRECTORY_SEPARATOR.$relativeDirectory);
         }
 
         foreach (File::allFiles($sourceDirectory, true) as $file) {
@@ -1130,12 +1157,12 @@ class UpdateManagerService
             }
 
             $relativePath = ltrim(Str::after($file->getPathname(), $sourceDirectory), DIRECTORY_SEPARATOR);
-            $logicalPath = trim($logicalRoot . '/' . str_replace('\\', '/', $relativePath), '/');
+            $logicalPath = trim($logicalRoot.'/'.str_replace('\\', '/', $relativePath), '/');
             if ($this->isProtectedPath($logicalPath)) {
                 continue;
             }
 
-            $targetPath = $targetDirectory . DIRECTORY_SEPARATOR . $relativePath;
+            $targetPath = $targetDirectory.DIRECTORY_SEPARATOR.$relativePath;
             File::ensureDirectoryExists(dirname($targetPath));
             if (! File::copy($file->getPathname(), $targetPath)) {
                 throw new RuntimeException("Failed to copy {$logicalPath} while preparing a rollback-safe restore.");
@@ -1159,8 +1186,8 @@ class UpdateManagerService
                 continue;
             }
 
-            $entryPath = $targetDirectory . DIRECTORY_SEPARATOR . $entry;
-            $logicalPath = trim($logicalRoot . '/' . str_replace('\\', '/', $entry), '/');
+            $entryPath = $targetDirectory.DIRECTORY_SEPARATOR.$entry;
+            $logicalPath = trim($logicalRoot.'/'.str_replace('\\', '/', $entry), '/');
 
             if ($this->isProtectedPath($logicalPath)) {
                 continue;
@@ -1171,6 +1198,7 @@ class UpdateManagerService
                 if ($this->directoryIsEmpty($entryPath)) {
                     @rmdir($entryPath);
                 }
+
                 continue;
             }
 
@@ -1181,6 +1209,7 @@ class UpdateManagerService
     private function directoryIsEmpty(string $path): bool
     {
         $entries = scandir($path);
+
         return $entries !== false && count(array_diff($entries, ['.', '..'])) === 0;
     }
 
@@ -1188,11 +1217,13 @@ class UpdateManagerService
     {
         if (is_link($path)) {
             @unlink($path);
+
             return;
         }
 
         if (File::isDirectory($path)) {
             File::deleteDirectory($path);
+
             return;
         }
 
@@ -1200,6 +1231,7 @@ class UpdateManagerService
             File::delete($path);
         }
     }
+
     private function flushOpcache(): void
     {
         if (function_exists('opcache_reset')) {
@@ -1210,7 +1242,7 @@ class UpdateManagerService
     private function assertRestoreTargetsWritable(array $paths, string $installRoot): void
     {
         foreach ($paths as $relativePath) {
-            $targetPath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $targetPath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
             $probePath = File::exists($targetPath) ? $targetPath : dirname($targetPath);
 
             while (! File::exists($probePath) && dirname($probePath) !== $probePath) {
@@ -1226,7 +1258,7 @@ class UpdateManagerService
     private function makeRollbackStageRoot(): string
     {
         $rollbackRoot = rtrim((string) config('update-manager.staging_root'), DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . 'rollback-' . Str::uuid();
+            .DIRECTORY_SEPARATOR.'rollback-'.Str::uuid();
 
         File::makeDirectory($rollbackRoot, 0755, true);
 
@@ -1236,7 +1268,7 @@ class UpdateManagerService
     private function assertSnapshotPathsExist(string $snapshotRoot, array $paths): void
     {
         foreach ($paths as $relativePath) {
-            $sourcePath = $snapshotRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $sourcePath = $snapshotRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
 
             if (! File::exists($sourcePath)) {
                 throw new RuntimeException("The recovery snapshot is incomplete. Missing path: {$relativePath}.");
@@ -1254,7 +1286,7 @@ class UpdateManagerService
         ];
 
         foreach ($criticalPaths as $relativePath) {
-            $absolutePath = $installRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $absolutePath = $installRoot.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
             if (! File::exists($absolutePath)) {
                 throw new RuntimeException("Recovery verification failed. Required path {$relativePath} was not restored.");
             }
@@ -1305,13 +1337,13 @@ class UpdateManagerService
 
     private function snapshotStandaloneEnv(SystemSnapshot $snapshot): ?string
     {
-        $envPath = $this->installRoot() . DIRECTORY_SEPARATOR . '.env';
+        $envPath = $this->installRoot().DIRECTORY_SEPARATOR.'.env';
         if (! File::exists($envPath)) {
             return null;
         }
 
         $snapshotPath = rtrim((string) config('update-manager.snapshot_root'), DIRECTORY_SEPARATOR)
-            . DIRECTORY_SEPARATOR . "snapshot-{$snapshot->id}.env";
+            .DIRECTORY_SEPARATOR."snapshot-{$snapshot->id}.env";
 
         File::copy($envPath, $snapshotPath);
 
@@ -1335,24 +1367,24 @@ class UpdateManagerService
     private function copyReleaseIntoInstall(string $packageRoot, string $installRoot, SystemUpdate $update): void
     {
         foreach ((array) config('update-manager.root_files', []) as $file) {
-            $source = $packageRoot . DIRECTORY_SEPARATOR . $file;
+            $source = $packageRoot.DIRECTORY_SEPARATOR.$file;
             if (! File::exists($source)) {
                 continue;
             }
 
-            $target = $installRoot . DIRECTORY_SEPARATOR . $file;
+            $target = $installRoot.DIRECTORY_SEPARATOR.$file;
             File::ensureDirectoryExists(dirname($target));
             File::copy($source, $target);
             $this->appendLog($update, "Updated {$file}.");
         }
 
         foreach ((array) config('update-manager.directories', []) as $directory) {
-            $sourceDirectory = $packageRoot . DIRECTORY_SEPARATOR . $directory;
+            $sourceDirectory = $packageRoot.DIRECTORY_SEPARATOR.$directory;
             if (! File::isDirectory($sourceDirectory)) {
                 continue;
             }
 
-            $targetDirectory = $installRoot . DIRECTORY_SEPARATOR . $directory;
+            $targetDirectory = $installRoot.DIRECTORY_SEPARATOR.$directory;
             $this->copyDirectoryContents($sourceDirectory, $targetDirectory, $directory, $update);
         }
     }
@@ -1363,13 +1395,13 @@ class UpdateManagerService
 
         foreach (File::allFiles($sourceDirectory, true) as $file) {
             $relativePath = ltrim(Str::after($file->getPathname(), $sourceDirectory), DIRECTORY_SEPARATOR);
-            $logicalPath = trim($logicalRoot . '/' . str_replace('\\', '/', $relativePath), '/');
+            $logicalPath = trim($logicalRoot.'/'.str_replace('\\', '/', $relativePath), '/');
 
             if ($this->isProtectedPath($logicalPath)) {
                 continue;
             }
 
-            $targetPath = $targetDirectory . DIRECTORY_SEPARATOR . $relativePath;
+            $targetPath = $targetDirectory.DIRECTORY_SEPARATOR.$relativePath;
             File::ensureDirectoryExists(dirname($targetPath));
             File::copy($file->getPathname(), $targetPath);
         }
@@ -1383,7 +1415,7 @@ class UpdateManagerService
 
         foreach ((array) config('update-manager.protected_paths', []) as $protectedPath) {
             $protected = trim(str_replace('\\', '/', $protectedPath), '/');
-            if ($normalized === $protected || str_starts_with($normalized, $protected . '/')) {
+            if ($normalized === $protected || str_starts_with($normalized, $protected.'/')) {
                 return true;
             }
         }
@@ -1395,8 +1427,8 @@ class UpdateManagerService
     {
         $logRoot = rtrim((string) config('update-manager.log_root'), DIRECTORY_SEPARATOR);
         File::ensureDirectoryExists($logRoot);
-        $logPath = $logRoot . DIRECTORY_SEPARATOR . "update-{$update->id}.log";
-        File::append($logPath, '[' . now()->toDateTimeString() . "] {$message}\n");
+        $logPath = $logRoot.DIRECTORY_SEPARATOR."update-{$update->id}.log";
+        File::append($logPath, '['.now()->toDateTimeString()."] {$message}\n");
     }
 
     private function extractZipSafely(ZipArchive $zip, string $destination): bool
@@ -1422,13 +1454,14 @@ class UpdateManagerService
                 return false;
             }
 
-            $targetPath = $destinationRoot . '/' . implode('/', $segments);
-            if (! str_starts_with(str_replace('\\', '/', $targetPath), $destinationRoot . '/')) {
+            $targetPath = $destinationRoot.'/'.implode('/', $segments);
+            if (! str_starts_with(str_replace('\\', '/', $targetPath), $destinationRoot.'/')) {
                 return false;
             }
 
             if (str_ends_with($entryName, '/')) {
                 File::makeDirectory($targetPath, 0755, true, true);
+
                 continue;
             }
 
@@ -1451,13 +1484,3 @@ class UpdateManagerService
         return true;
     }
 }
-
-
-
-
-
-
-
-
-
-

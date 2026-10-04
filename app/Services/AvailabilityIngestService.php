@@ -509,7 +509,10 @@ class AvailabilityIngestService
                 // whichever is higher) can be computed per row.
                 $deposit = $data['deposit'] ?? $data['deposit_amount'] ?? $this->defaultDeposit($source, $rentPrice);
                 $adminFee = $data['admin_fee'] ?? $source->default_admin_fee ?? null;
-                $tawtheeqFee = $data['tawtheeq'] ?? $data['tawtheeq_fee'] ?? $source->default_tawtheeq_fee ?? null;
+                // Source sheets spell this several ways; all of them land in
+                // contract_fee. default_tawtheeq_fee keeps its name because it
+                // mirrors the sheet's own column heading.
+                $contractFee = $data['contract_fee'] ?? $data['tawtheeq'] ?? $data['tawtheeq_fee'] ?? $source->default_tawtheeq_fee ?? null;
 
                 $notesParts = ["Source: {$source->name} availability sheet."];
 
@@ -556,7 +559,7 @@ class AvailabilityIngestService
                 if ($remarkLine !== '') {
                     $descriptionParts[] = $remarkLine;
                 }
-                if ($deposit !== null || $adminFee !== null || $tawtheeqFee !== null) {
+                if ($deposit !== null || $adminFee !== null || $contractFee !== null) {
                     $bits = [];
                     if ($deposit !== null) {
                         $bits[] = 'Deposit: AED '.number_format($deposit);
@@ -564,8 +567,8 @@ class AvailabilityIngestService
                     if ($adminFee !== null) {
                         $bits[] = 'Admin fee: AED '.number_format($adminFee);
                     }
-                    if ($tawtheeqFee !== null) {
-                        $bits[] = 'Tawtheeq: AED '.number_format($tawtheeqFee);
+                    if ($contractFee !== null) {
+                        $bits[] = 'Contract Fee: AED '.number_format($contractFee);
                     }
                     $descriptionParts[] = implode(' | ', $bits);
                 }
@@ -604,7 +607,7 @@ class AvailabilityIngestService
                     'rent_price' => $rentPrice,
                     'deposit_amount' => $deposit,
                     'admin_fee' => $adminFee,
-                    'tawtheeq_fee' => $tawtheeqFee,
+                    'contract_fee' => $contractFee,
                     'rent_period' => 'yearly',
                     'handover_date' => $handoverDate ? $handoverDate->toDateString() : null,
                     'available_from' => $availableFrom ? $availableFrom->toDateString() : null,
@@ -838,7 +841,8 @@ class AvailabilityIngestService
         return match ($field) {
             'unit_no', 'building', 'floor_no', 'plot_no', 'community',
             'rera_permit_no', 'title_deed_no', 'owner_name' => $value,
-            'rent_price', 'rent', 'deposit', 'deposit_amount', 'admin_fee', 'tawtheeq', 'tawtheeq_fee',
+            'rent_price', 'rent', 'deposit', 'deposit_amount', 'admin_fee',
+            'contract_fee', 'tawtheeq', 'tawtheeq_fee',
             'service_charge', 'list_price' => $this->moneyNumeric($value),
             'parking' => $this->parkingCount($value),
             'bedrooms' => $this->bedroomCount($value),

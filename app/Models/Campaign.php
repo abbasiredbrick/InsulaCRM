@@ -65,7 +65,7 @@ class Campaign extends Model
      */
     public static function typeLabels(): array
     {
-        return array_map(fn($label) => __($label), self::TYPES);
+        return array_map(fn ($label) => __($label), self::TYPES);
     }
 
     /**
@@ -81,7 +81,7 @@ class Campaign extends Model
      */
     public static function statusLabels(): array
     {
-        return array_map(fn($label) => __($label), self::STATUSES);
+        return array_map(fn ($label) => __($label), self::STATUSES);
     }
 
     /**
@@ -124,14 +124,14 @@ class Campaign extends Model
     public function getClosedDealCountAttribute(): int
     {
         return Deal::whereIn('lead_id', $this->leads()->pluck('id'))
-            ->where('stage', 'closed_won')
+            ->won()
             ->count();
     }
 
     public function getRevenueAttribute(): float
     {
         return (float) Deal::whereIn('lead_id', $this->leads()->pluck('id'))
-            ->where('stage', 'closed_won')
+            ->won()
             ->sum('assignment_fee');
     }
 

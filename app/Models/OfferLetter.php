@@ -49,13 +49,22 @@ class OfferLetter extends Model
         'discount_approved_by',
         'discount_approved_at',
         'commission_rate_pct',
+        // 'percentage' of the contract value, or a stated 'value'.
+        'commission_basis',
+        // The VAT rate this letter was priced at — a snapshot of the tenant's
+        // rate at the time, so a signed letter never silently re-prices when the
+        // tenant setting changes. Zero when the tenant is not VAT registered.
         'commission_vat_pct',
         'commission_amount',
         'commission_vat',
         'commission_total',
         'security_deposit',
         'admin_fee',
-        'tawtheeq_fee',
+        'admin_fee_vat',
+        'admin_fee_total',
+        'contract_fee',
+        'contract_fee_vat',
+        'contract_fee_total',
         'signed_pdf_path',
         'signed_at',
         'declined_at',
@@ -80,7 +89,11 @@ class OfferLetter extends Model
             'commission_total' => 'decimal:2',
             'security_deposit' => 'decimal:2',
             'admin_fee' => 'decimal:2',
-            'tawtheeq_fee' => 'decimal:2',
+            'admin_fee_vat' => 'decimal:2',
+            'admin_fee_total' => 'decimal:2',
+            'contract_fee' => 'decimal:2',
+            'contract_fee_vat' => 'decimal:2',
+            'contract_fee_total' => 'decimal:2',
             'signed_at' => 'datetime',
             'declined_at' => 'datetime',
             'withdrawn_at' => 'datetime',
@@ -131,6 +144,75 @@ class OfferLetter extends Model
     public function hasDiscount(): bool
     {
         return (float) $this->discount_amount > 0;
+    }
+
+    /**
+     * Whether the commission was entered as a stated value rather than a
+     * percentage of the contract value.
+     */
+    public function isCommissionOnValue(): bool
+    {
+        return $this->commission_basis === 'value';
+    }
+
+    /**
+     * The VAT rate this letter carries, and zero when the tenant was not VAT
+     * registered when it was written.
+     */
+    public function vatRate(): float
+    {
+        return (float) $this->commission_vat_pct;
+    }
+
+    public function chargesVat(): bool
+    {
+        return $this->vatRate() > 0;
+    }
+
+    /**
+     * Every service the client pays us, VAT inclusive.
+     *
+     * These are the only lines that are ever VATable — the residential lease or
+     * sale value above them is not.
+     *
+     * @return array<int, array{label: string, net: float, vat: float, total: float}>
+     */
+    public function serviceCharges(): array
+    {
+        $commissionNet = (float) $this->commission_amount;
+        $commissionVat = (float) $this->commission_vat;
+
+        $lines = [[
+            'label' => $this->isCommissionOnValue() ? __('Commission') : __('Commission @ :rate%', ['rate' => rtrim(rtrim(number_format((float) $this->commission_rate_pct, 2, '.', ''), '0'), '.')]),
+            'net' => $commissionNet,
+            'vat' => $commissionVat,
+            'total' => (float) $this->commission_total,
+        ]];
+
+        foreach ([['admin_fee', __('Admin Fee')], ['contract_fee', __('Contract Fee')]] as [$column, $label]) {
+            $net = (float) ($this->{$column} ?? 0);
+
+            if ($net <= 0) {
+                continue;
+            }
+
+            $lines[] = [
+                'label' => $label,
+                'net' => $net,
+                'vat' => (float) ($this->{$column.'_vat'} ?? 0),
+                'total' => (float) ($this->{$column.'_total'} ?? $net),
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * VAT charged across every service line, for the invoice summary.
+     */
+    public function totalVat(): float
+    {
+        return round(array_sum(array_column($this->serviceCharges(), 'vat')), 2);
     }
 
     /**

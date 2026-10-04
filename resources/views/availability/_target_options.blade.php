@@ -5,6 +5,7 @@
     'rent' => 'Rent (AED)',
     'deposit' => 'Deposit (AED)',
     'admin_fee' => 'Admin fee (AED)',
+    'contract_fee' => 'Contract fee (AED)',
     'tawtheeq' => 'Tawtheeq fee (AED)',
     'status' => 'Status word (Vacant / Up-coming…)',
     'parking' => 'Parking',

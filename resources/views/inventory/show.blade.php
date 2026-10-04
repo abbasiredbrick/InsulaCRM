@@ -66,8 +66,8 @@
                         <div class="fw-bold">{{ $property->admin_fee ? \App\Helpers\TenantFormatHelper::currency($property->admin_fee) : '—' }}</div>
                     </div>
                     <div class="col-md-4">
-                        <div class="text-muted small">{{ __('Tawtheeq fee') }}</div>
-                        <div class="fw-bold">{{ $property->tawtheeq_fee ? \App\Helpers\TenantFormatHelper::currency($property->tawtheeq_fee) : '—' }}</div>
+                        <div class="text-muted small">{{ __('Contract fee') }}</div>
+                        <div class="fw-bold">{{ $property->contract_fee ? \App\Helpers\TenantFormatHelper::currency($property->contract_fee) : '—' }}</div>
                     </div>
                     <div class="col-md-4">
                         <div class="text-muted small">{{ __('Sale') }}</div>

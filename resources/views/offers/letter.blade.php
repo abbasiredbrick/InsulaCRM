@@ -147,57 +147,97 @@
         @php
             $words = app(\App\Services\OfferLetterService::class);
             $cur = strtoupper($tenant->currency ?? 'AED');
+            $money = fn ($v) => \App\Helpers\TenantFormatHelper::currency($v);
+            $rate = rtrim(rtrim(number_format((float) $offer->commission_vat_pct, 2, '.', ''), '0'), '.');
         @endphp
+
+        {{-- The advertised price and the discount are printed above the contract
+             value rather than folded into a notice at the bottom, because all
+             three are figures the client is entitled to see and the contract
+             value is only explicable next to them. --}}
+        <table class="terms">
+            <tr>
+                <td class="k">{{ __('Unit Price (as listed)') }}</td>
+                <td class="v">{{ $money($offer->original_amount) }}</td>
+            </tr>
+            @if($offer->hasDiscount())
+            <tr>
+                <td class="k">{{ __('Discount Value') }}</td>
+                <td class="v">− {{ $money($offer->discount_amount) }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="k" style="font-weight:700;">{{ __('Contract Value') }}</td>
+                <td class="v" style="font-weight:700;">{{ $money($offer->approved_amount) }}</td>
+            </tr>
+        </table>
+
         <table class="payments">
             <thead>
                 <tr><th>{{ __('Item') }}</th><th class="amt" style="text-align:right;">{{ __('Amount') }}</th><th style="text-align:right;">{{ __('Payable To') }}</th></tr>
             </thead>
             <tbody>
-                @if($deal?->dealType() === 'rent')
+                {{-- Contract value. No VAT on this line: residential lease and
+                     residential sale consideration are not VATable in the UAE. --}}
                 <tr>
-                    <td>{{ __('Rental Amount') }} — {{ $offer->payment_period }}<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div></td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->approved_amount) }}</td>
-                    <td class="payee">{{ $property?->owner_name ?? __('Landlord') }}</td>
+                    <td>
+                        {{ $deal?->dealType() === 'rent' ? __('Rental Amount') : __('Sales Amount') }}
+                        @if($deal?->dealType() === 'rent' && $offer->payment_period) — {{ $offer->payment_period }}@endif
+                        <div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div>
+                        @if($offer->hasDiscount())
+                        <div class="words">{{ __('After discount of :amount on the listed price.', ['amount' => $money($offer->discount_amount)]) }}</div>
+                        @endif
+                    </td>
+                    <td class="amt">{{ $money($offer->approved_amount) }}</td>
+                    <td class="payee">{{ $property?->owner_name ?? ($deal?->dealType() === 'rent' ? __('Landlord') : __('Seller')) }}</td>
                 </tr>
-                @else
-                <tr>
-                    <td>{{ __('Sales Amount') }}<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->approved_amount, $cur) }} {{ __('Only') }}</div></td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->approved_amount) }}</td>
-                    <td class="payee">{{ $property?->owner_name ?? __('Seller') }}</td>
-                </tr>
-                @endif
-                @if($offer->tawtheeq_fee !== null)
-                <tr>
-                    <td>{{ __('Tawtheeq Fee') }}</td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->tawtheeq_fee) }}</td>
-                    <td class="payee">{{ $tenant->name }}</td>
-                </tr>
-                @endif
-                @if($offer->admin_fee !== null)
-                <tr>
-                    <td>{{ __('Admin Fee + VAT') }}</td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->admin_fee) }}</td>
-                    <td class="payee">{{ $tenant->name }}</td>
-                </tr>
-                @endif
                 <tr>
                     <td>{{ __('Security Deposit') }}@if($deal?->dealType() === 'rent' && $offer->approved_amount > 0) (5% {{ __('of annual rent') }})@endif<div class="words">{{ $words->amountInWords($offer->security_deposit, $cur) }} {{ __('Only') }}</div></td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->security_deposit) }}</td>
-                    <td class="payee">{{ $tenant->name }}</td>
-                </tr>
-                <tr>
-                    <td>{{ __('Commission @') }} {{ rtrim(rtrim(number_format((float) $offer->commission_rate_pct, 2, '.', ''), '0'), '.') }}% + VAT<div class="words">{{ __('(Amount in words):') }} {{ $words->amountInWords($offer->commission_total, $cur) }} {{ __('Only') }}</div></td>
-                    <td class="amt">{{ \App\Helpers\TenantFormatHelper::currency($offer->commission_total) }}</td>
+                    <td class="amt">{{ $money($offer->security_deposit) }}</td>
                     <td class="payee">{{ $tenant->name }}</td>
                 </tr>
             </tbody>
         </table>
 
-        @if($offer->discount_amount > 0)
-        <div class="notice">{{ __('A discount of :amount (from :original) has been granted on this offer.', [
-            'amount' => \App\Helpers\TenantFormatHelper::currency($offer->discount_amount),
-            'original' => \App\Helpers\TenantFormatHelper::currency($offer->original_amount),
-        ]) }} @if(! $offer->discount_approved_by) {{ __('Pending approval.') }} @endif</div>
+        {{-- Everything below this is a service we charge, and these are the only
+             lines that carry VAT. --}}
+        <div class="kicker">{{ __('Agency Services') }}</div>
+        <table class="payments">
+            <thead>
+                <tr>
+                    <th>{{ __('Service') }}</th>
+                    <th style="text-align:right;">{{ __('Amount') }}</th>
+                    @if($offer->chargesVat())<th style="text-align:right;">{{ __('VAT @ :rate%', ['rate' => $rate]) }}</th>@endif
+                    <th style="text-align:right;">{{ __('Total') }}</th>
+                    <th style="text-align:right;">{{ __('Payable To') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($offer->serviceCharges() as $charge)
+                <tr>
+                    <td>{{ $charge['label'] }}</td>
+                    <td class="amt">{{ $money($charge['net']) }}</td>
+                    @if($offer->chargesVat())<td class="amt">{{ $money($charge['vat']) }}</td>@endif
+                    <td class="amt">{{ $money($charge['total']) }}</td>
+                    <td class="payee">{{ $tenant->name }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+            @if($offer->chargesVat())
+            <tfoot>
+                <tr>
+                    <td style="font-weight:700;">{{ __('Total Payable to Agency') }}</td>
+                    <td class="amt" style="font-weight:700;">{{ $money(array_sum(array_column($offer->serviceCharges(), 'net'))) }}</td>
+                    <td class="amt" style="font-weight:700;">{{ $money($offer->totalVat()) }}</td>
+                    <td class="amt" style="font-weight:700;">{{ $money(array_sum(array_column($offer->serviceCharges(), 'total'))) }}</td>
+                    <td class="payee"></td>
+                </tr>
+            </tfoot>
+            @endif
+        </table>
+
+        @if($offer->hasDiscount() && ! $offer->discount_approved_by)
+        <div class="notice">{{ __('The discount above is pending manager approval and is not binding until it is approved.') }}</div>
         @endif
 
         <div class="notice">

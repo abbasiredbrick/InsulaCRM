@@ -10,11 +10,11 @@
         <h3 class="card-title">{{ __('All Leads') }}</h3>
         <div class="card-actions">
             <div class="btn-group me-2" role="group" aria-label="{{ __('View') }}">
-                <a href="{{ route('leads.index', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.index') ? 'active' : '' }}">
+                <a href="{{ route('leads.table', $filters) }}" class="btn btn-outline-primary btn-sm {{ ($currentView ?? null) === 'table' ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
                     {{ __('Table') }}
                 </a>
-                <a href="{{ route('leads.kanban', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.kanban') ? 'active' : '' }}">
+                <a href="{{ route('leads.kanban', $filters) }}" class="btn btn-outline-primary btn-sm {{ ($currentView ?? null) === 'kanban' ? 'active' : '' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="10" y="3" width="4" height="12" rx="1"/><rect x="15" y="3" width="6" height="7" rx="1"/></svg>
                     {{ __('Kanban') }}
                 </a>

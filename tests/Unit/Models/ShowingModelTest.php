@@ -15,7 +15,7 @@ class ShowingModelTest extends TestCase
 
     public function test_outcomes_constant_has_all_values(): void
     {
-        $expected = ['interested', 'not_interested', 'made_offer', 'needs_second_showing'];
+        $expected = ['interested', 'not_interested', 'made_offer', 'needs_second_showing', 'offer_requested'];
         $this->assertEquals($expected, array_keys(Showing::OUTCOMES));
     }
 

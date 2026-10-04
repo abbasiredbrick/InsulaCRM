@@ -17,7 +17,22 @@ class LeadRequest extends FormRequest
     public function rules(): array
     {
         $leadSources = implode(',', CustomFieldService::getValidSlugs('lead_source'));
-        $leadStatuses = implode(',', CustomFieldService::getValidSlugs('lead_status'));
+
+        // The dropdown already omits the automated statuses; validating against
+        // the assignable set as well means a forged POST cannot set closed_won
+        // and skip the commission the deal stage would have applied.
+        $statuses = CustomFieldService::getAssignableStatusSlugs();
+
+        // A lead that a deal already closed is sitting on closed_won or
+        // closed_lost, and editing its phone number posts that status straight
+        // back. Without this the form rejects its own current value and the lead
+        // becomes uneditable — the one thing a manager most needs to do to a
+        // closed record.
+        if ($current = $this->route('lead')?->status) {
+            $statuses[] = $current;
+        }
+
+        $leadStatuses = implode(',', array_unique($statuses));
 
         $rules = [
             'agent_id' => ['required', Rule::exists('users', 'id')->where('tenant_id', auth()->user()->tenant_id)],

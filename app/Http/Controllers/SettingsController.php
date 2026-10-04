@@ -20,6 +20,7 @@ use App\Services\CustomFieldService;
 use App\Services\Settings\BackupService;
 use App\Services\Settings\LanguageFileService;
 use App\Services\UpdateManagerService;
+use App\Support\AppVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
@@ -1050,7 +1051,10 @@ class SettingsController extends Controller
             'residential_lease' => 'required|numeric|min:0|max:100',
             'commercial_lease' => 'required|numeric|min:0|max:100',
             'sales' => 'required|numeric|min:0|max:100',
-            'vat' => 'required|numeric|min:0|max:100',
+            // An unchecked switch sends nothing, which is exactly the intent:
+            // an absent field means "not registered", so the tenant drops back to
+            // charging no VAT rather than silently keeping the old flag.
+            'is_vat_registered' => 'nullable|boolean',
         ]);
 
         $tenant = auth()->user()->tenant;
@@ -1060,14 +1064,32 @@ class SettingsController extends Controller
             'residential_lease' => (string) (float) $data['residential_lease'],
             'commercial_lease' => (string) (float) $data['commercial_lease'],
             'sales' => (string) (float) $data['sales'],
-            'vat' => (string) (float) $data['vat'],
+            // Kept in sync rather than dropped: the column is no longer read for
+            // charging, but leaving a stale 7 or 10 behind would mislead anyone
+            // who inspects the stored settings.
+            'vat' => (string) Tenant::VAT_RATE,
         ];
 
-        $tenant->update(['custom_options' => $options]);
+        $isVatRegistered = $request->boolean('is_vat_registered');
+
+        $tenant->update([
+            'custom_options' => $options,
+            'is_vat_registered' => $isVatRegistered,
+        ]);
 
         AuditLog::log('settings.commission_rates_updated', $tenant, $options['commission_rates']);
 
-        return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', __('Standard commission rates saved.'));
+        // Stated plainly, because turning this off removes VAT from letters the
+        // client may already have seen priced with it.
+        $message = __('Standard commission rates saved.');
+
+        if (! $isVatRegistered) {
+            $message .= ' '.__('VAT is off: no VAT will be added to the commission, admin fee or contract fee.');
+        } else {
+            $message .= ' '.__('VAT is on: :rate% will be added to the commission, admin fee and contract fee.', ['rate' => rtrim(rtrim(number_format(Tenant::VAT_RATE, 2, '.', ''), '0'), '.')]);
+        }
+
+        return redirect()->route('settings.index', ['tab' => 'commissions'])->with('success', $message);
     }
 
     /**
@@ -1455,7 +1477,7 @@ class SettingsController extends Controller
     public function health()
     {
         $health = [
-            'app_version' => config('app.version', '1.0.0'),
+            'app_version' => AppVersion::current(),
             'php_version' => PHP_VERSION,
             'laravel_version' => app()->version(),
             'db_connection' => 'OK',

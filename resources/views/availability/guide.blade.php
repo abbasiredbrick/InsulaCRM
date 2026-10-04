@@ -48,7 +48,7 @@
                             <tr><td>Rent</td><td>100000</td><td><code>rent</code></td><td>{{ __('Annual rent in AED.') }}</td></tr>
                             <tr><td>Deposit</td><td>5000</td><td><code>deposit</code></td><td>{{ __('Leave blank to use the source default.') }}</td></tr>
                             <tr><td>Admin Fee</td><td>1050</td><td><code>admin_fee</code></td><td></td></tr>
-                            <tr><td>Tawtheeq Fee</td><td>150</td><td><code>tawtheeq</code></td><td></td></tr>
+                            <tr><td>Contract Fee</td><td>150</td><td><code>contract_fee</code></td><td></td></tr>
                             <tr><td>Status</td><td>Available for viewing</td><td><code>status</code></td><td>{{ __('See status words below.') }}</td></tr>
                             <tr><td>Balcony</td><td>Yes / No</td><td><code>balcony</code></td><td></td></tr>
                             <tr><td>View</td><td>Sea View</td><td><code>view</code></td><td></td></tr>
@@ -89,7 +89,7 @@
                 <ul class="mb-0">
                     <li>{{ __('Dates are read in many formats: 14 Sep 2026, Sep 14, 2026, 14/09/2026, 14.09.2026, 2026-09-14.') }}</li>
                     <li>{{ __('The word "Available" in a date column means the unit is ready now, so no date is stored.') }}</li>
-                    <li>{{ __('Admin fee and Tawtheeq fee fall back to the source defaults when the sheet has no column for them.') }}</li>
+                    <li>{{ __('Admin fee and contract fee fall back to the source defaults when the sheet has no column for them.') }}</li>
                     <li>{{ __('A deposit can be a fixed default, or a formula: "the higher of AED 5,000 or 5% of the annual rent". Set the deposit percentage and minimum on the source and it is computed per unit.') }}</li>
                 </ul>
             </div>

@@ -156,6 +156,49 @@ vanish from the UI.
 - Category dropdowns are driven off `Property::CATEGORIES`. There is no
   `studio` key and there should not be one.
 
+## A null status is not a cancellation — calendar sync withdraws instead of creates
+
+`sync()` decides create-vs-delete with `shouldRemove()`, which reads the
+model's `status`. **A column default only lands in the database, never in the
+in-memory model**, so `Showing::create($data)` without an explicit `status`
+leaves `$showing->status === null` until the row is re-read. `shouldRemove()`
+saw `null !== 'scheduled'`, decided the record was cancelled, and
+`removeEvent()` cleared nothing and logged nothing — the event was simply
+never created. This silently ate every viewing and meeting created from
+`showings.store` / `ScheduleHubController::storeMeeting`, which is how prod
+lead `BD2610002`'s viewing ended up on no calendar at all.
+
+Two independent guards, both required:
+
+- `Showing` and `Meeting` declare `protected $attributes = ['status' =>
+  'scheduled']` (plus `duration_minutes => 30`) so a fresh model matches its
+  column default. `Task` has no status default and does not need one.
+- `shouldRemove()` uses `filled($record->status) && $record->status !==
+  'scheduled'`. Never compare a possibly-null status directly to
+  `'scheduled'`; absence of information is not a cancellation.
+
+Symptom to recognise: a record saves, no `calendar_event_links` row, no log
+line, and a manual `sync()` for the same row works fine. Suspect
+`shouldRemove()`, not the provider — the provider would have logged.
+`test_a_newly_created_viewing_is_pushed_not_withdrawn` in
+`tests/Feature/CalendarSyncFailureReportingTest.php` reproduces this; it fails
+with 0 links when either guard is removed.
+
+Also part of this contract:
+
+- `sync()` / `removeEvent()` return a `CalendarSyncResult`
+  (`app/Services/Cloud/CalendarSyncResult.php`) — never `void`. Every call site
+  must surface `->failureMessage()` as the session `warning`; the layout
+  already renders it. A sync failure is a warning, never a failed request.
+- `calendar_event_links` is the source of truth. `stampLegacyEventColumns()`
+  mirrors it onto showing `calendar_*` / `main_calendar_*` (assigned agent
+  link, and the owner link when the owners differ) because the reminder job
+  still reads those columns; `clearLegacyEventColumns()` nulls them on
+  withdrawal.
+- `php artisan calendar:reconcile-events` repairs rows with a connected
+  involved user but no link. `--dry-run` first. Run it after any fix that
+  could have silently skipped syncs.
+
 ## Commands
 
 - Run the whole suite: `php -d memory_limit=1G vendor/bin/phpunit`
@@ -183,17 +226,25 @@ run) — `FollowupFeedbackTest::test_quick_log_posts_the_selected_card_type`,
 (a fixture `agent_code` collision, e.g. two `AJ` agents in one test).
 All pass in isolation; run isolated to confirm before debugging.
 
-`CalendarTest::test_calendar_events_returns_json` and the two
-`CalendarRealEstateTest` cases that assert a non-empty events array are a
-**separate, persistent** problem, not this rotation: they fail even in
-isolation and fail on a clean tree (verified by stashing). They read
-`CalendarController::events()`, which is unrelated to the UI work below. Do not
-treat a red calendar run as a regression you introduced, and do not spend a
-cycle on it while working here.
+`InventoryTest::test_index_sorts_by_price` is a **pre-existing** failure, not
+part of any rotation. It fails in isolation and fails identically on a tree
+with the calendar work fully reverted (verified by restoring the touched files
+from `HEAD`, not by stashing — see below): `assertLessThan(strpos($asc,
+$priciest->unitLabel()), strpos($asc, $oldTown->unitLabel()))` gets two equal
+offsets, so `unitLabel()` is not unique enough for the assertion to discriminate
+the two rows. `InventoryTest::test_index_filters_by_rent_range` beside it is
+flaky — it has failed in about half of runs. Neither is a calendar regression;
+do not spend a cycle on it while working here.
+
+The calendar events tests (`CalendarTest::test_calendar_events_returns_json`,
+the two `CalendarRealEstateTest` cases) **now pass** and are covered by the
+null-status fix above. If they go red again, read that section before assuming
+`CalendarController::events()` is at fault.
 
 Never `git stash` to bisect a failure here: the working tree carries a large
 body of uncommitted work, so stashing produces a tree that will not even boot
-its own tests.
+its own tests. Restore individual files from `HEAD` with `git checkout --
+<paths>` instead, and copy them aside first if the change is yours.
 
 ## Recycled Leads pool import
 

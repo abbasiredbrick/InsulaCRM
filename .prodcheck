@@ -1,0 +1,42 @@
+#!/bin/bash
+# Pull the production copies of the files this deploy touches, so the diff can
+# be reviewed before anything is uploaded.
+set -uo pipefail
+cd "$(dirname "$0")"
+
+rm -rf /tmp/prodcheck && mkdir -p /tmp/prodcheck
+
+FILES=(
+  app/Services/Portals/PortalLeadSyncService.php
+  app/Jobs/SyncOverduePortalLeads.php
+  app/Http/Middleware/CatchUpPortalLeads.php
+  database/migrations/2026_09_30_000002_add_receives_leads_to_users_table.php
+  app/Models/User.php
+  app/Services/LeadDistributionService.php
+  app/Services/Portals/PortalLeadService.php
+  app/Console/Commands/AssignUnclaimedLeads.php
+  app/Console/Commands/PortalsPullPropertyFinderLeads.php
+  app/Console/Commands/PullBayutLeads.php
+  app/Http/Controllers/SettingsController.php
+  app/Http/Controllers/PortalIntegrationController.php
+  bootstrap/app.php
+  resources/views/settings/index.blade.php
+  resources/views/settings/portal-integrations.blade.php
+)
+
+for f in "${FILES[@]}"; do
+  mkdir -p "/tmp/prodcheck/$(dirname "$f")"
+  # New files are expected to 550 on the server; that is not an error.
+  ./.ftpx "get -O /tmp/prodcheck/$(dirname "$f") /public_html/insulacrm/$f" >/dev/null 2>&1
+done
+
+echo "=== present on server, differing from local (i.e. what the upload changes) ==="
+for f in "${FILES[@]}"; do
+  if [[ ! -f "/tmp/prodcheck/$f" ]]; then
+    printf '%-70s NEW (not on server)\n' "$f"
+  elif ! diff -q "/tmp/prodcheck/$f" "$f" >/dev/null; then
+    printf '%-70s CHANGED (%s)\n' "$f" "$(diff "/tmp/prodcheck/$f" "$f" | grep -cE '^[<>]')"
+  else
+    printf '%-70s identical\n' "$f"
+  fi
+done

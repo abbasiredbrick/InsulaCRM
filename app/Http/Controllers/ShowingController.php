@@ -69,9 +69,11 @@ class ShowingController extends Controller
             );
         }
 
-        $calendar->sync($showing, auth()->user());
+        $result = $calendar->sync($showing, auth()->user());
 
-        return redirect()->route('showings.show', $showing)->with('success', __('Viewing scheduled successfully.'));
+        return redirect()->route('showings.show', $showing)
+            ->with('success', __('Viewing scheduled successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     /**
@@ -104,9 +106,11 @@ class ShowingController extends Controller
             $showing,
         );
 
-        $calendar->sync($showing, auth()->user());
+        $result = $calendar->sync($showing, auth()->user());
 
-        return back()->with('success', __('Viewing scheduled successfully.'));
+        return back()
+            ->with('success', __('Viewing scheduled successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     public function show(Showing $showing)
@@ -171,22 +175,30 @@ class ShowingController extends Controller
             );
         }
 
-        $calendar->sync($showing, auth()->user());
+        $result = $calendar->sync($showing, auth()->user());
 
         if ($request->ajax()) {
-            return response()->json(['success' => true, 'showing' => $showing->fresh()]);
+            return response()->json([
+                'success' => true,
+                'showing' => $showing->fresh(),
+                'warning' => $result->failureMessage(),
+            ]);
         }
 
-        return redirect()->route('showings.show', $showing)->with('success', __('Viewing updated successfully.'));
+        return redirect()->route('showings.show', $showing)
+            ->with('success', __('Viewing updated successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     public function destroy(Showing $showing, \App\Services\Cloud\CloudCalendarService $calendar)
     {
         $this->authorize('delete', $showing);
 
-        $calendar->removeEvent($showing);
+        $result = $calendar->removeEvent($showing);
         $showing->delete();
 
-        return redirect()->route('schedules.index')->with('success', __('Viewing deleted successfully.'));
+        return redirect()->route('schedules.index')
+            ->with('success', __('Viewing deleted successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 }

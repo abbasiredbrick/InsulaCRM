@@ -102,6 +102,32 @@ class DealCommissionService
     }
 
     /**
+     * The price the unit is *advertised* at, before any negotiation.
+     *
+     * This is deliberately not grossFor(): the offer letter prints "Unit Price (as
+     * listed)", then the discount, then the contract value, and for that to be
+     * honest the first figure has to be the listing. A deal's contract_price is
+     * already the negotiated number, so using it as the listed price would make
+     * the discount line always read zero and hide the real gap between asking
+     * price and agreed price. Falls back to grossFor() when the unit carries no
+     * listed price of its own.
+     */
+    public function listedPriceFor(Lead|Deal $entity): float
+    {
+        $property = $this->propertyFor($entity);
+
+        if ($entity->dealType() === 'sale') {
+            if ($property && (float) $property->sale_price > 0) {
+                return round((float) $property->sale_price, 2);
+            }
+        } elseif ($property && (float) $property->rent_price > 0) {
+            return round($this->annualise((float) $property->rent_price, $property->rent_period), 2);
+        }
+
+        return $this->grossFor($entity);
+    }
+
+    /**
      * Full (pre-discount) value of the transaction:
      *  - annual lease value for rent (monthly figures are annualised),
      *  - the sales value for sales.
@@ -145,13 +171,15 @@ class DealCommissionService
     }
 
     /**
-     * VAT on the commission at the tenant's VAT rate.
+     * VAT on top of a commission.
+     *
+     * Only ever called on the commission, never on the lease or sale value —
+     * residential rent and residential sale consideration are not VATable in the
+     * UAE. Zero unless the tenant is VAT registered.
      */
     public function vatFor(Lead|Deal $entity, float $commission, ?Tenant $tenant = null): float
     {
-        $rates = $this->rates($tenant ?? $entity->tenant);
-
-        return round($commission * ((float) $rates['vat'] / 100), 2);
+        return ($tenant ?? $entity->tenant)->vatOn($commission);
     }
 
     /**

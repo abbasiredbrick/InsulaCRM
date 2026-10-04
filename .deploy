@@ -1,0 +1,35 @@
+#!/bin/bash
+# Mirror individual files to production.
+#
+# The local and remote trees share a layout, so each file is uploaded by cd-ing
+# into its remote directory and putting the local path. An explicit remote-name
+# flag is avoided because lftp 4.9 treats it as a directory and appends the
+# basename, which silently double-appends the name.
+#
+# Usage: .deploy file [file ...]        (paths relative to the repo root)
+set -uo pipefail
+cd "$(dirname "$0")"
+
+REMOTE_ROOT=/public_html/insulacrm
+
+if [[ $# -eq 0 ]]; then
+  echo "usage: $0 <file> [file ...]" >&2
+  exit 1
+fi
+
+SCRIPT=""
+for f in "$@"; do
+  if [[ ! -f "$f" ]]; then
+    echo "missing local file: $f" >&2
+    exit 1
+  fi
+  dir=$(dirname "$f")
+  if [[ "$dir" == "." ]]; then
+    SCRIPT+="put $f; "
+  else
+    SCRIPT+="cd $REMOTE_ROOT/$dir; put $f; "
+  fi
+done
+SCRIPT+="cd $REMOTE_ROOT;"
+
+./.ftpx "$SCRIPT"

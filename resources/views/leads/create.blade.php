@@ -4,7 +4,7 @@
 @section('page-title', __('Add New Lead'))
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'kanban' ? route('leads.kanban') : route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ __('Add New Lead') }}</li>
 @endsection
 
@@ -78,7 +78,7 @@
                 <div class="col-md-4">
                     <label class="form-label required">{{ __('Status') }}</label>
                     <select name="status" class="form-select @error('status') is-invalid @enderror" required>
-                        @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
+                        @foreach(\App\Services\CustomFieldService::getAssignableOptions('lead_status') as $val => $label)
                             <option value="{{ $val }}" {{ old('status', 'new') == $val ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
                     </select>

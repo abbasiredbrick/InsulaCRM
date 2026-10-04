@@ -4,12 +4,12 @@
 @section('page-title', $lead->full_name)
 
 @section('breadcrumbs')
-<li class="breadcrumb-item"><a href="{{ session('leads.view') === 'kanban' ? route('leads.kanban') : route('leads.index') }}">{{ __('Leads') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ route('leads.index') }}">{{ __('Leads') }}</a></li>
 <li class="breadcrumb-item active" aria-current="page">{{ $lead->full_name }}</li>
 @endsection
 
 @section('page-actions')
-<x-back-link :fallback="session('leads.view') === 'kanban' ? route('leads.kanban') : route('leads.index')" :force="true" />
+<x-back-link :fallback="route('leads.index')" :force="true" />
 @endsection
 
 @section('content')
@@ -486,7 +486,7 @@
                             <label class="form-label mb-1">{{ __('Move status to') }}</label>
                             <select name="status" class="form-select" id="activity-status-select">
                                 <option value="">{{ __('Keep current (:status)', ['status' => \App\Services\CustomFieldService::getOptions('lead_status')[$lead->status] ?? $lead->status]) }}</option>
-                                @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
+                                @foreach(\App\Services\CustomFieldService::getAssignableOptions('lead_status') as $val => $label)
                                     @if($val === $lead->status)
                                         @continue
                                     @endif

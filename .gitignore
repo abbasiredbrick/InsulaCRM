@@ -29,3 +29,9 @@ Thumbs.db
 
 # Production deployment notes (credentials) — never commit
 PROD-DEPLOY.md
+
+# Local curl session cookie jar from manual testing - contains a live session token
+cookies.txt
+
+# Office lock files (~$ prefix)
+~$*

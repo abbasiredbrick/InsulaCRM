@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Notifications\BuyerMatchFound;
 use App\Notifications\DealStageChanged as DealStageChangedNotification;
 use App\Services\BuyerScoreService;
+use App\Services\DealLifecycleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -23,11 +24,34 @@ use Illuminate\Support\Facades\Storage;
 class DealController extends Controller
 {
     /**
+     * Dispatches /pipeline to whichever view this member last chose.
+     *
+     * With no stored preference the list is rendered as a fallback and is
+     * deliberately NOT recorded: opening the screen must not silently pick a
+     * view for the member. The first explicit choice is what sticks.
+     */
+    public function view(Request $request)
+    {
+        $this->authorize('viewAny', Deal::class);
+
+        if (auth()->user()->preferredView('pipeline') === 'board') {
+            return redirect()->route('pipeline.board', $request->query());
+        }
+
+        return $this->renderList($request, remember: false);
+    }
+
+    /**
      * Table (list) view of deals — a findable alternative to the kanban board.
      * Each row links to the deal detail page so the user can open a deal and
      * take further action (upload documents, generate offer letters, ...).
      */
     public function index(Request $request)
+    {
+        return $this->renderList($request, remember: true);
+    }
+
+    private function renderList(Request $request, bool $remember)
     {
         $this->authorize('viewAny', Deal::class);
 
@@ -120,9 +144,13 @@ class DealController extends Controller
         $feeField = $businessMode === 'realestate' ? 'total_commission' : 'assignment_fee';
         $stageLabels = Deal::stageLabels();
 
+        if ($remember) {
+            auth()->user()->rememberPreferredView('pipeline', 'list');
+        }
+
         return view('deals.index', compact(
             'deals', 'agents', 'businessMode', 'modeTerms', 'feeField', 'stageLabels'
-        ));
+        ) + ['currentView' => 'list']);
     }
 
     public function pipeline(Request $request)
@@ -231,9 +259,11 @@ class DealController extends Controller
         }
 
         // Summary strip — answers "business generated" vs "upcoming business".
-        $openDeals = $deals->filter(fn ($d) => ! in_array($d->stage, ['closed_won', 'closed_lost'], true));
-        $wonDeals = $deals->filter(fn ($d) => $d->stage === 'closed_won');
-        $lostDeals = $deals->filter(fn ($d) => $d->stage === 'closed_lost');
+        // A lease wins at deal_won, so these must go through the model helpers
+        // rather than matching 'closed_won' or a lease looks like open pipeline.
+        $openDeals = $deals->filter(fn ($d) => ! $d->isTerminal());
+        $wonDeals = $deals->filter(fn ($d) => $d->isWon());
+        $lostDeals = $deals->filter(fn ($d) => $d->isLost());
         $decided = $wonDeals->count() + $lostDeals->count();
 
         $wonThisMonth = $wonDeals->filter(fn ($d) => $d->stage_changed_at && $d->stage_changed_at->gte(now()->startOfMonth()));
@@ -251,10 +281,12 @@ class DealController extends Controller
             'avg_deal' => $wonDeals->count() > 0 ? round($wonDeals->sum('contract_price') / $wonDeals->count(), 2) : 0,
         ];
 
+        auth()->user()->rememberPreferredView('pipeline', 'board');
+
         return view('deals.pipeline', compact(
             'deals', 'stages', 'stageLabels', 'agents', 'dealType', 'counts',
             'businessMode', 'modeTerms', 'feeField', 'columns', 'summary', 'stageProbs'
-        ));
+        ) + ['currentView' => 'board']);
     }
 
     public function updateStage(Request $request, Deal $deal)
@@ -266,22 +298,62 @@ class DealController extends Controller
         ]);
 
         $oldStage = $deal->stage;
+        $requestedStage = $request->stage;
 
-        // Real estate mode: a signed offer letter must exist before a deal can
-        // be closed as Won.
-        if ($request->stage === 'closed_won' && $oldStage !== 'closed_won') {
-            $deal->loadMissing('lead');
-            if ($gateError = app(\App\Services\TransactionCloseService::class)->gateError($deal->lead)) {
-                return response()->json(['success' => false, 'message' => $gateError], 422);
+        $lifecycle = app(\App\Services\DealLifecycleService::class);
+
+        // deal_locked is the end of the road. Without this, dragging the card back
+        // to commission_received would auto-promote it to deal_won and quietly
+        // reopen a closed lease — and the promotion runs after the write, so the
+        // deal would end up in a *different* wrong stage than the one refused.
+        if ($oldStage === 'deal_locked' && $requestedStage !== 'deal_locked') {
+            return response()->json([
+                'success' => false,
+                'message' => __('This deal is locked and closed. Its stage cannot be changed.'),
+            ], 422);
+        }
+
+        // deal_won and deal_locked are outcomes, not choices: they exist so a lease
+        // wins when the commission lands and closes when the tenant moves in. The
+        // pipeline board is drag-and-drop, so hiding the stage from a dropdown is
+        // not enough — dropping a card on those columns has to be refused too, or
+        // an agent can skip the commission step and forge a win.
+        if (in_array($requestedStage, Deal::SYSTEM_STAGES, true) && $oldStage !== $requestedStage) {
+            $via = $lifecycle->promotionSourceFor($requestedStage);
+
+            return response()->json([
+                'success' => false,
+                'message' => $via
+                    ? __('This stage is set automatically when the deal reaches :stage.', ['stage' => Deal::stageLabel($via)])
+                    : __('This stage is set automatically.'),
+            ], 422);
+        }
+
+        // Resolve automatic promotions before writing anything: winning a lease
+        // goes through `commission_received`, so gating only on a literal
+        // 'closed_won' would let the deal reach deal_won with no signature.
+        $effectiveStage = DealLifecycleService::AUTO_PROMOTIONS[$requestedStage] ?? $requestedStage;
+
+        if ($effectiveStage === 'closed_won' || $effectiveStage === 'deal_won') {
+            if ($oldStage !== $effectiveStage) {
+                $deal->loadMissing('lead');
+                if ($deal->lead && $gateError = $lifecycle->gateError($deal)) {
+                    return response()->json(['success' => false, 'message' => $gateError], 422);
+                }
             }
         }
 
-        $updateData = [
-            'stage' => $request->stage,
+        $deal->update([
+            'stage' => $requestedStage,
             'stage_changed_at' => now(),
-        ];
+        ]);
 
-        $deal->update($updateData);
+        // Apply automatic promotions (commission received -> deal won, moved in ->
+        // deal locked) and the lead-status mirror. The returned stage is the one
+        // the deal actually rests on, which is not always the requested one.
+        $newStage = $lifecycle->apply($deal, $requestedStage, auth()->user());
+
+        $promoted = $newStage !== $requestedStage;
 
         Activity::create([
             'tenant_id' => auth()->user()->tenant_id,
@@ -289,29 +361,21 @@ class DealController extends Controller
             'agent_id' => auth()->id(),
             'type' => 'stage_change',
             'subject' => 'Deal stage changed',
-            'body' => 'Stage changed from "'.Deal::stageLabel($oldStage).'" to "'.Deal::stageLabel($request->stage).'"',
+            'body' => $promoted
+                ? 'Stage changed from "'.Deal::stageLabel($oldStage).'" to "'.Deal::stageLabel($requestedStage).'" — automatically advanced to "'.Deal::stageLabel($newStage).'"'
+                : 'Stage changed from "'.Deal::stageLabel($oldStage).'" to "'.Deal::stageLabel($newStage).'"',
             'logged_at' => now(),
         ]);
 
         event(new DealStageChanged($deal, $oldStage));
-        AuditLog::log('deal.stage_changed', $deal, ['stage' => $oldStage], ['stage' => $request->stage]);
+        AuditLog::log('deal.stage_changed', $deal, ['stage' => $oldStage], ['stage' => $newStage]);
         Hooks::doAction('deal.stage_changed', $deal, $oldStage);
-
-        // Convert the deal's lead into a Client (Buyer) when the deal is won,
-        // sync the lead status, and apply the standard commission + split.
-        if ($request->stage === 'closed_won' && $oldStage !== 'closed_won') {
-            app(\App\Services\LeadToClientService::class)->convertFromWonDeal($deal);
-            $deal->loadMissing('lead');
-            if ($deal->lead) {
-                app(\App\Services\TransactionCloseService::class)->closeAsWon($deal->lead, $deal, auth()->user());
-            }
-        }
 
         \App\Services\WebhookService::dispatch('deal.stage_changed', [
             'deal_id' => $deal->id,
             'title' => $deal->title,
             'old_stage' => $oldStage,
-            'new_stage' => $request->stage,
+            'new_stage' => $newStage,
             'agent_id' => $deal->agent_id,
         ], auth()->user()->tenant_id);
 
@@ -324,7 +388,7 @@ class DealController extends Controller
 
         // Dispatch buyer matching when deal moves to the mode-appropriate trigger stage
         $matchTrigger = \App\Services\BusinessModeService::getBuyerMatchTriggerStage();
-        if ($request->stage === $matchTrigger) {
+        if ($newStage === $matchTrigger) {
             app(\App\Services\BuyerMatchService::class)->matchForDeal($deal);
 
             // Notify admins and relevant agents if buyer matches found
@@ -353,7 +417,7 @@ class DealController extends Controller
         }
 
         // Decrease buyer reliability if deal reverts back to match trigger stage (buyer backed out)
-        if ($oldStage !== $matchTrigger && $request->stage === $matchTrigger) {
+        if ($oldStage !== $matchTrigger && $newStage === $matchTrigger) {
             $assignedMatch = $deal->buyerMatches()->where('status', 'interested')->first();
             if ($assignedMatch && $assignedMatch->buyer) {
                 $assignedMatch->update(['status' => 'passed']);
@@ -362,7 +426,7 @@ class DealController extends Controller
         }
 
         // Auto-create transaction checklist when entering under_contract in realestate mode
-        if ($request->stage === 'under_contract' && \App\Services\BusinessModeService::isRealEstate()) {
+        if ($newStage === 'under_contract' && \App\Services\BusinessModeService::isRealEstate()) {
             if ($deal->checklistItems()->count() === 0) {
                 foreach (TransactionChecklist::DEFAULT_ITEMS as $item) {
                     TransactionChecklist::create([
@@ -374,7 +438,11 @@ class DealController extends Controller
             }
         }
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'stage' => $newStage,
+            'promoted_to' => $promoted ? $newStage : null,
+        ]);
     }
 
     public function show(Deal $deal)

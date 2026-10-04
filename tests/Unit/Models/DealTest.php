@@ -3,6 +3,7 @@
 namespace Tests\Unit\Models;
 
 use App\Models\Deal;
+use App\Models\Lead;
 use Tests\TestCase;
 
 class DealTest extends TestCase
@@ -140,7 +141,7 @@ class DealTest extends TestCase
         ]);
         $signedDate = $deal->fresh()->offer_signed_date;
 
-        $deal->update(['stage' => 'deposit_collected']);
+        $deal->update(['stage' => 'deposit_received']);
 
         $fresh = $deal->fresh();
         $this->assertEquals($signedDate->toDateString(), $fresh->offer_signed_date->toDateString());
@@ -193,5 +194,54 @@ class DealTest extends TestCase
         $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
 
         $this->assertEquals('Payment & Tawtheeq/Ejari deadline', $deal->dueDiligencePeriodLabel($this->tenant));
+    }
+
+    /**
+     * stageProbability() falls back to 0.5 for an unknown key, so a stage that
+     * ships without a probability silently forecasts at a coin flip. Leasing is
+     * the vocabulary that grew a stage most recently, so assert it explicitly.
+     */
+    public function test_every_leasing_stage_has_an_explicit_probability(): void
+    {
+        $missing = array_values(array_diff(
+            array_keys(Lead::LEASING_STAGES),
+            array_keys(Deal::STAGE_PROBABILITIES)
+        ));
+
+        $this->assertSame([], $missing, 'Leasing stages missing from STAGE_PROBABILITIES: '.implode(', ', $missing));
+    }
+
+    public function test_offer_requested_is_ordered_between_viewing_done_and_offer_sent(): void
+    {
+        $order = array_keys(Lead::LEASING_STAGES);
+
+        $this->assertSame(
+            ['viewing_done', 'offer_requested', 'offer_sent'],
+            array_slice($order, array_search('viewing_done', $order, true), 3)
+        );
+    }
+
+    /**
+     * stageProbability() silently returns 0.5 for any undeclared key, so a stage
+     * added to the leasing vocabulary without a probability enters the weighted
+     * forecast at a coin flip. Assert the whole post-viewing ladder rises, which
+     * is what a rising forecast actually means.
+     */
+    public function test_the_post_viewing_probability_ladder_is_declared_and_rising(): void
+    {
+        $this->actingAsAdmin();
+
+        $ladder = ['viewing_done', 'offer_requested', 'offer_sent', 'negotiating', 'offer_signed', 'deposit_received'];
+
+        foreach ($ladder as $stage) {
+            $this->assertArrayHasKey($stage, Deal::STAGE_PROBABILITIES, "No explicit probability for {$stage}");
+        }
+
+        $previous = null;
+        foreach ($ladder as $stage) {
+            $p = Deal::stageProbability($stage, $this->tenant);
+            $this->assertGreaterThan($previous, $p, "{$stage} does not forecast above the stage before it");
+            $previous = $p;
+        }
     }
 }

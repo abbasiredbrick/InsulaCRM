@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\AppVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -28,8 +29,8 @@ class ErrorLogController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('message', 'like', "%{$search}%")
-                  ->orWhere('url', 'like', "%{$search}%")
-                  ->orWhere('file', 'like', "%{$search}%");
+                    ->orWhere('url', 'like', "%{$search}%")
+                    ->orWhere('file', 'like', "%{$search}%");
             });
         }
 
@@ -48,7 +49,7 @@ class ErrorLogController extends Controller
             })
             ->first();
 
-        if (!$error) {
+        if (! $error) {
             abort(404);
         }
 
@@ -65,11 +66,11 @@ class ErrorLogController extends Controller
             })
             ->first();
 
-        if (!$error) {
+        if (! $error) {
             abort(404);
         }
 
-        DB::table('error_logs')->where('id', $id)->update(['is_resolved' => !$error->is_resolved]);
+        DB::table('error_logs')->where('id', $id)->update(['is_resolved' => ! $error->is_resolved]);
 
         return redirect()->back()->with('success', __('Error status updated.'));
     }
@@ -84,13 +85,13 @@ class ErrorLogController extends Controller
             })
             ->first();
 
-        if (!$error) {
+        if (! $error) {
             abort(404);
         }
 
         $report = [
             'product' => config('app.name'),
-            'version' => config('app.version', '1.0.0'),
+            'version' => AppVersion::current(),
             'php_version' => PHP_VERSION,
             'laravel_version' => app()->version(),
             'error' => [
@@ -114,10 +115,10 @@ class ErrorLogController extends Controller
             'generated_at' => now()->toIso8601String(),
         ];
 
-        $filename = 'bug-report-' . $error->id . '-' . date('Y-m-d') . '.json';
+        $filename = 'bug-report-'.$error->id.'-'.date('Y-m-d').'.json';
 
         return response()->json($report, 200, [
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 

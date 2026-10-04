@@ -163,9 +163,9 @@ class ScheduleHubController extends Controller
             'at' => $meeting->scheduled_at->format('M d, Y g:i A'),
         ]));
 
-        $this->calendar->sync($meeting, auth()->user());
+        $result = $this->calendar->sync($meeting, auth()->user());
 
-        return $this->redirectBack(__('Meeting scheduled successfully.'));
+        return $this->redirectBack(__('Meeting scheduled successfully.'), $result->failureMessage());
     }
 
     public function storeTask(Request $request)
@@ -209,13 +209,13 @@ class ScheduleHubController extends Controller
             'due' => $task->due_label,
         ]));
 
-        $this->calendar->sync($task, auth()->user());
+        $result = $this->calendar->sync($task, auth()->user());
 
         if ($assignee->id !== auth()->id()) {
             Notification::send($assignee, new TaskAssigned($task, auth()->user()->tenant, auth()->user()));
         }
 
-        return $this->redirectBack(__('Task created successfully.'));
+        return $this->redirectBack(__('Task created successfully.'), $result->failureMessage());
     }
 
     /**
@@ -253,9 +253,11 @@ class ScheduleHubController extends Controller
             );
         }
 
-        $this->calendar->sync($showing, auth()->user());
+        $result = $this->calendar->sync($showing, auth()->user());
 
-        return back()->with('success', __('Viewing updated successfully.'));
+        return back()
+            ->with('success', __('Viewing updated successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     /**
@@ -312,9 +314,11 @@ class ScheduleHubController extends Controller
             );
         }
 
-        $this->calendar->sync($task, auth()->user());
+        $result = $this->calendar->sync($task, auth()->user());
 
-        return back()->with('success', __('Task updated successfully.'));
+        return back()
+            ->with('success', __('Task updated successfully.'))
+            ->with('warning', $result->failureMessage());
     }
 
     protected function logScheduleActivity(Lead $lead, string $type, string $subject, $entity, string $body): void
@@ -508,12 +512,14 @@ class ScheduleHubController extends Controller
         return auth()->user();
     }
 
-    protected function redirectBack(string $message)
+    protected function redirectBack(string $message, ?string $warning = null)
     {
         if (request()->expectsJson()) {
-            return response()->json(['success' => true, 'message' => $message]);
+            return response()->json(['success' => true, 'message' => $message, 'warning' => $warning]);
         }
 
-        return redirect()->route('schedules.index')->with('success', __($message));
+        return redirect()->route('schedules.index')
+            ->with('success', __($message))
+            ->with('warning', $warning);
     }
 }

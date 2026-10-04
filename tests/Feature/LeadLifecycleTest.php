@@ -150,13 +150,22 @@ class LeadLifecycleTest extends TestCase
 
     // ── Lost / dead → management notification ─────────────────────
 
-    public function test_lost_status_notifies_admins_for_cross_check(): void
+    public function test_a_lost_deal_notifies_admins_for_cross_check(): void
     {
         $this->actingAsAdmin();
-        $lead = $this->createLead(['status' => 'nurture']);
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented']);
+        $lead = $deal->lead;
+        $lead->update(['status' => 'nurture']);
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_lost'])->assertJson(['success' => true]);
+        // closed_lost is no longer assignable on the lead, so the cross-check
+        // alert now has to survive the trip through the deal stage instead.
+        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_lost'])
+            ->assertSessionHasErrors('status');
 
+        $this->patchJson(route('deals.updateStage', $deal), ['stage' => 'closed_lost'])
+            ->assertJson(['success' => true]);
+
+        $this->assertSame('closed_lost', $lead->fresh()->status);
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $this->adminUser->id,
             'type' => LeadLostForReview::class,
@@ -214,9 +223,11 @@ class LeadLifecycleTest extends TestCase
     public function test_lost_notification_points_to_the_lead(): void
     {
         $this->actingAsAdmin();
-        $lead = $this->createLead(['status' => 'nurture', 'first_name' => 'Review', 'last_name' => 'Me']);
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'offer_presented']);
+        $lead = $deal->lead;
+        $lead->update(['status' => 'nurture', 'first_name' => 'Review', 'last_name' => 'Me']);
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'closed_lost']);
+        $this->patchJson(route('deals.updateStage', $deal), ['stage' => 'closed_lost']);
 
         $notification = $this->adminUser->notifications()->where('type', LeadLostForReview::class)->first();
         $this->assertNotNull($notification);

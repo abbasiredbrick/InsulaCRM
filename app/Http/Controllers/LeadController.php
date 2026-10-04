@@ -21,7 +21,34 @@ use Illuminate\Support\Facades\Storage;
 
 class LeadController extends Controller
 {
+    /**
+     * Dispatches /leads to whichever view this member last chose.
+     *
+     * With no stored preference the list is rendered as a fallback and is
+     * deliberately NOT recorded: opening the screen must not silently pick a
+     * view for the member. The first explicit choice is what sticks.
+     */
+    public function view(Request $request)
+    {
+        $this->authorize('viewAny', Lead::class);
+
+        if (auth()->user()->preferredView('leads') === 'kanban') {
+            return redirect()->route('leads.kanban', $request->query());
+        }
+
+        return $this->renderList($request, remember: false);
+    }
+
+    /**
+     * The list view, reached directly (/leads/table or the List toggle). Being
+     * an explicit destination, it records the choice.
+     */
     public function index(Request $request)
+    {
+        return $this->renderList($request, remember: true);
+    }
+
+    private function renderList(Request $request, bool $remember)
     {
         $this->authorize('viewAny', Lead::class);
 
@@ -92,9 +119,12 @@ class LeadController extends Controller
 
         $showAgentPicker = ! $user->isAgent() || $user->isManager();
         $agents = $showAgentPicker ? $this->getAgents() : collect();
-        $request->session()->put('leads.view', 'table');
 
-        return view('leads.index', compact('leads', 'agents'));
+        if ($remember) {
+            $user->rememberPreferredView('leads', 'table');
+        }
+
+        return view('leads.index', compact('leads', 'agents') + ['currentView' => 'table']);
     }
 
     public function bulkAction(Request $request)
@@ -132,8 +162,8 @@ class LeadController extends Controller
                 break;
 
             case 'status':
-                $validStatuses = CustomFieldService::getValidSlugs('lead_status');
-                if (! in_array($request->status, $validStatuses)) {
+                $validStatuses = CustomFieldService::getAssignableStatusSlugs();
+                if (! in_array($request->status, $validStatuses, true)) {
                     return redirect()->back()->with('error', 'Invalid status.');
                 }
                 foreach ($leads as $lead) {
@@ -624,18 +654,10 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
-        $validStatuses = implode(',', \App\Services\CustomFieldService::getValidSlugs('lead_status'));
+        $validStatuses = implode(',', \App\Services\CustomFieldService::getAssignableStatusSlugs());
         $request->validate(['status' => "required|in:{$validStatuses}"]);
 
         $oldStatus = $lead->status;
-
-        // Real estate mode: a signed offer letter must exist before the lead
-        // can be closed as Won.
-        if ($request->status === 'closed_won' && $oldStatus !== 'closed_won') {
-            if ($gateError = app(\App\Services\TransactionCloseService::class)->gateError($lead)) {
-                return response()->json(['success' => false, 'message' => $gateError], 422);
-            }
-        }
 
         $lead->update(['status' => $request->status]);
 

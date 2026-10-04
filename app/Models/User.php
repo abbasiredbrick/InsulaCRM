@@ -25,6 +25,7 @@ class User extends Authenticatable
         'two_factor_provider',
         'onboarding_completed',
         'theme',
+        'ui_preferences',
         'calendar_feed_token',
         'email_from_name',
         'email_reply_to',
@@ -53,6 +54,7 @@ class User extends Authenticatable
             'two_factor_enabled' => 'boolean',
             'onboarding_completed' => 'boolean',
             'dashboard_widgets' => 'array',
+            'ui_preferences' => 'array',
         ];
     }
 
@@ -331,6 +333,40 @@ class User extends Authenticatable
     public function isInLeadRotation(): bool
     {
         return (bool) $this->is_active && (bool) $this->receives_leads;
+    }
+
+    /**
+     * The list/kanban choice this member last made for a screen, or null when
+     * they have never chosen one.
+     *
+     * A screen with no stored preference must render its fallback WITHOUT
+     * recording it — otherwise merely opening the screen would silently pick a
+     * default for the member, which is exactly what this preference exists to
+     * avoid. Only an explicit choice (preferredView remember) writes here.
+     */
+    public function preferredView(string $scope): ?string
+    {
+        $view = data_get($this->ui_preferences, $scope);
+
+        return is_string($view) && $view !== '' ? $view : null;
+    }
+
+    /**
+     * Record an explicit list/kanban choice, which then stands until the member
+     * changes it again. No-op when unchanged, so a view switch does not write
+     * on every page load.
+     */
+    public function rememberPreferredView(string $scope, string $view): void
+    {
+        $preferences = is_array($this->ui_preferences) ? $this->ui_preferences : [];
+
+        if (($preferences[$scope] ?? null) === $view) {
+            return;
+        }
+
+        $preferences[$scope] = $view;
+
+        $this->forceFill(['ui_preferences' => $preferences])->save();
     }
 
     /**

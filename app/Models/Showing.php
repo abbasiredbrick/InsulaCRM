@@ -19,6 +19,7 @@ class Showing extends Model
         'not_interested' => 'Not Interested',
         'made_offer' => 'Made Offer',
         'needs_second_showing' => 'Needs Second Viewing',
+        'offer_requested' => 'Offer Requested',
     ];
 
     protected $fillable = [
@@ -48,6 +49,17 @@ class Showing extends Model
     protected $casts = [
         'showing_date' => 'date',
         'reminder_sent_at' => 'datetime',
+    ];
+
+    /**
+     * Mirror the column default. Without this a model built by Showing::create()
+     * carries status = null until it is re-read, and a null status is not
+     * "cancelled" — code that asks "is this still scheduled?" must not have to
+     * guard against a not-yet-populated attribute.
+     */
+    protected $attributes = [
+        'status' => 'scheduled',
+        'duration_minutes' => 30,
     ];
 
     protected static function booted(): void

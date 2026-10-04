@@ -84,7 +84,7 @@ class Goal extends Model
      */
     public static function metricLabels(): array
     {
-        return array_map(fn($label) => __($label), self::METRIC_LABELS);
+        return array_map(fn ($label) => __($label), self::METRIC_LABELS);
     }
 
     /**
@@ -148,11 +148,12 @@ class Goal extends Model
     }
 
     /**
-     * Count deals with stage = closed_won within date range.
+     * Count won deals within date range. Leasing wins at deal_won and
+     * wholesale/sale at closed_won, so this must not match one key.
      */
     private function countDealsClosedWon($start, $end): float
     {
-        $query = Deal::where('stage', 'closed_won')
+        $query = Deal::won()
             ->whereBetween('updated_at', [$start->startOfDay(), $end->endOfDay()]);
 
         if ($this->user_id) {
@@ -163,11 +164,11 @@ class Goal extends Model
     }
 
     /**
-     * Sum assignment fees from closed_won deals within date range.
+     * Sum fees from won deals within date range.
      */
     private function sumRevenue($start, $end): float
     {
-        $query = Deal::where('stage', 'closed_won')
+        $query = Deal::won()
             ->whereBetween('updated_at', [$start->startOfDay(), $end->endOfDay()]);
 
         if ($this->user_id) {

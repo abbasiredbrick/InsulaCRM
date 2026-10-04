@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\AppVersion;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -49,7 +50,7 @@ class SystemDoctor extends Command
     private function checks(): array
     {
         $checks = [
-            $this->check('Version', true, 'info', config('app.version', '1.0.0')),
+            $this->check('Version', true, 'info', AppVersion::current()),
             $this->check('.env present', File::exists(base_path('.env')), 'critical', base_path('.env')),
             $this->check('APP_KEY configured', $this->appKeyConfigured(), 'critical', $this->appKeyConfigured() ? 'Application key is configured.' : 'APP_KEY is missing or still a placeholder.'),
             $this->check('storage/logs writable', is_writable(storage_path('logs')), 'critical', storage_path('logs')),

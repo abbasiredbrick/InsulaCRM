@@ -171,7 +171,7 @@
                             @elseif(in_array($item['type'], ['meeting', 'task'], true))
                             <a class="dropdown-item sched-edit-btn" href="#" data-type="{{ $item['type'] }}" data-id="{{ $item['id'] }}" data-edit-url="{{ route('schedules.edit', ['type' => $item['type'], 'id' => $item['id']]) }}">{{ __('Edit') }}</a>
                             @endif
-                            <button type="button" class="dropdown-item sched-feedback-btn" data-feedback-url="{{ route($item['feedback_route'], $item['entity']) }}" data-feedback-type="{{ $item['type'] }}" data-feedback-title="{{ $item['title'] }}">{{ __('Log feedback') }}</button>
+                            <button type="button" class="dropdown-item sched-feedback-btn" data-feedback-url="{{ route($item['feedback_route'], $item['entity']) }}" data-feedback-type="{{ $item['type'] }}" data-feedback-title="{{ $item['title'] }}" data-feedback-outcome="{{ $item['entity']->outcome ?? '' }}">{{ __('Log feedback') }}</button>
 
                             @php
                                 $statusOptions = [
@@ -358,9 +358,18 @@
                         <option value="cancelled">{{ __('Cancelled') }}</option>
                     </select>
                 </div>
-                <div class="mb-0">
+                <div class="mb-3">
                     <label class="form-label">{{ __('Feedback') }} <span class="text-danger">*</span></label>
                     <textarea name="feedback" class="form-control" rows="4" required placeholder="{{ __('Client feedback / notes...') }}"></textarea>
+                </div>
+                {{-- Viewings only: a client asking for an offer on this unit is the
+                     trigger that opens the deal. Tasks and meetings never have it. --}}
+                <div class="mb-0 d-none" id="feedbackOfferRequestedWrap">
+                    <label class="form-check">
+                        <input type="checkbox" class="form-check-input" name="offer_requested" value="1" id="feedbackOfferRequested">
+                        <span class="form-check-label">{{ __('Client requested to make an offer on this unit') }}</span>
+                    </label>
+                    <div class="form-hint">{{ __('Moves the lead to Offer Requested and creates the deal for this unit.') }}</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -486,6 +495,12 @@
             (btn.dataset.feedbackType.charAt(0).toUpperCase() + btn.dataset.feedbackType.slice(1)) + ': ' + btn.dataset.feedbackTitle;
         document.getElementById('feedbackStatus').value = '';
         form.querySelector('[name=feedback]').value = '';
+        // The offer checkbox means "this unit" — only viewings have a unit.
+        var offerWrap = document.getElementById('feedbackOfferRequestedWrap');
+        var offerBox = document.getElementById('feedbackOfferRequested');
+        var isViewing = btn.dataset.feedbackType === 'viewing';
+        offerWrap.classList.toggle('d-none', !isViewing);
+        offerBox.checked = isViewing && btn.dataset.feedbackOutcome === 'offer_requested';
         bootstrap.Modal.getOrCreateInstance(document.getElementById('feedbackModal')).show();
     }
 

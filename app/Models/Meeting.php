@@ -44,6 +44,14 @@ class Meeting extends Model
         ];
     }
 
+    /**
+     * Mirror the column default so a just-created meeting never reads back as
+     * null status, which is indistinguishable from "cancelled".
+     */
+    protected $attributes = [
+        'status' => 'scheduled',
+    ];
+
     protected static function booted(): void
     {
         static::addGlobalScope(new TenantScope);
