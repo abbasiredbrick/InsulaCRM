@@ -227,6 +227,11 @@ class OfferLetterController extends Controller
     {
         return $request->validate([
             'offer_no' => 'nullable|string|max:50',
+            // The date printed on the letter. Defaults to today when left blank,
+            // and may be backdated to fix up a letter generated after the fact -
+            // but never forward-dated, because an offer cannot be issued before
+            // the day it exists.
+            'issued_at' => 'nullable|date|before_or_equal:today',
             'valid_until' => 'nullable|date',
             'contract_start_date' => 'nullable|date',
             'contract_end_date' => 'nullable|date',

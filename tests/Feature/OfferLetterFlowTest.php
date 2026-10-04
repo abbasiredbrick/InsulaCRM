@@ -938,4 +938,184 @@ class OfferLetterFlowTest extends TestCase
 
         $this->assertEquals('declined', $offer->fresh()->status);
     }
+
+    public function test_the_offer_date_defaults_to_today_when_none_is_given(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        // Normal use never touches the field, so it is simply today.
+        $this->assertTrue($offer->issued_at->isToday());
+    }
+
+    public function test_the_offer_date_can_be_backdated(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        // Reconstructing a letter for a deal that was actually negotiated in March.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'issued_at' => '2026-03-03',
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('2026-03-03', $offer->issued_at->format('Y-m-d'));
+        $this->assertFalse($offer->issued_at->isToday());
+    }
+
+    public function test_the_offer_date_cannot_be_set_in_the_future(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'issued_at' => now()->addWeek()->format('Y-m-d'),
+        ])->assertSessionHasErrors('issued_at');
+
+        $this->assertSame(0, $deal->offerLetters()->count());
+    }
+
+    public function test_an_existing_offer_date_survives_an_edit_that_does_not_touch_it(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 500000,
+            'issued_at' => '2026-03-03',
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        // An admin-created letter is approved on the spot, so its commercial
+        // terms are frozen. Posting a new price is refused outright rather than
+        // half-applied.
+        $this->patch(route('deal.offers.update', $offer), [
+            'original_amount' => 475000,
+        ])->assertSessionHasErrors('original_amount');
+
+        $offer->refresh();
+
+        $this->assertEquals(500000.0, (float) $offer->original_amount);
+        // And the rejected edit must not have reset the date to today either.
+        $this->assertSame('2026-03-03', $offer->issued_at->format('Y-m-d'));
+    }
+
+    public function test_an_unsigned_issued_offer_keeps_its_price_locked_when_only_the_date_is_corrected(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 500000]);
+        $offer = $deal->offerLetters()->first();
+
+        // The date may be corrected on an issued letter...
+        $this->patch(route('deal.offers.update', $offer), [
+            'original_amount' => 500000,
+            'issued_at' => '2026-02-02',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $offer->refresh();
+
+        $this->assertSame('2026-02-02', $offer->issued_at->format('Y-m-d'));
+        // ...but a price smuggled in alongside it is ignored, not applied.
+        $this->assertEquals(500000.0, (float) $offer->original_amount);
+        $this->assertEquals(0.0, (float) $offer->discount_amount);
+        $this->assertEquals(10000.0, (float) $offer->commission_amount, '2% of 500k, not of a forged figure.');
+    }
+
+    public function test_the_offer_date_is_frozen_once_the_client_has_signed(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 500000]);
+        $offer = $deal->offerLetters()->first();
+        $offer->update(['status' => 'signed', 'signed_at' => now()]);
+
+        // Moving the date on a document the client has already signed would be
+        // falsifying their paperwork, not fixing a typo.
+        $this->patch(route('deal.offers.update', $offer), [
+            'original_amount' => 500000,
+            'issued_at' => '2026-02-02',
+        ])->assertSessionHasErrors('original_amount');
+
+        $this->assertTrue($offer->fresh()->issued_at->isToday());
+    }
+
+    public function test_an_offer_date_can_be_corrected_after_the_letter_was_issued(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'sale', 'stage' => 'active_listing', 'contract_price' => 500000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'sale']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 500000]);
+        $offer = $deal->offerLetters()->first();
+
+        $this->patch(route('deal.offers.update', $offer), [
+            'original_amount' => 500000,
+            'issued_at' => '2026-01-15',
+        ])->assertRedirect();
+
+        $this->assertSame('2026-01-15', $offer->fresh()->issued_at->format('Y-m-d'));
+    }
+
+    public function test_the_printed_letter_shows_the_backfilled_offer_date(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed', 'contract_price' => 120000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 120000,
+            'issued_at' => '2026-03-03',
+        ])->assertRedirect(route('deals.show', $deal));
+
+        $offer = $deal->offerLetters()->first();
+
+        $html = $this->get(route('deal.offers.print', $offer))->assertOk()->getContent();
+
+        $this->assertStringContainsString('March 3, 2026', $html);
+        $this->assertStringNotContainsString(now()->format('F j, Y'), $html);
+    }
+
+    public function test_the_offer_form_offers_an_editable_offer_date_capped_at_today(): void
+    {
+        $this->reAdmin();
+
+        // A rent deal: the offer LETTER panel is the rent branch of the deal page,
+        // a sale deal renders the separate wholesale offers panel instead.
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed', 'contract_price' => 120000]);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $html = $this->get(route('deals.show', $deal))->assertOk()->getContent();
+
+        $this->assertStringContainsString('name="issued_at"', $html);
+        $this->assertStringContainsString('Offer Date', $html);
+        $this->assertStringContainsString('max="'.now()->format('Y-m-d').'"', $html);
+        $this->assertStringContainsString('value="'.now()->format('Y-m-d').'"', $html);
+    }
 }

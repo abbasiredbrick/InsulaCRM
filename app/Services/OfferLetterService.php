@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\DealStageChanged as DealStageChangedNotification;
 use App\Notifications\OfferLetterApprovalRequired;
 use App\Notifications\OfferLetterApproved;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
@@ -88,6 +89,7 @@ class OfferLetterService
             'contract_start_date' => $start,
             'contract_end_date' => $end,
             'documents_required' => 'Passport, Residency Visa & Emirates ID Copy',
+            'issued_at' => now()->startOfDay(),
             'valid_until' => now()->addDay()->startOfDay(),
             'offer_no' => $this->nextOfferNo($deal->tenant),
         ];
@@ -126,7 +128,7 @@ class OfferLetterService
                 'status' => $status,
                 'approved_by' => $approvedBy,
                 'approved_at' => $approvedAt,
-                'issued_at' => now(),
+                'issued_at' => $this->resolveOfferDate($v['issued_at'] ?? null),
                 'valid_until' => $v['valid_until'] ?? now()->addDay()->startOfDay(),
                 'contract_start_date' => $v['contract_start_date'] ?? null,
                 'contract_end_date' => $v['contract_end_date'] ?? null,
@@ -174,6 +176,7 @@ class OfferLetterService
         return [
             'deal_type' => $offer->deal?->dealType(),
             'offer_no' => $offer->offer_no,
+            'issued_at' => $offer->issued_at,
             'valid_until' => $offer->valid_until,
             'contract_start_date' => $offer->contract_start_date,
             'contract_end_date' => $offer->contract_end_date,
@@ -281,7 +284,7 @@ class OfferLetterService
     public function updateFromValidated(OfferLetter $offer, User $user, array $v): OfferLetter
     {
         if (! $offer->isEditable()) {
-            throw new \RuntimeException(__('An approved offer letter can no longer be edited. Withdraw it and raise a new one.'));
+            return $this->correctDateOnIssuedOffer($offer, $user, $v);
         }
 
         $deal = $offer->deal;
@@ -294,6 +297,7 @@ class OfferLetterService
 
         $offer->fill(array_merge([
             'offer_no' => (string) ($v['offer_no'] ?? '') ?: $offer->offer_no,
+            'issued_at' => $this->resolveOfferDate($v['issued_at'] ?? null, $offer->issued_at),
             'valid_until' => $v['valid_until'] ?? $offer->valid_until,
             'contract_start_date' => $v['contract_start_date'] ?? null,
             'contract_end_date' => $v['contract_end_date'] ?? null,
@@ -597,6 +601,76 @@ class OfferLetterService
         $tenant = $offer->tenant;
 
         return view('offers.letter', compact('offer', 'deal', 'lead', 'property', 'tenant'))->render();
+    }
+
+    /**
+     * The one field that may still be corrected after approval: the offer date.
+     *
+     * An issued letter is otherwise frozen because its price and terms are what
+     * a manager approved and what the client may already have signed. The date is
+     * different in kind - it records when the offer was made, and a letter
+     * reconstructed after the fact or typed up late genuinely needs the earlier
+     * one. Nothing commercial moves, and the approval is not re-struck.
+     *
+     * Still refused once the client has signed. At that point the date is part of
+     * a signed document, and quietly moving it would be falsifying the client's
+     * paperwork rather than fixing a typo.
+     */
+    protected function correctDateOnIssuedOffer(OfferLetter $offer, User $user, array $v): OfferLetter
+    {
+        if ($offer->status !== 'issued' || $offer->signed_at) {
+            throw new \RuntimeException(__('An approved offer letter can no longer be edited. Withdraw it and raise a new one.'));
+        }
+
+        // Only when a date was actually posted. Otherwise this would turn a
+        // refused edit into a silent no-op: the request would appear to succeed
+        // while quietly discarding the price change the caller believed it made.
+        if (! isset($v['issued_at']) || trim((string) $v['issued_at']) === '') {
+            throw new \RuntimeException(__('An approved offer letter can no longer be edited. Withdraw it and raise a new one.'));
+        }
+
+        $offer->issued_at = $this->resolveOfferDate($v['issued_at'] ?? null, $offer->issued_at);
+        $offer->save();
+
+        AuditLog::log('offer_letter.offer_date_corrected', $offer, [
+            'from' => (string) $offer->getOriginal('issued_at'),
+            'to' => (string) $offer->issued_at,
+        ]);
+
+        return $offer;
+    }
+
+    /**
+     * Resolve the offer date, defaulting to today.
+     *
+     * This is the date printed on the letter and shown in the list, and it is
+     * editable so a letter issued from a reconstructed or imported deal can carry
+     * the date it was really made rather than the date it was typed up. Normal
+     * use never posts anything and gets today.
+     *
+     * A blank or unparseable value falls back rather than throwing: a bad date in
+     * a form field must never stop an offer being issued. $fallback lets the edit
+     * path keep the date already on the record when the field is left alone.
+     */
+    protected function resolveOfferDate($value, $fallback = null): Carbon
+    {
+        if ($value instanceof Carbon) {
+            return $value->copy()->startOfDay();
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            try {
+                return Carbon::parse(trim($value))->startOfDay();
+            } catch (\Throwable $e) {
+                // Fall through to the default.
+            }
+        }
+
+        if ($fallback instanceof Carbon) {
+            return $fallback->copy()->startOfDay();
+        }
+
+        return now()->startOfDay();
     }
 
     /**

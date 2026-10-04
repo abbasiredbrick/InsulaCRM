@@ -21,19 +21,28 @@
 @endphp
 
 <div class="row g-2">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <label class="form-label">{{ __('Offer No.') }}</label>
         <input type="text" name="offer_no" class="form-control form-control-sm" value="{{ $d['offer_no'] }}">
     </div>
-    <div class="col-md-3">
+    {{-- Defaults to today because that is what it is when you are issuing the
+         letter now. It stays editable so a letter written up after the fact can
+         carry the date it was really issued. --}}
+    <div class="col-md-4">
+        <label class="form-label">{{ __('Offer Date') }}</label>
+        <input type="date" name="issued_at" class="form-control form-control-sm"
+               value="{{ optional($d['issued_at'] ?? null)->format('Y-m-d') ?: now()->format('Y-m-d') }}"
+               max="{{ now()->format('Y-m-d') }}">
+    </div>
+    <div class="col-md-4">
         <label class="form-label">{{ __('Valid Until') }}</label>
         <input type="date" name="valid_until" class="form-control form-control-sm" value="{{ optional($d['valid_until'])->format('Y-m-d') }}">
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <label class="form-label">{{ __('Start Date') }}</label>
         <input type="date" name="contract_start_date" class="form-control form-control-sm" value="{{ optional($d['contract_start_date'])->format('Y-m-d') }}">
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <label class="form-label">{{ __('End Date') }}</label>
         <input type="date" name="contract_end_date" class="form-control form-control-sm" value="{{ optional($d['contract_end_date'])->format('Y-m-d') }}">
     </div>
