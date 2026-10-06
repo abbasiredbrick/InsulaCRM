@@ -1,6 +1,6 @@
 {{-- PWA Meta Tags & Service Worker Registration --}}
 <link rel="manifest" href="{{ asset('manifest.json') . '?v=2' }}">
-<meta name="theme-color" content="#0054a6">
+<meta name="theme-color" content="#17212f">
 <meta name="application-name" content="{{ config('app.name') }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -182,7 +182,7 @@ function showInstallBanner() {
     var banner = document.createElement('div');
     banner.id = 'pwa-install-banner';
     banner.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:9999;' +
-        'background:#0054a6;color:#fff;padding:0.75rem 1.25rem;border-radius:0.5rem;' +
+        'background:#17212f;color:#fff;padding:0.75rem 1.25rem;border-radius:0.5rem;' +
         'box-shadow:0 4px 16px rgba(0,0,0,0.15);display:flex;align-items:center;gap:1rem;' +
         'font-size:0.875rem;max-width:480px;width:calc(100% - 2rem);animation:slideUp 0.3s ease;';
 
@@ -190,7 +190,7 @@ function showInstallBanner() {
         '<strong>Install ' + '{{ config('app.name') }}' + '</strong><br>' +
         '<span style="opacity:0.85;font-size:0.8rem;">Add to your home screen for quick access</span>' +
         '</div>' +
-        '<button id="pwa-install-btn" style="background:#fff;color:#0054a6;border:none;padding:0.375rem 1rem;' +
+        '<button id="pwa-install-btn" style="background:#fff;color:#17212f;border:none;padding:0.375rem 1rem;' +
         'border-radius:0.25rem;font-weight:600;font-size:0.8rem;cursor:pointer;white-space:nowrap;">Install</button>' +
         '<button id="pwa-dismiss-btn" style="background:transparent;border:none;color:#fff;opacity:0.7;' +
         'cursor:pointer;padding:0.25rem;font-size:1.1rem;line-height:1;" title="Dismiss">&times;</button>';
@@ -224,7 +224,7 @@ function showUpdateBanner() {
         'font-size:0.875rem;animation:slideUp 0.3s ease;';
 
     banner.innerHTML = '<span>A new version is available.</span>' +
-        '<button onclick="window.location.reload()" style="background:#0054a6;color:#fff;border:none;' +
+        '<button onclick="window.location.reload()" style="background:#17212f;color:#fff;border:none;' +
         'padding:0.25rem 0.75rem;border-radius:0.25rem;font-size:0.8rem;cursor:pointer;">Refresh</button>' +
         '<button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:#fff;' +
         'opacity:0.7;cursor:pointer;">&times;</button>';

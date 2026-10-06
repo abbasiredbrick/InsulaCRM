@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'truerentor' => [
+        'base_url' => env('TRUERENTOR_BASE_URL', 'https://truerentor.vercel.app'),
+        'client_id' => env('TRUERENTOR_CLIENT_ID', 'keystone'),
+        'client_secret' => env('TRUERENTOR_CLIENT_SECRET'),
+    ],
+
 ];

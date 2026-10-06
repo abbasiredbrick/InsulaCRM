@@ -28,14 +28,46 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
+    /**
+     * Offer-letter assets a tenant can upload, as input name => storage directory.
+     */
+    protected const LETTER_ASSETS = [
+        'signature' => 'letter-assets/signatures',
+        'stamp' => 'letter-assets/stamps',
+        'iban_letter' => 'letter-assets/iban-letters',
+    ];
+
     public function __construct(
         private readonly BackupService $backupService,
         private readonly LanguageFileService $languageFileService,
     ) {}
+
+    /**
+     * Remove a superseded letter asset from disk.
+     *
+     * Only ever called when a replacement has already been validated, and it
+     * fails soft: a stale file on disk is untidy, but failing the settings save
+     * would leave the tenant unable to update their own signature at all.
+     */
+    protected function deleteLetterAsset($tenant, string $field): void
+    {
+        $current = $tenant->getAttribute($field.'_path');
+
+        if (blank($current)) {
+            return;
+        }
+
+        try {
+            Storage::disk('public')->delete($current);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
 
     public function index()
     {
@@ -99,11 +131,33 @@ class SettingsController extends Controller
     {
         $tenant = auth()->user()->tenant;
 
-        $data = $request->only(['name', 'email', 'address', 'phone', 'website', 'timezone', 'currency', 'date_format', 'country', 'measurement_system', 'locale']);
+        $data = $request->only(['name', 'email', 'address', 'phone', 'website', 'google_maps_embed_key', 'letterhead_display', 'timezone', 'currency', 'date_format', 'country', 'measurement_system', 'locale', 'bank_details']);
 
         if ($request->hasFile('logo')) {
             $path = $request->file('logo')->store('logos', 'public');
             $data['logo_path'] = $path;
+        }
+
+        // Signature, stamp and the IBAN letter print on offer letters, so they are
+        // restricted to images: an SVG or PDF here would be rendered onto a legal
+        // document and printed as-is. The IBAN letter is an image page rather than
+        // a PDF because the letter is HTML printed by the browser — there is no
+        // PDF merge engine, so a PDF page could not actually be attached.
+        foreach (self::LETTER_ASSETS as $field => $directory) {
+            if (! $request->hasFile($field)) {
+                continue;
+            }
+
+            $file = $request->file($field);
+            $request->validate([
+                $field => ['required', 'image', 'mimes:png,jpeg', 'max:4096'],
+            ]);
+
+            // Replace rather than orphan: an old signature left on disk is a
+            // stale authorisation that nobody would think to revoke.
+            $this->deleteLetterAsset($tenant, $field);
+
+            $data[$field.'_path'] = $file->store($directory, 'public');
         }
 
         $tenant->update($data);

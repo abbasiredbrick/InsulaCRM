@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\AvailabilityImportRun;
 use App\Models\AvailabilityReview;
 use App\Models\AvailabilitySource;
+use App\Models\MapLocation;
+use App\Models\Property;
 use App\Services\AvailabilityIngestService;
+use App\Services\MapLocationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -37,6 +41,9 @@ class AvailabilitySourceController extends Controller
             'name' => 'required|string|max:150',
             'contact_info' => 'nullable|string|max:255',
             'url' => 'nullable|url|max:500',
+            'api_token' => 'nullable|string|max:500',
+            'org_slug' => 'nullable|string|max:100',
+            'base_url' => 'nullable|string|max:255',
             'default_building' => 'nullable|string|max:150',
             'default_category' => 'nullable|string|max:40',
             'default_city' => 'nullable|string|max:100',
@@ -49,6 +56,7 @@ class AvailabilitySourceController extends Controller
         ]);
 
         $url = $data['url'] ?? null;
+        $orgSlug = $data['org_slug'] ?? null;
 
         $source = AvailabilitySource::create([
             'tenant_id' => auth()->user()->tenant_id,
@@ -57,19 +65,33 @@ class AvailabilitySourceController extends Controller
             'missing_status' => $data['missing_status'] ?? ($url ? 'unlisted' : 'leased'),
         ]);
 
-        // URL-published lists (e.g. RDK's portfolio JSON) have a known shape,
-        // so jump straight to a working mapping.
         if ($url) {
+            // TrueRentor feeds already arrive keyed by Keystone's canonical
+            // field names, so the mapping is identity. RDK portfolio JSON uses
+            // its own header names and gets a fixed mapping instead.
             $source->update([
-                'column_map' => [
-                    'Unit' => 'unit_no',
-                    'Tower' => 'building',
-                    'Property' => 'community',
-                    'City' => 'city',
-                    'Type' => 'features',
-                    'Remarks' => 'remarks',
-                    'Rent' => 'rent',
-                ],
+                'column_map' => $orgSlug
+                    ? [
+                        'unit_no' => 'unit_no',
+                        'building' => 'building',
+                        'community' => 'community',
+                        'features' => 'features',
+                        'bedrooms' => 'bedrooms',
+                        'square_footage' => 'square_footage',
+                        'rent' => 'rent',
+                        'furnishing' => 'furnishing',
+                        'status' => 'status',
+                        'remarks' => 'remarks',
+                    ]
+                    : [
+                        'Unit' => 'unit_no',
+                        'Tower' => 'building',
+                        'Property' => 'community',
+                        'City' => 'city',
+                        'Type' => 'features',
+                        'Remarks' => 'remarks',
+                        'Rent' => 'rent',
+                    ],
             ]);
         }
 
@@ -158,6 +180,140 @@ class AvailabilitySourceController extends Controller
         return view('availability.guide');
     }
 
+    // ── TrueRentor connect ────────────────────────────────────────────────
+
+    /**
+     * "Connect TrueRentor" screen: paste a token, or start the OAuth redirect
+     * flow. Both land as an AvailabilitySource pointing at the TrueRentor feed.
+     */
+    public function connectTruerentor()
+    {
+        return view('availability.truerentor-connect', [
+            'baseUrl' => config('services.truerentor.base_url'),
+            'hasOAuth' => (bool) config('services.truerentor.client_secret'),
+        ]);
+    }
+
+    /**
+     * Build the TrueRentor authorize URL and redirect the broker there.
+     */
+    public function startTruerentorOAuth(Request $request)
+    {
+        $data = $request->validate([
+            'org_slug' => 'required|string|max:100',
+        ]);
+
+        $base = rtrim((string) config('services.truerentor.base_url'), '/');
+        $state = Str::random(32);
+
+        $request->session()->put('truerentor.oauth', [
+            'state' => $state,
+            'org_slug' => $data['org_slug'],
+        ]);
+
+        $query = http_build_query([
+            'client_id' => config('services.truerentor.client_id'),
+            'redirect_uri' => route('availability-sources.truerentor.callback'),
+            'org_slug' => $data['org_slug'],
+            'state' => $state,
+        ]);
+
+        return redirect("{$base}/connect/authorize?{$query}");
+    }
+
+    /**
+     * OAuth callback: exchange the code for a broker token and create the source.
+     */
+    public function truerentorCallback(Request $request)
+    {
+        $stored = $request->session()->pull('truerentor.oauth');
+        $state = $request->query('state');
+        $code = $request->query('code');
+        $error = $request->query('error');
+
+        if ($error || ! $stored || ! $state || ! hash_equals((string) $stored['state'], (string) $state)) {
+            return redirect()->route('availability-sources.truerentor')
+                ->with('error', $error ? __('Connection was denied or failed.') : __('The connection state was invalid — please try again.'));
+        }
+
+        if (! $code) {
+            return redirect()->route('availability-sources.truerentor')->with('error', __('No authorisation code returned.'));
+        }
+
+        $base = rtrim((string) config('services.truerentor.base_url'), '/');
+        $response = Http::asForm()->post("{$base}/api/v1/oauth/token", [
+            'code' => $code,
+            'client_id' => config('services.truerentor.client_id'),
+            'client_secret' => config('services.truerentor.client_secret'),
+            'redirect_uri' => route('availability-sources.truerentor.callback'),
+        ]);
+
+        if ($response->failed() || ! ($payload = $response->json()) || empty($payload['ok'])) {
+            return redirect()->route('availability-sources.truerentor')->with('error', __('Could not exchange the authorisation code.'));
+        }
+
+        $this->upsertTruerentorSource(
+            $payload['org_slug'],
+            $payload['org_name'] ?? $payload['org_slug'],
+            $payload['access_token']
+        );
+
+        return redirect()->route('availability-sources.index')->with('success', __('TrueRentor connected — your inventory will now sync automatically.'));
+    }
+
+    /**
+     * Paste a token directly (standalone path, no OAuth).
+     */
+    public function connectTruerentorStore(Request $request)
+    {
+        $data = $request->validate([
+            'org_slug' => 'required|string|max:100',
+            'api_token' => 'required|string|max:500',
+        ]);
+
+        $this->upsertTruerentorSource($data['org_slug'], $data['org_slug'], $data['api_token']);
+
+        return redirect()->route('availability-sources.index')->with('success', __('TrueRentor source added.'));
+    }
+
+    protected function upsertTruerentorSource(string $orgSlug, string $name, string $token): AvailabilitySource
+    {
+        $base = rtrim((string) config('services.truerentor.base_url'), '/');
+        $tenantId = auth()->user()->tenant_id;
+
+        $source = AvailabilitySource::where('org_slug', $orgSlug)->first();
+
+        $attributes = [
+            'name' => "TrueRentor — {$name}",
+            'url' => "{$base}/api/v1/availability/{$orgSlug}",
+            'api_token' => $token,
+            'base_url' => $base,
+            'org_slug' => $orgSlug,
+            'missing_status' => 'leased',
+            'default_city' => 'Abu Dhabi',
+            'column_map' => [
+                'unit_no' => 'unit_no',
+                'building' => 'building',
+                'community' => 'community',
+                'features' => 'features',
+                'bedrooms' => 'bedrooms',
+                'square_footage' => 'square_footage',
+                'rent' => 'rent',
+                'furnishing' => 'furnishing',
+                'status' => 'status',
+                'remarks' => 'remarks',
+            ],
+        ];
+
+        if ($source) {
+            $source->update($attributes);
+        } else {
+            $source = AvailabilitySource::create(['tenant_id' => $tenantId] + $attributes);
+        }
+
+        return $source;
+    }
+
     /**
      * Download a CSV template for a source, using the exact headers its saved
      * mapping expects (or the standard layout when no mapping exists yet), so a
@@ -241,6 +397,7 @@ class AvailabilitySourceController extends Controller
             'parse_options' => $parseOptions,
             'header' => $table['header'],
             'rows' => $table['rows'],
+            'context_url' => $table['context_url'] ?? null,
         ]);
 
         return redirect()->route('availability-sources.review', $source);
@@ -309,7 +466,9 @@ class AvailabilitySourceController extends Controller
                 $preview['rows'],
                 auth()->user()->tenant_id,
                 auth()->id(),
-                $run->id
+                $run->id,
+                true,
+                $preview['context_url'] ?? null
             );
 
             $run->update([
@@ -370,6 +529,137 @@ class AvailabilitySourceController extends Controller
         }
 
         return redirect()->route('availability-sources.index')->with('success', $summary);
+    }
+
+    /**
+     * Manual location/map-link screen: every building (sub_community) the
+     * tenant has units for, with its current map link, so a missing or wrong
+     * location can be fixed by hand without re-importing the sheet.
+     */
+    public function locationsIndex()
+    {
+        $tenantId = auth()->user()->tenant_id;
+        $maps = app(MapLocationService::class);
+
+        $groups = Property::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNotNull('sub_community')
+            ->where('sub_community', '<>', '')
+            ->selectRaw('sub_community, MAX(community) as community, MAX(city) as city, COUNT(*) as unit_count')
+            ->groupBy('sub_community')
+            ->orderByDesc('unit_count')
+            ->get();
+
+        $locations = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('sub_community');
+
+        $missing = 0;
+        foreach ($groups as $group) {
+            $location = $locations[$group->sub_community] ?? null;
+            $group->map_url = $location?->map_url;
+            $group->map_query = $location?->map_query;
+            $group->suggested = $maps->searchUrl($maps->queryFor([$group->sub_community, $group->community, $group->city]));
+            $group->prefill = $group->map_url ?: $group->suggested;
+            $group->current_query = $group->map_query;
+            if (! $location || $location->map_url === null) {
+                $missing++;
+            }
+        }
+
+        return view('availability.locations', [
+            'groups' => $groups,
+            'maps' => $maps,
+            'missing' => $missing,
+        ]);
+    }
+
+    /**
+     * Apply a location/map link to a building (sub_community).
+     *
+     * mode=save   — "location" is a full http(s) link (stored verbatim) or a
+     *               place name (turned into a Google Maps search link).
+     * mode=auto   — build a search link for the building when it has none yet.
+     * mode=clear  — drop the location from the building.
+     */
+    public function applyLocation(Request $request)
+    {
+        $data = $request->validate([
+            'building' => 'required|string|max:255',
+            'community' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'location' => 'nullable|string|max:2048',
+            'mode' => 'required|in:save,clear,auto',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $maps = app(MapLocationService::class);
+
+        if ($data['mode'] === 'auto' && $data['building'] === '__all__') {
+            $updated = $maps->backfillForTenant($tenantId);
+
+            return back()->with(
+                $updated > 0 ? 'success' : 'info',
+                __('Generated map links for :count building(s).', ['count' => $updated])
+            );
+        }
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('sub_community', $data['building'])
+            ->first();
+
+        if ($data['mode'] === 'clear') {
+            if ($location) {
+                $location->update(['map_url' => null, 'map_query' => null]);
+
+                return back()->with('success', __('Location cleared for :building.', ['building' => $data['building']]));
+            }
+
+            return back()->with('info', __('No location to clear for :building.', ['building' => $data['building']]));
+        }
+
+        $queryParts = [$data['building'], $data['community'] ?? null, $data['city'] ?? null];
+
+        if ($data['mode'] === 'auto') {
+            if ($location && $location->map_url !== null) {
+                return back()->with('info', __(':building already has a location.', ['building' => $data['building']]));
+            }
+            $query = $maps->queryFor($queryParts);
+            $mapUrl = $maps->searchUrl($query);
+            $mapQuery = $query !== '' ? $query : null;
+        } else {
+            $input = trim((string) ($data['location'] ?? ''));
+            $clean = $maps->cleanUrl($input);
+            if ($clean !== null) {
+                $mapUrl = $clean;
+                $query = $maps->queryFor($queryParts);
+                $mapQuery = $query !== '' ? $query : null;
+            } else {
+                $mapUrl = $maps->searchUrl($input);
+                $mapQuery = $input !== '' ? $input : null;
+            }
+        }
+
+        if ($mapUrl === null && $mapQuery === null) {
+            return back()->with('error', __('No map link understood from that input for :building.', ['building' => $data['building']]));
+        }
+
+        if ($location) {
+            $location->update(['map_url' => $mapUrl, 'map_query' => $mapQuery]);
+        } else {
+            MapLocation::create([
+                'tenant_id' => $tenantId,
+                'sub_community' => $data['building'],
+                'community' => $data['community'] ?: null,
+                'city' => $data['city'] ?: null,
+                'map_url' => $mapUrl,
+                'map_query' => $mapQuery,
+            ]);
+        }
+
+        return back()->with('success', __('Saved location for :building.', ['building' => $data['building']]));
     }
 
     /**
@@ -469,7 +759,7 @@ class AvailabilitySourceController extends Controller
             return back()->withErrors(['file' => __('No rows could be read from that file. Check the file or the source mapping.')])->withInput();
         }
 
-        $out = $this->runRows($source, $table['rows'], $format, basename($path));
+        $out = $this->runRows($source, $table['rows'], $format, basename($path), null, true, $table['context_url'] ?? null);
         Storage::delete($path);
 
         if (! $out['ok']) {
@@ -502,7 +792,7 @@ class AvailabilitySourceController extends Controller
         ]);
 
         try {
-            $table = $this->ingest->fetchUrl($source->url);
+            $table = $this->ingest->fetchUrl($source->url, $source->api_token);
         } catch (\Throwable $e) {
             $run->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
 
@@ -516,7 +806,7 @@ class AvailabilitySourceController extends Controller
             return back()->withErrors(['url' => $message])->withInput();
         }
 
-        $out = $this->runRows($source, $table['rows'], 'url', $source->url, $run, false);
+        $out = $this->runRows($source, $table['rows'], 'url', $source->url, $run, false, $table['context_url'] ?? null);
 
         if (! $out['ok']) {
             return back()->withErrors(['url' => $out['error']]);
@@ -530,7 +820,7 @@ class AvailabilitySourceController extends Controller
      *
      * @return array{ok: bool, error?: string, result?: array<string, mixed>}
      */
-    protected function runRows(AvailabilitySource $source, array $rows, string $format, string $filename, ?AvailabilityImportRun $run = null, bool $guardReconciliation = true): array
+    protected function runRows(AvailabilitySource $source, array $rows, string $format, string $filename, ?AvailabilityImportRun $run = null, bool $guardReconciliation = true, ?string $contextUrl = null): array
     {
         $run ??= AvailabilityImportRun::create([
             'tenant_id' => auth()->user()->tenant_id,
@@ -542,7 +832,7 @@ class AvailabilitySourceController extends Controller
         ]);
 
         try {
-            $result = $this->ingest->ingest($source, $rows, auth()->user()->tenant_id, auth()->id(), $run->id, $guardReconciliation);
+            $result = $this->ingest->ingest($source, $rows, auth()->user()->tenant_id, auth()->id(), $run->id, $guardReconciliation, $contextUrl);
         } catch (\Throwable $e) {
             $run->update([
                 'status' => 'failed',

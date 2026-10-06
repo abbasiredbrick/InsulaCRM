@@ -62,6 +62,60 @@
                max="{{ now()->format('Y-m-d') }}">
     </div>
     <div class="col-md-4">
+        <label class="form-label">{{ __('Occupant Name') }}</label>
+        <input type="text" name="occupant_name" class="form-control form-control-sm" value="{{ $d['occupant_name'] ?? '' }}">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label">{{ __('Emirates ID No.') }}</label>
+        <input type="text" name="emirates_id" class="form-control form-control-sm" value="{{ $d['emirates_id'] ?? '' }}">
+    </div>
+
+    <div class="col-md-4">
+        <label class="form-label">{{ __('Last Page') }}</label>
+        {{-- Both bank sources live in Settings → General, so the letter only has to
+             say which one it carries. "Attach IBAN letter" prints the uploaded
+             image; "Print bank details" prints the typed block. --}}
+        <select name="bank_details_source" class="form-select form-select-sm">
+            @foreach([
+                'details' => __('Print bank details'),
+                'upload' => __('Attach IBAN letter'),
+                'none' => __('No bank page'),
+            ] as $value => $label)
+                <option value="{{ $value }}" @selected(($d['bank_details_source'] ?? 'details') === $value)>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="col-md-8">
+        <label class="form-label">{{ __('Bank Details Override') }}</label>
+        <input type="text" name="bank_details" class="form-control form-control-sm"
+               value="{{ $d['bank_details'] ?? '' }}"
+               placeholder="{{ __('Leave blank to use the bank details saved in Settings') }}">
+    </div>
+
+    <div class="col-12"><hr class="my-1"></div>
+
+    {{-- Who collects each amount. Defaults follow the usual arrangement but every
+         line is free: a landlord who wants the agency to collect everything, or who
+         takes the admin and contract fees themselves, are both ordinary. --}}
+    @foreach([
+        ['rent', __('Rent')],
+        ['deposit', __('Security Deposit')],
+        ['commission', __('Commission')],
+        ['admin_fee', __('Admin Fee')],
+        ['contract_fee', __('Contract Fee')],
+    ] as [$key, $label])
+        <div class="col-md-4">
+            <label class="form-label">{{ $label }} — {{ __('Payable To') }}</label>
+            <select name="{{ $key }}_payable_to" class="form-select form-select-sm" data-offer-payable="{{ $key }}">
+                @foreach(['landlord' => __('Landlord'), 'broker' => __('Broker')] as $value => $caption)
+                    <option value="{{ $value }}" @selected(($d[$key.'_payable_to'] ?? \App\Services\OfferLetterService::PAYABLE_DEFAULTS[$key]) === $value)>{{ $caption }}</option>
+                @endforeach
+            </select>
+        </div>
+    @endforeach
+
+    <div class="col-md-4">
         <label class="form-label">{{ __('Valid Until') }}</label>
         <input type="date" name="valid_until" class="form-control form-control-sm" value="{{ optional($d['valid_until'])->format('Y-m-d') }}">
     </div>
@@ -155,7 +209,15 @@
     </div>
     <div class="col-md-3">
         <label class="form-label">{{ __('Security Deposit') }} ({{ $currency }})</label>
-        <input type="number" name="security_deposit" class="form-control form-control-sm" step="0.01" min="0" value="{{ $d['security_deposit'] ?? '' }}">
+        {{-- Kept in step with the contract value: in 5% mode the server
+             recomputes it, so typing a figure here would simply be overwritten. --}}
+        <input type="number" name="security_deposit" class="form-control form-control-sm" data-offer-deposit
+               step="0.01" min="0" value="{{ $d['security_deposit'] ?? '' }}"
+               @if(($d['security_deposit_mode'] ?? 'percent_5') === 'percent_5') readonly aria-label="{{ __('Security Deposit') }}" @endif>
+        <select name="security_deposit_mode" class="form-select form-select-sm mt-1" data-offer-deposit-mode>
+            <option value="percent_5" @selected(($d['security_deposit_mode'] ?? 'percent_5') === 'percent_5')>{{ __('5% of contract value') }}</option>
+            <option value="custom" @selected(($d['security_deposit_mode'] ?? '') === 'custom')>{{ __('Set manually') }}</option>
+        </select>
     </div>
     <div class="col-md-3">
         <label class="form-label">{{ __('No. of Payments') }}</label>

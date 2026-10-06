@@ -4,14 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Lead;
+use App\Models\MapLocation;
 use App\Models\Property;
 use App\Models\Tenant;
+use App\Notifications\ShareInterest;
 use App\Services\LeadDistributionService;
+use App\Services\TenantMailConfigurator;
 use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Client-facing "shared inventory" links.
@@ -145,11 +150,52 @@ class ClientShareController extends Controller
     }
 
     /**
+     * Per-tenant web app manifest so the shared portal installs like an app.
+     *
+     * The global manifest.json targets the staff CRM (start_url /dashboard).
+     * Installing the portal from a share link must open the portal, not the
+     * staff login, so the manifest is resolved for the tenant, scoped to its
+     * /s/{slug} tree.
+     */
+    public function manifest(string $slug)
+    {
+        $tenant = $this->tenant($slug);
+
+        $shortName = mb_strlen($tenant->name) <= 16
+            ? $tenant->name
+            : __('Keystone Portal');
+
+        return response()->json([
+            'name' => $tenant->name.' — '.__('Available Units'),
+            'short_name' => $shortName,
+            'description' => __('Browse the available units of :name.', ['name' => $tenant->name]),
+            'start_url' => url('/s/'.$tenant->slug),
+            'id' => '/s/'.$tenant->slug.'/',
+            'scope' => '/s/'.$tenant->slug.'/',
+            'display' => 'standalone',
+            'background_color' => '#ffffff',
+            'theme_color' => '#17212f',
+            'orientation' => 'any',
+            'categories' => ['business', 'realestate'],
+            'icons' => [
+                ['src' => asset('img/icon-192.png'), 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any maskable'],
+                ['src' => asset('img/icon-512.png'), 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any maskable'],
+            ],
+        ], 200, ['Content-Type' => 'application/manifest+json']);
+    }
+
+    /**
      * Show the shared inventory (after identity verification) or the gate.
      */
     public function index(Request $request, string $slug)
     {
         $tenant = $this->tenant($slug);
+
+        // The share pages are public — there is no authenticated user for the
+        // helper to resolve a tenant from, so without this every price would
+        // fall back to the USD default. Pin the tenant being viewed.
+        \App\Helpers\TenantFormatHelper::setTenant($tenant);
+
         $lead = $this->identify($tenant, $request);
 
         if (! $lead) {
@@ -170,6 +216,32 @@ class ClientShareController extends Controller
 
         $interested = $lead->properties()->pluck('properties.id')->all();
 
+        // Location per building (sub_community), not per unit: every unit under
+        // a sub_community shares the same map link. Resolve each building once,
+        // and key the embedded map to the first one that has a location.
+        $maps = app(\App\Services\MapLocationService::class);
+        $subCommunities = $units->pluck('sub_community')->filter()->unique()->values();
+        $mapLocations = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('sub_community', $subCommunities)
+            ->get()
+            ->keyBy('sub_community');
+
+        $mapEmbed = null;
+        $embedKey = $tenant->mapsEmbedKey();
+        if ($embedKey !== null) {
+            foreach ($units as $unit) {
+                $location = $unit->sub_community ? ($mapLocations[$unit->sub_community] ?? null) : null;
+                if ($location && $location->map_query !== null && $location->map_query !== '') {
+                    $mapEmbed = [
+                        'query' => $location->map_query,
+                        'embed' => $maps->embedUrl($location->map_query, $embedKey),
+                    ];
+                    break;
+                }
+            }
+        }
+
         return view('share.inventory', [
             'tenant' => $tenant,
             'lead' => $lead,
@@ -178,6 +250,9 @@ class ClientShareController extends Controller
             'buildings' => $buildings,
             'interested' => $interested,
             'filters' => $request->query(),
+            'mapEmbed' => $mapEmbed,
+            'mapLocations' => $mapLocations,
+            'maps' => $maps,
         ]);
     }
 
@@ -191,18 +266,30 @@ class ClientShareController extends Controller
 
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'phone' => 'required_without:email|nullable|string|max:20',
-            'email' => 'required_without:phone|nullable|email|max:255',
+            'last_name' => 'nullable|string|max:255',
+            'phone' => 'required|string|max:24',
+            'email' => 'nullable|email|max:255',
         ]);
+
+        $phone = $this->normalizePhone($validated['phone'] ?? null);
+
+        // The phone is how the team reaches the client (call/WhatsApp), so it
+        // must be a real international number: a leading "+" with the country
+        // code and the subscriber digits, E.164 style. Anything else is
+        // rejected here and the visitor never proceeds.
+        if ($phone !== null && ! preg_match('/^\+[1-9][0-9]{4,14}$/', $phone)) {
+            throw ValidationException::withMessages([
+                'phone' => __('Enter the phone with the country code, e.g. +971501234567.'),
+            ]);
+        }
 
         $filters = $request->query();
 
         $lead = null;
-        if (! empty($validated['phone'])) {
+        if (! empty($phone)) {
             $lead = Lead::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
-                ->where('phone', trim($validated['phone']))
+                ->where('phone', $phone)
                 ->first();
         }
         if (! $lead && ! empty($validated['email'])) {
@@ -225,8 +312,8 @@ class ClientShareController extends Controller
             $lead = Lead::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
                 'first_name' => $validated['first_name'],
-                'last_name' => $validated['last_name'],
-                'phone' => $validated['phone'] ?? null,
+                'last_name' => $validated['last_name'] ?? '',
+                'phone' => $phone,
                 'email' => $validated['email'] ?? null,
                 'lead_source' => 'Share Link',
                 'status' => 'new',
@@ -294,8 +381,35 @@ class ClientShareController extends Controller
             'new_values' => ['property_id' => $property->id],
         ]);
 
+        $this->notifyAssignedAgent($tenant, $lead, $property);
+
         return redirect()->route('share.inventory', array_merge(['slug' => $slug], $request->query()))
             ->with('interest', $property->id);
+    }
+
+    /**
+     * Email the unit's assigned agent about a new interest. Failed sends are
+     * logged, never surfaced as errors — the client's redirect must not break.
+     */
+    protected function notifyAssignedAgent(Tenant $tenant, Lead $lead, Property $property): void
+    {
+        $agent = $property->assignedAgent;
+
+        if (! $agent || ! $agent->email) {
+            return;
+        }
+
+        try {
+            app(TenantMailConfigurator::class)->apply($tenant);
+            Notification::route('mail', $agent->email)->notify(new ShareInterest($lead, $property));
+        } catch (\Throwable $e) {
+            Log::warning('Share interest email failed', [
+                'tenant_id' => $tenant->id,
+                'lead_id' => $lead->id,
+                'property_id' => $property->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -307,6 +421,27 @@ class ClientShareController extends Controller
         Cookie::queue(Cookie::forget($this->cookieName($tenant)));
 
         return redirect()->route('share.inventory', array_merge(['slug' => $slug], $request->query()));
+    }
+
+    /**
+     * Clean a phone typed into the share form: drop the cosmetic separators
+     * (spaces, dashes, dots, parentheses) so "+971 50 123 4567" stores as
+     * "+971501234567". A value that does not start with "+" is returned as-is
+     * so the E.164 check rejects it instead of silently repairing it.
+     */
+    protected function normalizePhone(?string $phone): ?string
+    {
+        $phone = trim((string) $phone);
+
+        if ($phone === '') {
+            return null;
+        }
+
+        if (! str_starts_with($phone, '+')) {
+            return $phone;
+        }
+
+        return str_replace([' ', '-', '.', '(', ')'], '', $phone);
     }
 
     /**

@@ -63,6 +63,18 @@ abstract class TestCase extends BaseTestCase
             'measurement_system' => 'imperial',
             'locale' => 'en',
             'distribution_method' => 'round_robin',
+
+            // Offer-letter readiness (OfferLetterReadiness) blocks creation until
+            // the company can actually produce a letter: a letterhead to print,
+            // and the marks of authority plus bank details to print with it. The
+            // fixture is a fully configured company so the ordinary offer tests
+            // exercise the happy path; the gate's own tests strip these back
+            // to prove each one bites.
+            'address' => '12 Marina Walk, Dubai',
+            'phone' => '+971 4 555 0100',
+            'signature_path' => 'letter-assets/signature.png',
+            'stamp_path' => 'letter-assets/stamp.png',
+            'iban_letter_path' => 'letter-assets/iban.png',
         ], $tenantOverrides));
 
         $adminRole = Role::where('name', 'admin')->first();

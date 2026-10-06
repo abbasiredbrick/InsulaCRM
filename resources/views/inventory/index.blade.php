@@ -98,6 +98,7 @@
                 {{ __('Copy share link') }}
             </button>
             <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
+            <a href="{{ route('availability-sources.locations') }}" class="btn btn-sm btn-outline-secondary">{{ __('Map Locations') }}</a>
             <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
         </div>
     </div>

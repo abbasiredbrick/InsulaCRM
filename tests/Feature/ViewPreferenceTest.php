@@ -85,6 +85,56 @@ class ViewPreferenceTest extends TestCase
             ->assertSee('data-live-results', false);
     }
 
+    public function test_the_kanban_table_toggle_points_at_the_route_that_records_the_choice(): void
+    {
+        $this->seedLead();
+
+        $html = $this->actingAs($this->adminUser)
+            ->get('/leads/kanban')
+            ->assertOk()
+            ->getContent();
+
+        // The toggle used to point at /leads, the dispatcher, which redirects to
+        // kanban whenever kanban is the remembered view — so the button could
+        // never leave the board. Only /leads/table records the choice.
+        $this->assertStringContainsString(
+            'href="'.route('leads.table').'"',
+            $html,
+            'the Table toggle must link to /leads/table'
+        );
+
+        // Following it must render the list, not bounce back to the board.
+        $this->actingAs($this->adminUser)
+            ->get(route('leads.table'))
+            ->assertOk()
+            ->assertSee('data-live-results', false);
+
+        $this->assertSame('table', $this->adminUser->fresh()->preferredView('leads'));
+    }
+
+    public function test_the_kanban_filters_and_clear_stay_on_the_board(): void
+    {
+        $this->seedLead();
+
+        $html = $this->actingAs($this->adminUser)
+            ->get('/leads/kanban?search=PrefLead')
+            ->assertOk()
+            ->getContent();
+
+        // Going through the dispatcher here cost a redirect hop on every
+        // debounced keystroke of the board's own filter form.
+        $this->assertStringContainsString(
+            'action="'.route('leads.kanban').'"',
+            $html,
+            'the board filter form must post to /leads/kanban'
+        );
+        $this->assertStringNotContainsString(
+            'action="'.route('leads.index').'"',
+            $html,
+            'the board filter form must not post to the dispatcher'
+        );
+    }
+
     public function test_leads_dispatcher_keeps_the_active_filters(): void
     {
         $this->seedLead();

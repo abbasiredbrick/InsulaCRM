@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Deal;
 use App\Models\OfferLetter;
+use App\Models\OfferLetterChangeRequest;
+use App\Services\OfferLetterReadiness;
 use App\Services\OfferLetterService;
+use App\Services\OfferSignatureRequestService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -67,6 +70,24 @@ class OfferLetterController extends Controller
     {
         $this->authorize('update', $deal);
 
+        // Checked before validation so the agent is told what is missing rather
+        // than what they mistyped. An offer letter is a document a client is
+        // held to, so a company with no signature, no seal and no IBAN on file
+        // must not be able to produce one at all.
+        $readiness = app(OfferLetterReadiness::class);
+        $gate = $readiness->gateError($deal);
+
+        if ($gate !== null) {
+            if ($request->expectsJson()) {
+                abort(422, $gate);
+            }
+
+            return back()
+                ->withInput()
+                ->withErrors(['offer_letter' => $gate])
+                ->with('error', $gate);
+        }
+
         $v = $this->validateOffer($request);
 
         $offer = $this->offers->createFromValidated($deal, auth()->user(), $v);
@@ -118,6 +139,74 @@ class OfferLetterController extends Controller
         \App\Models\AuditLog::log('offer_letter.approved', $offerLetter);
 
         return redirect()->route('deals.show', $deal)->with('success', __('Offer letter approved — it can now be printed for the client.'));
+    }
+
+    /**
+     * Send an approved offer letter to the occupant to sign on their phone.
+     *
+     * The signing link is returned in the flash message as well as emailed, so
+     * an agent whose lead has no email on file can put the identical link into
+     * WhatsApp instead of being told the feature does not work.
+     */
+    public function requestSignature(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        $validated = $request->validate([
+            'signature_email' => ['nullable', 'email', 'max:255'],
+            'signature_message' => ['nullable', 'string', 'max:1000'],
+            'signature_expires_hours' => ['nullable', 'integer', 'between:6,720'],
+        ]);
+
+        try {
+            $url = app(OfferSignatureRequestService::class)->request(
+                $offerLetter,
+                auth()->user(),
+                [
+                    'email' => $validated['signature_email'] ?? null,
+                    'message' => $validated['signature_message'] ?? null,
+                    'expires_hours' => $validated['signature_expires_hours'] ?? null,
+                ]
+            );
+        } catch (ValidationException $e) {
+            return redirect()->route('deals.show', $deal)->withErrors($e->errors());
+        }
+
+        \App\Models\AuditLog::log('offer_letter.signature_requested', $offerLetter, [
+            'to' => $validated['signature_email'] ?? null,
+        ]);
+
+        $emailed = filled($validated['signature_email'] ?? null)
+            || filled($offerLetter->deal?->lead?->email);
+
+        return redirect()->route('deals.show', $deal)
+            ->with('success', $emailed
+                ? __('Offer letter sent to the client for signature.')
+                : __('Signing link created, but the client has no email on file — share this link manually.')
+                .($emailed ? '' : ' '.$url));
+    }
+
+    /**
+     * Cancel a live signing link.
+     *
+     * Used when the client is not going to sign, or when the terms are about to
+     * change: an open link left alive would otherwise let them sign a letter
+     * that is no longer the one on screen.
+     */
+    public function revokeSignature(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        app(OfferSignatureRequestService::class)->revoke($offerLetter);
+
+        \App\Models\AuditLog::log('offer_letter.signature_revoked', $offerLetter);
+
+        return redirect()->route('deals.show', $deal)
+            ->with('success', __('The signing link has been closed.'));
     }
 
     /**
@@ -179,6 +268,10 @@ class OfferLetterController extends Controller
             'status' => 'required|in:declined',
         ]);
 
+        // Close the signing link first: a declined letter must not be signable
+        // through a link that is already sitting in the client's inbox.
+        app(OfferSignatureRequestService::class)->revoke($offerLetter);
+
         $offerLetter->update(['status' => 'declined', 'declined_at' => now()]);
 
         \App\Models\AuditLog::log('offer_letter.declined', $offerLetter);
@@ -205,6 +298,66 @@ class OfferLetterController extends Controller
             ->with('success', $offerLetter->status === 'issued'
                 ? __('Offer letter updated and issued.')
                 : __('Offer letter updated — waiting for approval.'));
+    }
+
+    /**
+     * Ask a manager to unlock an approved letter for editing.
+     *
+     * Separate from update() rather than a mode of it: raising a request writes
+     * no terms at all, so there is nothing here to authorise beyond the deal
+     * the letter belongs to.
+     */
+    public function requestChange(Request $request, OfferLetter $offerLetter)
+    {
+        $deal = $offerLetter->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        $validated = $request->validate([
+            // Required: a manager is approving a described change, not a
+            // button. "Please fix it" tells them nothing to approve.
+            'reason' => 'required|string|max:1000',
+        ]);
+
+        try {
+            $this->offers->requestChange($offerLetter, $request->user(), $validated['reason']);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['change_request' => $e->getMessage()]);
+        }
+
+        return redirect()->route('deals.show', $deal)
+            ->with('success', __('Change requested. A manager will review it before the letter can be edited.'));
+    }
+
+    public function reviewChange(Request $request, OfferLetterChangeRequest $changeRequest)
+    {
+        $offer = $changeRequest->offerLetter;
+        abort_unless($offer, 404);
+        $deal = $offer->deal;
+        abort_unless($deal, 404);
+        $this->authorize('update', $deal);
+
+        $validated = $request->validate([
+            'decision' => 'required|in:approve,reject',
+            // A rejection without a reason gives the agent nothing to act on.
+            'note' => 'nullable|string|max:1000',
+        ]);
+
+        $approve = $validated['decision'] === 'approve';
+
+        if (! $approve && blank($validated['note'] ?? null)) {
+            return back()->withErrors(['note' => __('Please say why the change is being rejected.')]);
+        }
+
+        try {
+            $this->offers->reviewChange($changeRequest, $request->user(), $approve, $validated['note'] ?? null);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['change_request' => $e->getMessage()]);
+        }
+
+        return redirect()->route('deals.show', $deal)->with('success', $approve
+            ? __('Change approved — the letter can be edited again and must be re-approved.')
+            : __('Change request rejected.'));
     }
 
     public function withdraw(Request $request, OfferLetter $offerLetter)
@@ -236,8 +389,6 @@ class OfferLetterController extends Controller
             return back()->withErrors(['status' => $e->getMessage()]);
         }
 
-        \App\Models\AuditLog::log('offer_letter.deleted', $offerLetter);
-
         return redirect()->route('deals.show', $deal)->with('success', __('Offer letter deleted.'));
     }
 
@@ -259,6 +410,23 @@ class OfferLetterController extends Controller
             // How many payments the rent is split into. 1-12: monthly is the
             // ceiling, and a single upfront payment is the floor.
             'payment_period' => 'nullable|integer|min:1|max:12',
+            // The signatory. Not read off the lead: the person signing is
+            // regularly a spouse or nominee, not the person who enquired.
+            'occupant_name' => 'nullable|string|max:255',
+            'emirates_id' => 'nullable|string|max:50',
+            'bank_details_source' => 'nullable|in:upload,details,none',
+            'bank_details' => 'nullable|string|max:5000',
+            // 'percent_5' recomputes the deposit from the contract value on the
+            // server, so a posted figure is ignored; 'custom' keeps it.
+            'security_deposit_mode' => 'nullable|in:percent_5,custom',
+            // Who collects each line. Both values are accepted for all five:
+            // a landlord who takes the admin and contract fees themselves is
+            // ordinary, so nothing is locked to a party.
+            'rent_payable_to' => 'nullable|in:landlord,broker',
+            'deposit_payable_to' => 'nullable|in:landlord,broker',
+            'commission_payable_to' => 'nullable|in:landlord,broker',
+            'admin_fee_payable_to' => 'nullable|in:landlord,broker',
+            'contract_fee_payable_to' => 'nullable|in:landlord,broker',
             // The unit the offer is written on, chosen from the ones this client
             // has been shown. Scoped to the tenant in applyChosenUnit().
             'unit_id' => 'nullable|integer',

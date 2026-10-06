@@ -24,6 +24,11 @@ class Tenant extends Model
         'phone',
         'website',
         'logo_path',
+        'letterhead_display',
+        'signature_path',
+        'stamp_path',
+        'iban_letter_path',
+        'bank_details',
         'timezone',
         'currency',
         'is_vat_registered',
@@ -59,6 +64,7 @@ class Tenant extends Model
         'storage_disk',
         'google_client_id',
         'google_client_secret',
+        'google_maps_embed_key',
         'microsoft_client_id',
         'microsoft_client_secret',
         'calendar_sync_enabled',
@@ -132,6 +138,17 @@ class Tenant extends Model
                 : null,
             default => null,
         };
+    }
+
+    /**
+     * The Google Maps Embed API key used to render the inline map on the
+     * public share page. Null when unset (the map then degrades to a link).
+     */
+    public function mapsEmbedKey(): ?string
+    {
+        $key = trim((string) $this->google_maps_embed_key);
+
+        return $key === '' ? null : $key;
     }
 
     /**

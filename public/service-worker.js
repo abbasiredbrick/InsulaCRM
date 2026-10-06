@@ -11,7 +11,7 @@
  * Bump CACHE_VERSION to invalidate all caches on deploy.
  */
 
-var APP_ASSET_VERSION = '1.3.4';
+var APP_ASSET_VERSION = '1.6.0';
 var CACHE_VERSION = 'v' + APP_ASSET_VERSION;
 var STATIC_CACHE = 'keystone-static-' + CACHE_VERSION;
 var DYNAMIC_CACHE = 'keystone-dynamic-' + CACHE_VERSION;
@@ -107,6 +107,17 @@ self.addEventListener('fetch', function(event) {
     // Skip chrome-extension and non-http(s) requests
     if (!request.url.startsWith('http')) return;
 
+    // A client's offer letter is never cached.
+    //
+    // The worker is registered at scope '/', so it also controls the public
+    // signing and verification links — anyone who has the app open on a handset
+    // (or a browser the client shares) controls those pages too. The
+    // navigation strategy below writes every response into DYNAMIC_CACHE, which
+    // would leave a signed offer letter sitting in a cache on the device after
+    // the tab is closed, and could serve it back after the token expired.
+    // Straight to the network, nothing stored.
+    if (isClientOfferDocument(request.url)) return;
+
     // Determine strategy based on URL patterns
     if (isStaticAsset(request.url)) {
         // Cache-first for static assets
@@ -174,16 +185,19 @@ function networkFirstWithAppShellFallback(request) {
         }
         return response;
     }).catch(function() {
-        // Fall back to app shell when offline
-        return caches.match(APP_SHELL_CACHE).then(function(cache) {
-            if (cache) {
-                return cache.match(BASE_PATH + 'offline');
-            }
-            // Last resort: return the app shell HTML
+        // Serve the last-cached copy of the exact page when offline. This is
+        // what makes the client availability portal work like an installed app:
+        // a share link visited once online stays readable on the plane. (Offer
+        // documents are never cached - see isClientOfferDocument - so they never
+        // reach this cache.)
+        return caches.match(request).then(function(cached) {
+            if (cached) return cached;
+
+            // Fall back to the generic offline page...
             return caches.match(BASE_PATH + 'offline').then(function(fallback) {
                 if (fallback) return fallback;
-                // Return minimal app shell
-                return new Response('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0054a6"><link rel="manifest" href="/manifest.json"></head><body class="p-4"><h1>Keystone</h1><p>Working offline</p></body></html>', {
+                // Last resort: return minimal shell
+                return new Response('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#17212f"><link rel="manifest" href="/manifest.json"></head><body class="p-4"><h1>Keystone</h1><p>Working offline</p></body></html>', {
                     status: 200,
                     headers: { 'Content-Type': 'text/html', 'Content-Encoding': 'gzip' }
                 });
@@ -209,6 +223,18 @@ function fetchWithTimeout(request, timeout) {
             reject(error);
         });
     });
+}
+
+/**
+ * Check if a URL is one of the public, token-addressed client documents: the
+ * signing link (/offer/<token>/sign) and the QR verification page
+ * (/verify/offer/<token>). Both carry a signed offer letter.
+ */
+function isClientOfferDocument(url) {
+    var path = url.replace(/[?#].*$/, '');
+
+    return /\/offer\/[^/]+\/sign\/?$/.test(path)
+        || /\/verify\/offer\/[^/]+\/?$/.test(path);
 }
 
 /**

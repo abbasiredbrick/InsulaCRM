@@ -9,6 +9,7 @@ use App\Notifications\OfferLetterApproved;
 use App\Services\OfferLetterService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class OfferLetterFlowTest extends TestCase
@@ -268,7 +269,11 @@ class OfferLetterFlowTest extends TestCase
         $this->assertStringContainsString('Contract Fee', $html);
         $this->assertStringContainsString('Admin Fee', $html);
         $this->assertStringContainsString('VAT @ 5%', $html);
-        $this->assertStringContainsString('Agency Services', $html);
+        // One table now, not a separate "Agency Services" block: what changes
+        // between letters is who collects each line, not which table it sits in.
+        $this->assertStringContainsString('Payable To', $html);
+        $this->assertStringContainsString('Total Payable', $html);
+        $this->assertStringNotContainsString('Agency Services', $html);
 
         // The old wording is gone.
         $this->assertStringNotContainsString('Tawtheeq Fee', $html);
@@ -636,7 +641,7 @@ class OfferLetterFlowTest extends TestCase
         $this->assertEquals(auth()->user()->id, $offer->approved_by);
     }
 
-    public function test_an_issued_offer_cannot_be_edited(): void
+    public function test_an_issued_offer_cannot_be_edited_by_an_agent(): void
     {
         $this->reAdmin();
         $deal = $this->saleDeal(500000);
@@ -644,7 +649,18 @@ class OfferLetterFlowTest extends TestCase
 
         $this->assertFalse($offer->isEditable());
 
-        $this->patch(route('deal.offers.update', $offer), [
+        // An issued letter's terms are locked, so an agent editing one is
+        // refused — the figures were approved by someone else. Managers keep
+        // the authority they already hold; everyone else asks instead.
+        $agent = \App\Models\User::factory()->create([
+            'tenant_id' => $this->tenant->id,
+            'role_id' => \App\Models\Role::where('name', 'agent')->first()->id,
+            'is_active' => true,
+        ]);
+        $deal->update(['agent_id' => $agent->id]);
+        $deal->lead->update(['agent_id' => $agent->id]);
+
+        $this->actingAs($agent)->patch(route('deal.offers.update', $offer), [
             'original_amount' => 1,
         ])->assertSessionHasErrors('original_amount');
 
@@ -833,6 +849,75 @@ class OfferLetterFlowTest extends TestCase
         $this->assertDatabaseHas('offer_letters', ['id' => $offer->id, 'status' => 'signed']);
     }
 
+    public function test_only_the_owner_can_delete_a_signed_offer_and_the_purge_removes_the_trail(): void
+    {
+        $owner = $this->actingAsRole('owner', ['business_mode' => 'realestate']);
+
+        $deal = $this->rentDeal(120000);
+        $offer = $this->issueOffer($deal);
+        $offer = $this->signOffer($offer);
+
+        $offer->refresh();
+        $this->assertEquals('signed', $offer->status);
+        $this->assertTrue($offer->canDeleteBy($owner));
+
+        $pdfPath = $offer->signed_pdf_path;
+        $this->assertNotNull($pdfPath);
+        $this->assertTrue(Storage::disk(config('filesystems.default'))->exists($pdfPath));
+
+        $activityIds = \App\Models\Activity::where('deal_id', $deal->id)
+            ->where(function ($q) use ($offer) {
+                $q->where('subject', 'like', '%'.$offer->offer_no.'%')
+                    ->orWhere('body', 'like', '%'.$offer->offer_no.'%');
+            })
+            ->pluck('id');
+        $auditIds = \App\Models\AuditLog::where('model_type', OfferLetter::class)
+            ->where('model_id', $offer->id)
+            ->pluck('id');
+
+        $this->assertTrue($activityIds->isNotEmpty());
+
+        $this->delete(route('deal.offers.destroy', $offer))
+            ->assertRedirect(route('deals.show', $deal))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('offer_letters', ['id' => $offer->id]);
+        $this->assertFalse(Storage::disk(config('filesystems.default'))->exists($pdfPath));
+
+        foreach ($activityIds as $id) {
+            $this->assertDatabaseMissing('activities', ['id' => $id]);
+        }
+        foreach ($auditIds as $id) {
+            $this->assertDatabaseMissing('audit_log', ['id' => $id]);
+        }
+
+        // A purge logs nothing new — the deletion is as invisible as the letter.
+        $this->assertDatabaseMissing('activities', ['deal_id' => $deal->id, 'subject' => 'Offer letter deleted']);
+    }
+
+    public function test_an_owner_deleting_an_unapproved_letter_keeps_the_normal_deleted_trail(): void
+    {
+        $owner = $this->actingAsRole('owner', ['business_mode' => 'realestate']);
+
+        $deal = $this->rentDeal(120000);
+        $offer = $this->pendingOffer($deal);
+
+        $this->assertTrue($offer->canDelete());
+        $this->assertTrue($offer->canDeleteBy($owner));
+
+        $this->delete(route('deal.offers.destroy', $offer))
+            ->assertRedirect(route('deals.show', $deal))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('offer_letters', ['id' => $offer->id]);
+        $this->assertDatabaseHas('activities', ['deal_id' => $deal->id, 'subject' => 'Offer letter deleted']);
+        $this->assertDatabaseHas('audit_log', [
+            'model_type' => OfferLetter::class,
+            'model_id' => $offer->id,
+            'action' => 'offer_letter.deleted',
+        ]);
+    }
+
     public function test_offer_actions_require_deal_update_permission(): void
     {
         $this->reAdmin();
@@ -1004,17 +1089,17 @@ class OfferLetterFlowTest extends TestCase
 
         $offer = $deal->offerLetters()->first();
 
-        // An admin-created letter is approved on the spot, so its commercial
-        // terms are frozen. Posting a new price is refused outright rather than
-        // half-applied.
+        // An admin-created letter is approved on the spot, and an approver may
+        // still edit it, so this edit goes through.
         $this->patch(route('deal.offers.update', $offer), [
             'original_amount' => 475000,
-        ])->assertSessionHasErrors('original_amount');
+        ])->assertRedirect(route('deals.show', $deal));
 
         $offer->refresh();
 
-        $this->assertEquals(500000.0, (float) $offer->original_amount);
-        // And the rejected edit must not have reset the date to today either.
+        $this->assertEquals(475000.0, (float) $offer->original_amount);
+        // And the edit must not have reset the date to today, because this
+        // edit did not touch it.
         $this->assertSame('2026-03-03', $offer->issued_at->format('Y-m-d'));
     }
 
@@ -1168,7 +1253,8 @@ class OfferLetterFlowTest extends TestCase
         $json->assertOk();
 
         $this->assertEquals(90000.0, (float) $json->json('original_amount'));
-        $this->assertEquals(7500.0, (float) $json->json('security_deposit'));
+        // 5% of 90,000 — the inventory deposit is deliberately not used.
+        $this->assertEquals(4500.0, (float) $json->json('security_deposit'));
         $this->assertEquals(1750.0, (float) $json->json('admin_fee'));
         $this->assertEquals(350.0, (float) $json->json('contract_fee'));
     }
@@ -1203,7 +1289,8 @@ class OfferLetterFlowTest extends TestCase
 
         $this->assertEquals(2500.0, (float) $offer->admin_fee);
         $this->assertEquals(500.0, (float) $offer->contract_fee);
-        $this->assertEquals(10000.0, (float) $offer->security_deposit);
+        // 5% of 120,000 rather than the 10,000 the inventory row carried.
+        $this->assertEquals(6000.0, (float) $offer->security_deposit);
     }
 
     public function test_a_unit_from_another_tenant_cannot_be_used_for_an_offer(): void
@@ -1449,7 +1536,8 @@ class OfferLetterFlowTest extends TestCase
         $this->assertEquals(120000.0, (float) $offer->original_amount, 'Listed price must follow the offered unit.');
         $this->assertEquals(2500.0, (float) $offer->admin_fee);
         $this->assertEquals(500.0, (float) $offer->contract_fee);
-        $this->assertEquals(10000.0, (float) $offer->security_deposit);
+        // 5% of 120,000 rather than the 10,000 the inventory row carried.
+        $this->assertEquals(6000.0, (float) $offer->security_deposit);
         $this->assertNotEquals(1000.0, (float) $offer->admin_fee, 'Must not fall back to the lead\'s unit.');
     }
 
@@ -1471,5 +1559,356 @@ class OfferLetterFlowTest extends TestCase
         // No unit chosen, so the lead's unit remains the fallback rather than
         // leaving the letter with no price source at all.
         $this->assertEquals(96000.0, (float) $deal->offerLetters()->first()->original_amount);
+    }
+
+    public function test_the_security_deposit_is_five_per_cent_of_the_contract_value(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'discount_amount' => 20000,
+        ])->assertRedirect();
+
+        // Contract value 80,000, deposit 5% of that — not 5% of the listed price.
+        $this->assertEquals(80000.0, (float) $deal->offerLetters()->first()->approved_amount);
+        $this->assertEquals(4000.0, (float) $deal->offerLetters()->first()->security_deposit);
+    }
+
+    public function test_a_discount_moves_the_security_deposit_down_with_it(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+        $this->assertEquals(5000.0, (float) $deal->offerLetters()->orderByDesc('id')->first()->security_deposit);
+
+        // Adding a discount must not leave the letter asking for a deposit that
+        // no longer matches the rent the client just agreed to.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'discount_amount' => 40000,
+        ])->assertRedirect();
+
+        $this->assertEquals(3000.0, (float) $deal->offerLetters()->orderByDesc('id')->first()->security_deposit);
+    }
+
+    public function test_a_posted_deposit_is_ignored_while_the_five_per_cent_rule_is_on(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'security_deposit' => 99000,
+        ])->assertRedirect();
+
+        $this->assertEquals(5000.0, (float) $deal->offerLetters()->first()->security_deposit);
+    }
+
+    public function test_the_deposit_can_be_set_manually_when_the_rule_is_switched_off(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'security_deposit' => 12000,
+            'security_deposit_mode' => 'custom',
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertEquals(12000.0, (float) $offer->security_deposit);
+        $this->assertSame('custom', $offer->security_deposit_mode);
+    }
+
+    public function test_the_occupant_and_emirates_id_are_recorded_on_the_letter(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'occupant_name' => 'Fatima Al Mansouri',
+            'emirates_id' => '784-1998-1234567-1',
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('Fatima Al Mansouri', $offer->occupant_name);
+        $this->assertSame('784-1998-1234567-1', $offer->emirates_id);
+
+        $html = $this->get(route('deal.offers.print', $offer))->getContent();
+
+        $this->assertStringContainsString('Fatima Al Mansouri', $html);
+        $this->assertStringContainsString('784-1998-1234567-1', $html);
+    }
+
+    public function test_the_property_detail_line_reads_unit_building_sub_community_community_city_and_emirate(): void
+    {
+        $this->reAdmin();
+
+        $unit = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'unit_no' => '2506',
+            'building_no' => 'Burj Al Shams Tower',
+            'sub_community' => 'Reem Island',
+            'community' => 'Reem Island',
+            'city' => 'Abu Dhabi',
+            'state' => 'Abu Dhabi',
+        ]);
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'unit_id' => $unit->id,
+            'original_amount' => 100000,
+        ])->assertRedirect();
+
+        $html = $this->get(route('deal.offers.print', $deal->offerLetters()->first()))->getContent();
+
+        // Every part in one line, in the order an agent reads it out.
+        $this->assertStringContainsString('Unit No. 2506', $html);
+        $this->assertStringContainsString('Burj Al Shams Tower', $html);
+        $this->assertStringContainsString('Reem Island', $html);
+        $this->assertStringContainsString('Abu Dhabi', $html);
+    }
+
+    public function test_a_half_filled_unit_never_prints_an_empty_segment(): void
+    {
+        $this->reAdmin();
+
+        // Only a unit number and a city: no building, sub-community or community.
+        $unit = $this->createProperty([
+            'tenant_id' => $this->tenant->id,
+            'unit_no' => '1204',
+            'city' => 'Dubai',
+        ]);
+
+        $unit->forceFill(['building_no' => null, 'sub_community' => null, 'community' => null])->save();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'unit_id' => $unit->id,
+            'original_amount' => 100000,
+        ])->assertRedirect();
+
+        $html = $this->get(route('deal.offers.print', $deal->offerLetters()->first()))->getContent();
+
+        $this->assertStringContainsString('Unit No. 1204', $html);
+        $this->assertStringNotContainsString('Unit No. 1204,,', $html);
+        $this->assertStringNotContainsString(',,', $html);
+    }
+
+    public function test_each_money_line_can_be_routed_to_the_landlord_or_the_broker(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        // The landlord asks the agency to collect everything.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+            'rent_payable_to' => 'broker',
+            'deposit_payable_to' => 'broker',
+            'commission_payable_to' => 'broker',
+            'admin_fee_payable_to' => 'broker',
+            'contract_fee_payable_to' => 'broker',
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('broker', $offer->rent_payable_to);
+        $this->assertSame('broker', $offer->deposit_payable_to);
+
+        $payees = collect($offer->payableLines())->pluck('payee')->unique()->all();
+        $this->assertCount(1, $payees, 'Every line collected by us should name only the agency.');
+    }
+
+    public function test_the_landlord_may_collect_the_rent_deposit_and_fees_while_paying_only_the_commission(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'admin_fee' => 2500,
+            'contract_fee' => 500,
+            'rent_payable_to' => 'landlord',
+            'deposit_payable_to' => 'landlord',
+            'commission_payable_to' => 'broker',
+            'admin_fee_payable_to' => 'landlord',
+            'contract_fee_payable_to' => 'landlord',
+        ])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $byKey = collect($offer->payableLines())->keyBy('key');
+
+        $this->assertSame('landlord', $offer->admin_fee_payable_to);
+        $this->assertSame('landlord', $offer->contract_fee_payable_to);
+
+        // Rent, deposit, admin and contract fees name the landlord; only the
+        // commission is ours.
+        $this->assertSame('Landlord', $byKey['rent']['payee']);
+        $this->assertSame('Landlord', $byKey['deposit']['payee']);
+        $this->assertSame('Landlord', $byKey['admin_fee']['payee']);
+        $this->assertSame('Landlord', $byKey['contract_fee']['payee']);
+        $this->assertSame($this->tenant->name, $byKey['commission']['payee']);
+    }
+
+    public function test_the_default_payable_split_is_the_conventional_one(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+
+        $offer = $deal->offerLetters()->first();
+
+        $this->assertSame('landlord', $offer->rent_payable_to);
+        $this->assertSame('landlord', $offer->deposit_payable_to);
+        $this->assertSame('broker', $offer->commission_payable_to);
+        $this->assertSame('broker', $offer->admin_fee_payable_to);
+        $this->assertSame('broker', $offer->contract_fee_payable_to);
+    }
+
+    public function test_a_bogus_payable_to_value_is_rejected_rather_than_coerced(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        // Silently rewriting an unknown party to the default would put a
+        // collection instruction on a legal document that nobody asked for.
+        $this->post(route('deal.offers.store', $deal), [
+            'original_amount' => 100000,
+            'rent_payable_to' => 'somebody-else',
+        ])->assertSessionHasErrors('rent_payable_to');
+
+        $this->assertSame(0, $deal->offerLetters()->count());
+    }
+
+    public function test_a_legacy_letter_with_no_payable_to_still_names_a_party(): void
+    {
+        $this->reAdmin();
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+        // The migration backfills every existing row with the conventional split,
+        // so a stored null is unreachable — but an unhydrated model must still
+        // name a party rather than print a blank payee.
+        $ghost = new OfferLetter([
+            'approved_amount' => 100000,
+            'security_deposit' => 5000,
+            'rent_payable_to' => null,
+            'deposit_payable_to' => null,
+        ]);
+        $ghost->setRelation('deal', $deal);
+        $ghost->setRelation('tenant', $this->tenant);
+
+        $this->assertSame('landlord', $ghost->payableToAttributes()['rent_payable_to']);
+        $this->assertSame('broker', $ghost->payableToAttributes()['commission_payable_to']);
+
+        $payees = collect($ghost->payableLines())->pluck('payee')->filter()->all();
+        $this->assertNotEmpty($payees);
+        $this->assertNotContains('', $payees);
+    }
+
+    public function test_the_letterhead_shows_both_logo_and_name_by_default(): void
+    {
+        $this->reAdmin();
+
+        $tenant = $this->tenant;
+        $tenant->update(['letterhead_display' => 'both']);
+        Storage::fake('public');
+        Storage::disk('public')->put('logos/t.png', 'x');
+        $tenant->update(['logo_path' => 'logos/t.png']);
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+        $html = $this->get(route('deal.offers.print', $deal->offerLetters()->first()))->getContent();
+
+        $this->assertStringContainsString('<img src=', $html);
+        $this->assertStringContainsString($tenant->name, $html);
+    }
+
+    public function test_the_letterhead_can_be_set_to_the_name_only(): void
+    {
+        $this->reAdmin();
+
+        $tenant = $this->tenant;
+        Storage::fake('public');
+        Storage::disk('public')->put('logos/t.png', 'x');
+        $tenant->update(['logo_path' => 'logos/t.png', 'letterhead_display' => 'name']);
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+        $html = $this->get(route('deal.offers.print', $deal->offerLetters()->first()))->getContent();
+
+        $this->assertStringNotContainsString('<img src=', $html);
+        $this->assertStringContainsString($tenant->name, $html);
+    }
+
+    public function test_a_logo_only_letterhead_still_names_the_company_when_no_logo_is_uploaded(): void
+    {
+        $this->reAdmin();
+
+        // A letter that names no company is not acceptable, so "logo only" with no
+        // logo must fall back to the name rather than print a blank letterhead.
+        $this->tenant->update(['letterhead_display' => 'logo', 'logo_path' => null]);
+
+        $deal = $this->createDeal(['deal_type' => 'rent', 'stage' => 'offer_signed']);
+        $deal->lead->update(['status' => 'negotiating', 'deal_type' => 'rent']);
+
+        $this->post(route('deal.offers.store', $deal), ['original_amount' => 100000])->assertRedirect();
+        $html = $this->get(route('deal.offers.print', $deal->offerLetters()->first()))->getContent();
+
+        $this->assertStringNotContainsString('<img src=', $html);
+        $this->assertStringContainsString($this->tenant->name, $html);
+    }
+
+    public function test_the_letterhead_choice_is_saved_from_settings(): void
+    {
+        $this->reAdmin();
+
+        $this->put(route('settings.updateGeneral'), [
+            'name' => 'Pristine Properties',
+            'email' => 'admin@pristine.test',
+            'currency' => 'AED',
+            'country' => 'AE',
+            'letterhead_display' => 'name',
+        ])->assertRedirect();
+
+        $this->assertSame('name', $this->tenant->fresh()->letterhead_display);
     }
 }

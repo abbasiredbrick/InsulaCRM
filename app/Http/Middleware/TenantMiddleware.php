@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\TenantMailConfigurator;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -9,6 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class TenantMiddleware
 {
+    public function __construct(private TenantMailConfigurator $mail) {}
+
     /**
      * Ensure the authenticated user belongs to an active tenant.
      */
@@ -18,8 +21,9 @@ class TenantMiddleware
             $user = auth()->user();
 
             // Check tenant is active
-            if (!$user->tenant || $user->tenant->status !== 'active') {
+            if (! $user->tenant || $user->tenant->status !== 'active') {
                 auth()->logout();
+
                 return redirect()->route('login')->withErrors([
                     'email' => 'Your account has been suspended. Please contact support.',
                 ]);
@@ -36,45 +40,12 @@ class TenantMiddleware
             view()->share('businessMode', $businessMode);
             view()->share('modeTerms', \App\Services\BusinessModeService::getTerminology($user->tenant));
 
-            // Apply tenant mail settings if configured — overrides .env defaults
-            $mail = $user->tenant->mail_settings ?? [];
-            if (!empty($mail['mail_host'])) {
-                config([
-                    'mail.default' => 'smtp',
-                    'mail.mailers.smtp.host' => $mail['mail_host'],
-                    'mail.mailers.smtp.port' => $mail['mail_port'] ?? 587,
-                    'mail.mailers.smtp.encryption' => $mail['mail_encryption'] ?? 'tls',
-                    'mail.mailers.smtp.username' => $mail['mail_username'] ?? '',
-                    'mail.mailers.smtp.password' => $this->decryptMailPassword($mail['mail_password'] ?? ''),
-                ]);
-                if (!empty($mail['mail_from_address'])) {
-                    config(['mail.from.address' => $mail['mail_from_address']]);
-                }
-                if (!empty($mail['mail_from_name'])) {
-                    config(['mail.from.name' => $mail['mail_from_name']]);
-                }
-
-                // Purge the cached mailer so it picks up the new config
-                app('mail.manager')->purge('smtp');
-            }
+            // Apply tenant mail settings if configured — overrides .env defaults.
+            // Public routes with no session must do this themselves; see
+            // TenantMailConfigurator.
+            $this->mail->apply($user->tenant);
         }
 
         return $next($request);
-    }
-
-    /**
-     * Decrypt an encrypted mail password, returning the original string if decryption fails.
-     */
-    private function decryptMailPassword(string $value): string
-    {
-        if (empty($value)) {
-            return '';
-        }
-
-        try {
-            return decrypt($value);
-        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-            return $value;
-        }
     }
 }

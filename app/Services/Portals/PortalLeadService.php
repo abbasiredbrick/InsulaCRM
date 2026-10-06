@@ -56,17 +56,26 @@ class PortalLeadService
             }
         }
 
-        // Listing references embed the owning agent's code ({AGENTCODE}-{PROPERTYID}),
-        // so the lead can be routed straight to that agent.
+        // The recorded listing_reference on the inventory unit is checked first.
+        // A listing created manually on Property Finder carries no agent code,
+        // so the unit's own reference is the only thing that can route it — and
+        // its owner must win before any other routing gets a chance to run.
         $reference = $data['reference'] ?? null;
+
+        $property = $this->matchProperty($integration, $reference);
+
         [$agentCode, $propertyId] = $this->parseListingReference($reference);
 
+        $property ??= $this->matchPropertyById($tenant->id, $propertyId);
+
+        $unitService = app(\App\Services\UnitLeadAssignmentService::class);
+        $unitOwner = $unitService->unitOwner($property, $tenant->id);
+
+        // Listing references also embed the owning agent's code
+        // ({AGENTCODE}-{PROPERTYID}), which is only consulted as a fallback.
         $routedAgent = $agentCode !== null
             ? $this->findAgentByCode($tenant->id, $agentCode)
             : null;
-
-        $property = $this->matchProperty($integration, $reference)
-            ?? $this->matchPropertyById($tenant->id, $propertyId);
 
         // A client who already exists (hand-typed or from an earlier portal lead)
         // is never duplicated: the new listing is added to their existing lead.
@@ -93,9 +102,12 @@ class PortalLeadService
             $integration->portal
         );
 
+        // The unit owner takes the lead outright: it beats the agent code the
+        // portal carried, and being already assigned it also keeps the lead out
+        // of pool distribution below.
         $lead = Lead::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,
-            'agent_id' => $routedAgent?->id,
+            'agent_id' => $unitOwner?->id ?? $routedAgent?->id,
             'first_name' => $first,
             'last_name' => $last,
             'phone' => $phone,
@@ -120,15 +132,27 @@ class PortalLeadService
             $this->handleUnmatched($lead, $tenant);
         }
 
-        // New-lead notification: email the agent the lead was assigned to
-        // (routed or distributed), otherwise email the Owner so an unassigned
-        // inbound lead never lingers silently.
-        $this->notifyNewLeadRouting($lead, $tenant);
-
+        // Link the unit before anyone is emailed, so the notification the
+        // owner receives points at a lead that already shows its listing.
+        // Ownership was settled above (agent_id is already the unit owner when
+        // one applies), so there is nothing left to reassign here.
         $this->linkProperty($lead, $property);
 
-        if ($property !== null) {
-            app(\App\Services\UnitLeadAssignmentService::class)->assignToUnitOwnerIfRequired($lead, $property);
+        // New-lead notification: email the agent the lead was assigned to
+        // (unit owner, routed, or distributed), otherwise email the Owner so an
+        // unassigned inbound lead never lingers silently.
+        $this->notifyNewLeadRouting($lead, $tenant);
+
+        // Record the assignment itself: AssignmentHistoryService reads audit
+        // rows carrying agent_id in new_values, and a portal lead never passed
+        // through the form that writes those.
+        if ($lead->agent_id !== null) {
+            AuditLog::log('lead.updated', $lead, null, [
+                'agent_id' => $lead->agent_id,
+                'previous_agent_id' => $routedAgent?->id,
+                'property_id' => $property?->id,
+                'reason' => $unitOwner !== null ? 'unit_owner' : 'portal_reference',
+            ]);
         }
 
         AuditLog::log('lead.received_from_portal_'.$source, $lead);

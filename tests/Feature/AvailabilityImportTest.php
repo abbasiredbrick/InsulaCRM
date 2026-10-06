@@ -1193,6 +1193,20 @@ class AvailabilityImportTest extends TestCase
         ];
     }
 
+    protected function truerentorPayload(): array
+    {
+        return [
+            'spec' => 'truerentor.availability',
+            'version' => '1.0',
+            'organization' => ['slug' => 'ams-properties', 'name' => 'AMS Properties', 'currency' => 'AED', 'show_prices_publicly' => true],
+            'referral_code' => 'AMS-AB12',
+            'units' => [
+                ['listing_id' => 'u-1', 'label' => '1201', 'type' => '2br', 'furnished' => true, 'bedrooms' => 2, 'size_sqm' => 100, 'listing_rate' => 100000, 'frequency' => 'yearly', 'building_name' => 'Burj Al Shams', 'building_address' => 'Al Reem Island, Abu Dhabi', 'cover_url' => 'https://cdn/x.jpg', 'share_path' => '/p/ams-properties/u/u-1?ref=AMS-AB12'],
+                ['listing_id' => 'u-2', 'label' => '1502', 'type' => 'studio', 'furnished' => false, 'bedrooms' => 0, 'size_sqm' => 45, 'listing_rate' => null, 'frequency' => 'monthly', 'building_name' => 'Burj Al Shams', 'building_address' => 'Al Reem Island, Abu Dhabi', 'cover_url' => null, 'share_path' => '/p/ams-properties/u/u-2?ref=AMS-AB12'],
+            ],
+        ];
+    }
+
     protected function urlSource(): AvailabilitySource
     {
         return AvailabilitySource::create([
@@ -1245,6 +1259,33 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame('Marriott Residences', $byUnit['RA-02']['Tower']);
         $this->assertSame('View: Community. 7BHK - DRIVER ROOM - STORAGE', $byUnit['RA-02']['Remarks']);
         $this->assertSame('Dubai', $byUnit['RA-02']['City']);
+    }
+
+    public function test_fetch_url_parses_truerentor_feed_into_canonical_rows(): void
+    {
+        Http::fake([
+            'https://truerentor.vercel.app/api/v1/availability/*' => Http::response(json_encode($this->truerentorPayload()), 200),
+        ]);
+
+        $service = new AvailabilityIngestService;
+
+        $table = $service->fetchUrl('https://truerentor.vercel.app/api/v1/availability/ams-properties', 'some-token');
+
+        $this->assertSame(
+            ['unit_no', 'building', 'community', 'features', 'bedrooms', 'square_footage', 'rent', 'furnishing', 'status', 'remarks'],
+            $table['header']
+        );
+        $this->assertCount(2, $table['rows']);
+
+        $byUnit = collect($table['rows'])->keyBy('unit_no');
+        $this->assertSame('Burj Al Shams', $byUnit['1201']['building']);
+        $this->assertSame('2br', $byUnit['1201']['features']);
+        $this->assertSame('2', $byUnit['1201']['bedrooms']);
+        $this->assertSame('100000', $byUnit['1201']['rent']);
+        $this->assertSame('Furnished', $byUnit['1201']['furnishing']);
+        $this->assertStringContainsString('listing_id=u-1', $byUnit['1201']['remarks']);
+        $this->assertSame('Unfurnished', $byUnit['1502']['furnishing']);
+        $this->assertSame('', $byUnit['1502']['rent']); // null listing_rate → empty
     }
 
     public function test_sync_url_creates_units_in_place_and_records_a_url_run(): void

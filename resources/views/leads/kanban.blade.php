@@ -170,7 +170,7 @@
 @php $filters = request()->only(['agent_id', 'search', 'source', 'temperature']); @endphp
 <div class="kanban-toolbar">
     <div class="btn-group" role="group" aria-label="{{ __('View') }}">
-        <a href="{{ route('leads.index', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.index') ? 'active' : '' }}">
+        <a href="{{ route('leads.table', $filters) }}" class="btn btn-outline-primary btn-sm {{ request()->routeIs('leads.table') ? 'active' : '' }}">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
             {{ __('Table') }}
         </a>
@@ -184,7 +184,7 @@
 
 <div class="card mb-3">
     <div class="card-body py-3">
-        <form method="GET" action="{{ route('leads.index') }}" class="row g-2" data-live-filter>
+        <form method="GET" action="{{ route('leads.kanban') }}" class="row g-2" data-live-filter>
             <div class="col-md-4 col-lg-5">
                 <label for="kanban-search" class="visually-hidden">{{ __('Search') }}</label>
                 <input type="text" name="search" id="kanban-search" class="form-control" placeholder="{{ __('Search name, phone, email, reference...') }}" value="{{ request('search') }}">
@@ -220,7 +220,7 @@
             @endif
             @if(request()->hasAny(['search', 'source', 'temperature', 'agent_id']))
             <div class="col-auto">
-                <a href="{{ route('leads.index') }}" class="btn btn-outline-secondary">{{ __('Clear') }}</a>
+                <a href="{{ route('leads.kanban') }}" class="btn btn-outline-secondary">{{ __('Clear') }}</a>
             </div>
             @endif
         </form>

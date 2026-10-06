@@ -1,184 +1,49 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $tenant->name }} – {{ __('Available Units') }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bp-primary: #0054a6;
-            --bp-primary-dark: #003d7a;
-            --bp-primary-light: #e8f0fe;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #1e293b;
-        }
-        .bp-hero {
-            background: linear-gradient(135deg, var(--bp-primary) 0%, var(--bp-primary-dark) 100%);
-            color: #fff;
-            padding: 2.5rem 0;
-        }
-        .bp-hero .bp-logo {
-            max-height: 56px;
-            max-width: 180px;
-            margin-bottom: 0.75rem;
-        }
-        .bp-hero h1 {
-            font-size: 1.6rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-        .bp-hero p {
-            font-size: 1rem;
-            opacity: 0.92;
-            margin-bottom: 0;
-        }
-        .visitor-bar {
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 0.6rem 0;
-            font-size: 0.9rem;
-        }
-        .filter-bar {
-            background: #fff;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            margin-bottom: 1.5rem;
-        }
-        .unit-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            background: #fff;
-            display: flex;
-            flex-direction: column;
-            transition: box-shadow 0.2s, transform 0.2s;
-        }
-        .unit-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        .unit-thumb {
-            height: 170px;
-            background: var(--bp-primary-light);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #94a3b8;
-            font-size: 2rem;
-            overflow: hidden;
-        }
-        .unit-thumb img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .unit-body {
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-        }
-        .unit-title {
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 0.25rem;
-        }
-        .unit-loc {
-            font-size: 0.8rem;
-            color: #64748b;
-            margin-bottom: 0.75rem;
-        }
-        .unit-price {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--bp-primary);
-            margin-bottom: 0.75rem;
-        }
-        .unit-stats {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            font-size: 0.8rem;
-            color: #64748b;
-            margin-bottom: 1rem;
-        }
-        .unit-stats strong {
-            color: #1e293b;
-        }
-        .furnishing-badge {
-            display: inline-block;
-            background-color: var(--bp-primary-light);
-            color: var(--bp-primary);
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.2rem 0.5rem;
-            border-radius: 0.25rem;
-            text-transform: uppercase;
-        }
-        .btn-primary {
-            background-color: var(--bp-primary);
-            border-color: var(--bp-primary);
-        }
-        .btn-primary:hover {
-            background-color: var(--bp-primary-dark);
-            border-color: var(--bp-primary-dark);
-        }
-        .bp-empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: #64748b;
-        }
-        .bp-footer {
-            background: #1e293b;
-            color: #94a3b8;
-            padding: 1.5rem 0;
-            margin-top: 3rem;
-        }
-    </style>
-</head>
-<body>
-    <div class="bp-hero">
-        <div class="container d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-                @if($tenant->logo_path)
-                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($tenant->logo_path) }}" alt="{{ $tenant->name }}" class="bp-logo">
-                @endif
-                <h1>{{ $tenant->name }}</h1>
-                <p>{{ __('Available rental units') }}</p>
-            </div>
-        </div>
-    </div>
+@extends('layouts.share', ['tenant' => $tenant])
 
-    <div class="visitor-bar">
-        <div class="container d-flex justify-content-between align-items-center">
-            <span>
-                {{ __('Hi') }}, <strong>{{ $lead->first_name }}</strong>
+@section('title', $tenant->name.' – '.__('Available Units'))
+
+@section('content')
+    <div class="share-subnav rounded-top mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-2">
+            <span class="text-secondary small">
+                {{ __('Hi') }}, <strong class="text-body">{{ $lead->first_name }}</strong>
                 @if($lead->phone)
-                    <span class="text-muted ms-1">({{ $lead->phone }})</span>
+                    <span class="ms-1">({{ $lead->phone }})</span>
                 @endif
             </span>
-            <form action="{{ route('share.logout', $tenant->slug) }}" method="POST" class="d-inline">
+            <form action="{{ route('share.logout', $tenant->slug) }}" method="POST" class="d-inline mb-0">
                 @csrf
-                <button type="submit" class="btn btn-link btn-sm text-decoration-none">{{ __('Not you? Switch') }}</button>
+                <button type="submit" class="btn btn-link btn-sm text-decoration-none text-secondary">{{ __('Not you? Switch') }}</button>
             </form>
         </div>
     </div>
 
-    <div class="container py-4">
-        @if(session('interest'))
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                {{ __('Thanks! We have saved your interest in this unit — our team will get back to you.') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        @endif
+    @if(session('interest'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ __('Thanks! We have saved your interest in this unit — our team will get back to you.') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
 
-        <form method="GET" action="{{ route('share.inventory', $tenant->slug) }}" class="filter-bar">
+    @if(! empty($mapEmbed))
+        <div class="card mb-4 overflow-hidden">
+            <div class="card-body pb-0 d-flex justify-content-between align-items-center gap-2">
+                <h6 class="mb-0">{{ __('Where the available units are') }}</h6>
+                <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode($mapEmbed['query']) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary text-nowrap">
+                    {{ __('Open in Google Maps') }}
+                </a>
+            </div>
+            <div class="ratio ratio-16x9">
+                <iframe src="{{ $mapEmbed['embed'] }}" title="{{ __('Map of :place', ['place' => $mapEmbed['query']]) }}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+            </div>
+            <div class="card-body small text-secondary">
+                {{ __('Map approximated by :place on Google Maps.', ['place' => $mapEmbed['query']]) }}
+            </div>
+        </div>
+    @endif
+
+    <form method="GET" action="{{ route('share.inventory', $tenant->slug) }}" class="card mb-4">
+        <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold mb-1">{{ __('Search') }}</label>
@@ -214,7 +79,7 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label small fw-semibold mb-1">{{ __('Max Rent (AED)') }}</label>
+                    <label class="form-label small fw-semibold mb-1">{{ __('Max Rent (:currency)', ['currency' => $tenant->currency ?? 'USD']) }}</label>
                     <input type="number" name="max_rent" min="0" step="1000" class="form-control form-control-sm" value="{{ data_get($filters, 'max_rent') }}" placeholder="{{ __('Yearly') }}">
                 </div>
                 <div class="col-md-2">
@@ -240,80 +105,144 @@
                     <a href="{{ route('share.inventory', $tenant->slug) }}" class="btn btn-sm btn-outline-secondary">{{ __('Reset') }}</a>
                 </div>
             </div>
-        </form>
+        </div>
+    </form>
 
-        @if($units->count() > 0)
-            <div class="row g-4">
-                @foreach($units as $unit)
-                    <div class="col-md-6 col-lg-4">
-                        <div class="unit-card h-100">
-                            <div class="unit-thumb">
-                                @php $photo = $unit->media->first(); @endphp
-                                @if($photo)
-                                    <img src="{{ $photo->url() }}" alt="{{ $unit->display_name }}">
+    @if($units->count() > 0)
+        <div class="row g-4">
+            @foreach($units as $unit)
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 mb-0">
+                        <div class="unit-thumb">
+                            @php $photo = $unit->media->first(); @endphp
+                            @if($photo)
+                                <img src="{{ $photo->url() }}" alt="{{ $unit->display_name }}">
+                            @else
+                                <span>🏢</span>
+                            @endif
+                        </div>
+                        <div class="card-body d-flex flex-column">
+                            <button type="button" class="card-title mb-1 text-start p-0 border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#unitModal{{ $unit->id }}">
+                                {{ $unit->display_name }}
+                            </button>
+                            <div class="text-secondary mb-2" style="font-size:0.8rem;">
+                                {{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
+                            </div>
+                            <div class="unit-price mb-2">
+                                @if($unit->rent_price)
+                                    {{ \App\Helpers\TenantFormatHelper::currency($unit->rent_price) }}
+                                    <span class="text-muted" style="font-size:0.8rem; font-weight:500;">/ {{ __(\App\Models\Property::RENT_PERIODS[$unit->rent_period] ?? $unit->rent_period) }}</span>
                                 @else
-                                    <span>🏢</span>
+                                    {{ __('Price on request') }}
                                 @endif
                             </div>
-                            <div class="unit-body">
-                                <div class="unit-title">{{ $unit->display_name }}</div>
-                                <div class="unit-loc">
-                                    {{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
-                                    @if($unit->unit_no)
-                                        • {{ __('Unit') }} {{ $unit->unit_no }}
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                @if($unit->bedroomLabel() !== '')
+                                    <span class="badge bg-azure-lt">{{ $unit->bedroomLabel() }}</span>
+                                @endif
+                                @if($unit->bathrooms)
+                                    <span class="badge bg-azure-lt">{{ $unit->bathrooms }} {{ __('Baths') }}</span>
+                                @endif
+                                @if($unit->square_footage)
+                                    <span class="badge bg-azure-lt">{{ number_format($unit->square_footage) }} {{ __('sq ft') }}</span>
+                                @endif
+                                @if($unit->furnishing)
+                                    <span class="badge bg-primary-lt">{{ __(\App\Models\Property::FURNISHING[$unit->furnishing] ?? $unit->furnishing) }}</span>
+                                @endif
+                            </div>
+                            @php
+                                $unitLocation = $unit->sub_community ? ($mapLocations[$unit->sub_community] ?? null) : null;
+                            @endphp
+                            @if($unitLocation && ($unitLocation->map_url || $unitLocation->map_query))
+                                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                                    <a href="{{ $maps->urlFor($unitLocation) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 21a9 9 0 0 1 -9 -9c0 -4.97 4.03 -9 9 -9s9 4.03 9 9a9 9 0 0 1 -9 9z"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M12 3a17 17 0 0 1 0 18"/><path d="M12 3a17 17 0 0 0 0 18"/></svg>
+                                        {{ __('View on map') }}
+                                    </a>
+                                    @if($unitLocation->map_query)
+                                        <a href="{{ $maps->directionsUrl($unitLocation->map_query) }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+                                            {{ __('Directions') }}
+                                        </a>
                                     @endif
                                 </div>
-                                <div class="unit-price">
-                                    @if($unit->rent_price)
-                                        {{ \App\Helpers\TenantFormatHelper::currency($unit->rent_price) }}
-                                        <span class="text-muted" style="font-size:0.8rem; font-weight:500;">/ {{ __(\App\Models\Property::RENT_PERIODS[$unit->rent_period] ?? $unit->rent_period) }}</span>
-                                    @else
-                                        {{ __('Price on request') }}
-                                    @endif
-                                </div>
-                                <div class="unit-stats">
-                                    @if($unit->bedroomLabel() !== '')
-                                        <span><strong>{{ $unit->bedroomLabel() }}</strong></span>
-                                    @endif
-                                    @if($unit->bathrooms)
-                                        <span><strong>{{ $unit->bathrooms }}</strong> {{ __('Baths') }}</span>
-                                    @endif
-                                    @if($unit->square_footage)
-                                        <span><strong>{{ number_format($unit->square_footage) }}</strong> {{ __('sq ft') }}</span>
-                                    @endif
-                                    @if($unit->furnishing)
-                                        <span class="furnishing-badge">{{ __(\App\Models\Property::FURNISHING[$unit->furnishing] ?? $unit->furnishing) }}</span>
-                                    @endif
-                                </div>
-                                <div class="mt-auto">
-                                    @if(in_array($unit->id, $interested, true))
-                                        <span class="btn btn-sm btn-success w-100 disabled">{{ __('Interest saved ✓') }}</span>
-                                    @else
-                                        <form action="{{ route('share.interest', ['slug' => $tenant->slug, 'property' => $unit->id]) }}" method="POST">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-primary w-100">{{ __('I\'m interested') }}</button>
-                                        </form>
-                                    @endif
-                                </div>
+                            @endif
+                            <div class="mt-auto">
+                                @if(in_array($unit->id, $interested, true))
+                                    <span class="btn btn-sm btn-success w-100 disabled">{{ __('Interest saved ✓') }}</span>
+                                @else
+                                    <button type="button" class="btn btn-sm btn-primary w-100" data-bs-toggle="modal" data-bs-target="#unitModal{{ $unit->id }}">{{ __('I\'m interested') }}</button>
+                                @endif
                             </div>
                         </div>
                     </div>
-                @endforeach
-            </div>
-        @else
-            <div class="bp-empty-state">
-                <h5>{{ __('No units match your filters') }}</h5>
-                <p>{{ __('Try adjusting your search criteria, or reach out to us and we will find something for you.') }}</p>
-            </div>
-        @endif
-    </div>
-
-    <footer class="bp-footer">
-        <div class="container text-center">
-            <p class="mb-0">&copy; {{ date('Y') }} {{ $tenant->name }}. {{ __('All rights reserved.') }}</p>
+                </div>
+            @endforeach
         </div>
-    </footer>
+    @else
+        <div class="text-center py-5 text-secondary">
+            <h5 class="mb-1">{{ __('No units match your filters') }}</h5>
+            <p class="mb-0">{{ __('Try adjusting your search criteria, or reach out to us and we will find something for you.') }}</p>
+        </div>
+    @endif
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+    @if($units->count() > 0)
+        @foreach($units as $unit)
+            <div class="modal fade" id="unitModal{{ $unit->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header pb-0 border-0">
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                        </div>
+                        <div class="modal-body pt-0">
+                            <div class="ratio ratio-21x9 rounded overflow-hidden mb-3">
+                                @php $photo = $unit->media->first(); @endphp
+                                @if($photo)
+                                    <img src="{{ $photo->url() }}" alt="{{ $unit->display_name }}" class="object-fit-cover">
+                                @else
+                                    <div class="d-flex align-items-center justify-content-center bg-secondary-subtle" style="font-size:3rem;">🏢</div>
+                                @endif
+                            </div>
+                            <h5 class="mb-1">{{ $unit->display_name }}</h5>
+                            <div class="text-secondary mb-2">
+                                {{ $unit->sub_community ?: $unit->community }}{{ $unit->sub_community && $unit->community ? ', ' . $unit->community : '' }}
+                            </div>
+                            <div class="unit-price mb-3">
+                                @if($unit->rent_price)
+                                    {{ \App\Helpers\TenantFormatHelper::currency($unit->rent_price) }}
+                                    <span class="text-muted" style="font-size:0.85rem; font-weight:500;">/ {{ __(\App\Models\Property::RENT_PERIODS[$unit->rent_period] ?? $unit->rent_period) }}</span>
+                                @else
+                                    {{ __('Price on request') }}
+                                @endif
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                                @if($unit->bedroomLabel() !== '')
+                                    <span class="badge bg-azure-lt">{{ $unit->bedroomLabel() }}</span>
+                                @endif
+                                @if($unit->bathrooms)
+                                    <span class="badge bg-azure-lt">{{ $unit->bathrooms }} {{ __('Baths') }}</span>
+                                @endif
+                                @if($unit->square_footage)
+                                    <span class="badge bg-azure-lt">{{ number_format($unit->square_footage) }} {{ __('sq ft') }}</span>
+                                @endif
+                                @if($unit->furnishing)
+                                    <span class="badge bg-primary-lt">{{ __(\App\Models\Property::FURNISHING[$unit->furnishing] ?? $unit->furnishing) }}</span>
+                                @endif
+                                @if($unit->parking)
+                                    <span class="badge bg-azure-lt">{{ $unit->parking }} {{ __('Parking') }}</span>
+                                @endif
+                            </div>
+                            @if(in_array($unit->id, $interested, true))
+                                <button type="button" class="btn btn-success w-100" disabled>{{ __('Interest saved ✓') }}</button>
+                            @else
+                                <form action="{{ route('share.interest', ['slug' => $tenant->slug, 'property' => $unit->id]) }}" method="POST" class="mb-0">
+                                    @csrf
+                                    <button type="submit" class="btn btn-primary w-100">{{ __('I\'m interested in this unit') }}</button>
+                                </form>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
+@endsection

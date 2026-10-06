@@ -133,6 +133,67 @@
                             <input type="file" name="logo" class="form-control" accept="image/jpeg,image/png,image/gif">
                             <small class="form-hint">{{ __('JPG, PNG, or GIF. Max 2MB.') }}</small>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Letterhead') }}</label>
+                            <select name="letterhead_display" class="form-select">
+                                <option value="both" {{ ($tenant->letterhead_display ?? 'both') === 'both' ? 'selected' : '' }}>{{ __('Logo and company name') }}</option>
+                                <option value="logo" {{ ($tenant->letterhead_display ?? '') === 'logo' ? 'selected' : '' }}>{{ __('Logo only') }}</option>
+                                <option value="name" {{ ($tenant->letterhead_display ?? '') === 'name' ? 'selected' : '' }}>{{ __('Company name only') }}</option>
+                            </select>
+                            <small class="form-hint">{{ __('What the letterhead prints at the top of offer letters. A letter with no company named is not acceptable, so if no logo is uploaded only the name can show.') }}</small>
+                        </div>
+                    </div>
+
+                    @php
+                        // Resolved here so the three thumbnails below stay readable;
+                        // a tenant with no upload never reaches the branch.
+                        $assetUrl = fn ($path) => $path ? \Illuminate\Support\Facades\Storage::disk('public')->url($path) : null;
+                        $signatureUrl = $assetUrl($tenant->signature_path);
+                        $stampUrl = $assetUrl($tenant->stamp_path);
+                        $ibanLetterUrl = $assetUrl($tenant->iban_letter_path);
+                    @endphp
+
+                    {{-- Assets printed on offer letters once a letter is approved.
+                         "Tenant" here is the brokerage itself, so these are the
+                         agency's own authorised signatory, seal and bank letter. --}}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Authorised Signature') }}</label>
+                            @if($signatureUrl)
+                                <div class="mb-2">
+                                    <img src="{{ $signatureUrl }}" alt="{{ __('Signature') }}" style="max-height: 60px;" class="rounded">
+                                </div>
+                            @endif
+                            <input type="file" name="signature" class="form-control" accept="image/png,image/jpeg">
+                            <small class="form-hint">{{ __('A transparent PNG works best. Printed on approved offer letters only.') }}</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Company Stamp') }}</label>
+                            @if($stampUrl)
+                                <div class="mb-2">
+                                    <img src="{{ $stampUrl }}" alt="{{ __('Stamp') }}" style="max-height: 60px;" class="rounded">
+                                </div>
+                            @endif
+                            <input type="file" name="stamp" class="form-control" accept="image/png,image/jpeg">
+                            <small class="form-hint">{{ __('A transparent PNG of the company seal. Printed on approved offer letters only.') }}</small>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('IBAN Letter') }}</label>
+                            @if($ibanLetterUrl)
+                                <div class="mb-2">
+                                    <img src="{{ $ibanLetterUrl }}" alt="{{ __('IBAN Letter') }}" style="max-height: 110px;" class="rounded border">
+                                </div>
+                            @endif
+                            <input type="file" name="iban_letter" class="form-control" accept="image/png,image/jpeg">
+                            <small class="form-hint">{{ __('Attached as the last page of an offer letter when a letter is issued with "Attach IBAN letter". Upload an image — PDF pages cannot be merged into the letter.') }}</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Bank Details') }}</label>
+                            <textarea name="bank_details" rows="5" class="form-control" placeholder="{{ __('Account Name / Bank Name / IBAN / SWIFT / Account Number') }}">{{ $tenant->bank_details }}</textarea>
+                            <small class="form-hint">{{ __('Printed on the last page of an offer letter when a letter is issued with "Print bank details".') }}</small>
+                        </div>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-4">
@@ -224,6 +285,13 @@
                         <div class="col-md-6">
                             <label class="form-label">{{ __('Website') }}</label>
                             <input type="text" name="website" class="form-control" value="{{ $tenant->website }}" placeholder="e.g. www.pristineproperties.ae">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Google Maps Embed API key') }}</label>
+                            <input type="text" name="google_maps_embed_key" class="form-control" value="{{ $tenant->google_maps_embed_key }}" placeholder="{{ __('Paste a Maps Embed API key to show the inline map on shared inventory links') }}">
+                            <small class="form-hint d-block mt-2">{{ __('Used to render the map on the public share page. Create a "Maps Embed API" key in Google Cloud Console (free). Leave blank to hide the inline map.') }}</small>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>

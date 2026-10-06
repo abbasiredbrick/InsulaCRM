@@ -163,14 +163,20 @@ class AvailabilityIngestService
      * Fetch a PM's published availability from a public URL.
      *
      * Supports RDK-style portfolio JSON ({properties, units} — only the
-     * published "Show" units are imported) and falls back to CSV/TSV text for
-     * other sources that publish their list as a file.
+     * published "Show" units are imported), TrueRentor's RESO-flavoured feed
+     * ({spec: "truerentor.availability", organization, units}), a flat row-list
+     * JSON, and falls back to CSV/TSV text for other sources.
+     *
+     * A bearer token may be supplied for authenticated feeds (TrueRentor).
      *
      * @return array{header: array<int, string>, rows: array<int, array<string, string>>}
      */
-    public function fetchUrl(string $url): array
+    public function fetchUrl(string $url, ?string $token = null): array
     {
-        $response = Http::timeout(30)->get($url);
+        $request = $token
+            ? Http::withToken($token)->timeout(30)
+            : Http::timeout(30);
+        $response = $request->get($url);
 
         if ($response->failed()) {
             throw new RuntimeException("Could not fetch availability URL ({$url}): HTTP {$response->status()}.");
@@ -180,6 +186,10 @@ class AvailabilityIngestService
         $decoded = json_decode($body, true);
 
         if (is_array($decoded)) {
+            if (($decoded['spec'] ?? null) === 'truerentor.availability') {
+                return $this->truerentorJsonToRows($decoded);
+            }
+
             if (isset($decoded['units'], $decoded['properties']) && is_array($decoded['units'])) {
                 return $this->rdkJsonToRows($decoded);
             }
@@ -272,6 +282,48 @@ class AvailabilityIngestService
         return ['header' => $header, 'rows' => $rows];
     }
 
+    /**
+     * Turn a TrueRentor availability feed into rows keyed by Keystone's
+     * canonical field names. The feed's `share_path` already carries the
+     * broker's referral code, so leads submitted through it are attributed.
+     *
+     * @return array{header: array<int, string>, rows: array<int, array<string, string>>}
+     */
+    public function truerentorJsonToRows(array $data): array
+    {
+        $header = ['unit_no', 'building', 'community', 'features', 'bedrooms', 'square_footage', 'rent', 'furnishing', 'status', 'remarks'];
+        $rows = [];
+
+        foreach ($data['units'] ?? [] as $u) {
+            if (! is_array($u)) {
+                continue;
+            }
+
+            $rows[] = [
+                'unit_no' => trim((string) ($u['label'] ?? '')),
+                'building' => trim((string) ($u['building_name'] ?? '')),
+                'community' => trim((string) ($u['building_address'] ?? '')),
+                'features' => trim((string) ($u['type'] ?? '')),
+                'bedrooms' => (string) ($u['bedrooms'] ?? ''),
+                'square_footage' => (string) ($u['size_sqm'] ?? ''),
+                'rent' => (string) ($u['listing_rate'] ?? ''),
+                'furnishing' => ! empty($u['furnished']) ? 'Furnished' : 'Unfurnished',
+                'status' => 'listed',
+                'remarks' => trim(implode(' · ', array_filter([
+                    isset($u['listing_id']) ? "listing_id={$u['listing_id']}" : null,
+                    $u['share_path'] ?? null,
+                    $u['cover_url'] ?? null,
+                ]))),
+            ];
+        }
+
+        if ($rows === []) {
+            throw new RuntimeException('The TrueRentor availability feed lists no units.');
+        }
+
+        return ['header' => $header, 'rows' => $rows];
+    }
+
     protected function looksLikeRowList(array $decoded): bool
     {
         if ($decoded === [] || ! array_is_list($decoded) || ! is_array($decoded[0])) {
@@ -287,7 +339,7 @@ class AvailabilityIngestService
      *
      * @return array<string, mixed>
      */
-    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null, ?int $runId = null, bool $guardReconciliation = true): array
+    public function ingest(AvailabilitySource $source, array $rows, int $tenantId, ?int $userId = null, ?int $runId = null, bool $guardReconciliation = true, ?string $contextUrl = null): array
     {
         $columnMap = $source->column_map ?: [];
         $parseOptions = $source->parse_options ?: [];
@@ -308,7 +360,7 @@ class AvailabilityIngestService
                 fn ($key) => ! preg_match('/^col\d+$/i', (string) $key)
             );
             if ($savedMapKeys === [] || array_intersect($savedMapKeys, $rowKeys) === []) {
-                $detected = $this->detectHeaderMap($rowKeys);
+                $detected = $this->detectHeaderMap($rowKeys, $rows);
                 if ($detected !== []) {
                     $columnMap = $detected;
                     $mappingRebuilt = true;
@@ -327,6 +379,7 @@ class AvailabilityIngestService
         $skippedExamples = [];
         $lastBuilding = '';
         $lastCommunity = '';
+        $ensuredBuildings = [];
 
         // Snapshot the source's current units so we can tell whether this run
         // actually matched them (broken mappings silently create "Other"
@@ -344,8 +397,8 @@ class AvailabilityIngestService
 
         DB::transaction(function () use (
             $rows, $columnMap, $parseOptions, $statusMap, $city, $source, $tenantId, $runId,
-            $areaUnit, &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs, &$skippedExamples,
-            &$lastBuilding, &$lastCommunity
+            $contextUrl, $areaUnit, &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs,
+            &$skippedExamples, &$lastBuilding, &$lastCommunity, &$ensuredBuildings
         ) {
             foreach ($rows as $row) {
                 $total++;
@@ -583,6 +636,16 @@ class AvailabilityIngestService
                     $city,
                 ])));
 
+                // ── Map location (per building) ─────────────────────────────
+                // A source-provided link (URL column, AY pre-table line) is
+                // resolved here. The map_locations entry is ensured after the
+                // row is written — first-write-wins, so a correction made in
+                // Settings survives every re-import.
+                $sourceMapUrl = $data['map_url'] ?? $contextUrl ?? null;
+                if ($sourceMapUrl !== null && $sourceMapUrl !== '') {
+                    $sourceMapUrl = $this->normalizeField('map_url', $sourceMapUrl);
+                }
+
                 $record = [
                     'tenant_id' => $tenantId,
                     'availability_source_id' => $source->id,
@@ -673,6 +736,18 @@ class AvailabilityIngestService
                     Property::create($record);
                     $created++;
                 }
+
+                if ($building !== '' && $building !== null && ! isset($ensuredBuildings[$building])) {
+                    $ensuredBuildings[$building] = true;
+                    app(MapLocationService::class)->ensureMapLocation(
+                        $tenantId,
+                        $building,
+                        $community,
+                        $city,
+                        $sourceMapUrl
+                    );
+                }
+
                 $seenRefs["{$building}|{$unitNo}"] = true;
             }
         });
@@ -853,6 +928,7 @@ class AvailabilityIngestService
             'source_status', 'status' => $value,
             'furnishing' => $this->furnishing($value),
             'property_category' => $this->detectCategory($value),
+            'map_url' => app(MapLocationService::class)->cleanUrl($value),
             default => $value,
         };
     }
@@ -1383,22 +1459,39 @@ class AvailabilityIngestService
             'remarks' => 'remarks',
             'notes' => 'remarks',
             'city' => 'city',
+            'map link' => 'map_url',
+            'maps link' => 'map_url',
+            'location link' => 'map_url',
+            'location url' => 'map_url',
+            'map url' => 'map_url',
+            'gps link' => 'map_url',
+            'google maps link' => 'map_url',
         ];
     }
 
     /**
      * Build a column map from a parsed header row using the known synonyms.
+     * URL-valued columns (Reelam's map/location link) are caught first and
+     * pinned to map_url regardless of their header text.
      *
      * @param  array<int, string>  $header
+     * @param  array<int, array<string, mixed>>  $rows
      * @return array<string, string>
      */
-    protected function detectHeaderMap(array $header): array
+    protected function detectHeaderMap(array $header, array $rows = []): array
     {
         $known = $this->knownFieldColumns();
         $map = [];
+
+        foreach ($header as $name) {
+            if ($this->isUrlColumn($name, $rows)) {
+                $map[$name] = 'map_url';
+            }
+        }
+
         foreach ($header as $name) {
             $key = strtolower((string) $name);
-            if ($key !== '' && isset($known[$key])) {
+            if ($key !== '' && isset($known[$key]) && ! isset($map[$name])) {
                 $map[$name] = $known[$key];
             }
         }
@@ -1419,6 +1512,41 @@ class AvailabilityIngestService
         }
 
         return $map;
+    }
+
+    /**
+     * Whether a column's values are dominated by http(s) links — the reliable
+     * way to recognise a map/location column whose header text varies per
+     * source. Looks at up to the first 25 non-empty cells; a link wins when
+     * it is the only hit, so mis-detection of a mixed text column is avoided.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    protected function isUrlColumn(string $name, array $rows): bool
+    {
+        $matches = 0;
+        $total = 0;
+        foreach ($rows as $row) {
+            $value = trim((string) ($row[$name] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            $total++;
+            if ($this->looksLikeUrl($value)) {
+                $matches++;
+            }
+            if ($total >= 25) {
+                break;
+            }
+        }
+
+        return $total > 0 && $matches === $total;
+    }
+
+    protected function looksLikeUrl(string $value): bool
+    {
+        return preg_match('#^https?://|^www\.#i', $value) === 1
+            && filter_var($value, FILTER_VALIDATE_URL) !== false;
     }
 
     /**
@@ -1443,6 +1571,7 @@ class AvailabilityIngestService
             '/bedrooms?/' => 'bedrooms',
             '/balcony/' => 'balcony',
             '/^view(?:ing|s)?$/' => 'view',
+            '/google\s*maps|maps?\s*(?:link|url)|location\s*(?:link|url|map)|map\s*(?:link|url)/' => 'map_url',
         ];
     }
 
@@ -1471,6 +1600,13 @@ class AvailabilityIngestService
     {
         $hasHeader = (bool) ($parseOptions['has_header'] ?? false);
         $inherit = (array) ($parseOptions['inherit_columns'] ?? []);
+
+        // AY-style sheets print a line carrying the location link before the
+        // table ("https://maps.app.goo.gl/..."). Single-cell URL rows lead the
+        // grid and would otherwise shift the columns, so lift them out and
+        // return them as a per-file context URL that applies to every row.
+        $contextUrl = $this->extractContextUrl($grid);
+        $grid = array_values($grid);
 
         // Sources created for the old paste-text format store "has_header: false".
         // If the file actually starts with recognizable named columns, promote it
@@ -1524,6 +1660,34 @@ class AvailabilityIngestService
             unset($row);
         }
 
-        return ['header' => $header, 'rows' => $rows];
+        return ['header' => $header, 'rows' => $rows, 'context_url' => $contextUrl];
+    }
+
+    /**
+     * Shift any leading single-cell URL rows out of the grid and return the
+     * first one found (the AY pre-table link line). Non-URL single-cell rows
+     * are left in place so the header/data shapes are untouched.
+     *
+     * @param  array<int, array<int|string, mixed>>  $grid
+     */
+    protected function extractContextUrl(array &$grid): ?string
+    {
+        foreach (array_keys($grid) as $key) {
+            $row = $grid[$key];
+            $values = array_filter($row, fn ($cell) => trim((string) $cell) !== '');
+            if (count($values) !== 1) {
+                break;
+            }
+            $value = trim((string) (reset($values) ?: ''));
+            if (! $this->looksLikeUrl($value)) {
+                break;
+            }
+            unset($grid[$key]);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
     }
 }

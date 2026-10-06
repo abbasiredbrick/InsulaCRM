@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Property;
 use App\Models\PropertyMedia;
+use App\Services\MapLocationService;
 use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -423,8 +424,10 @@ class ListingController extends Controller
 
         AuditLog::log('inventory.unit_created', $property);
 
-        return redirect()->route('inventory.show', $property)
+        $redirect = redirect()->route('inventory.show', $property)
             ->with('success', __('Unit added to inventory.'));
+
+        return $this->withMapLocationNotice($redirect, $property);
     }
 
     public function show(Request $request, Property $property)
@@ -492,8 +495,38 @@ class ListingController extends Controller
 
         AuditLog::log('inventory.unit_updated', $property);
 
-        return redirect()->route('inventory.show', $property)
+        $redirect = redirect()->route('inventory.show', $property)
             ->with('success', __('Unit updated.'));
+
+        return $this->withMapLocationNotice($redirect, $property);
+    }
+
+    /**
+     * Ensure the unit's building (sub_community) has a map location, generating
+     * a Google Maps search link from its name when it is a building we have not
+     * seen before. Returns the redirect, carrying a heads-up when a new entry
+     * was created so the user knows they can refine it in Settings.
+     */
+    protected function withMapLocationNotice($redirect, Property $property)
+    {
+        $sub = trim((string) $property->sub_community);
+        if ($sub === '') {
+            return $redirect;
+        }
+
+        $location = app(MapLocationService::class)->ensureMapLocation(
+            $property->tenant_id,
+            $sub,
+            $property->community,
+            $property->city,
+            null
+        );
+
+        if ($location && $location->wasRecentlyCreated) {
+            $redirect->with('warning', __('Map location for ":building" was generated from its name. Review or correct it in Settings → Inventory Sources → Map Locations.', ['building' => $sub]));
+        }
+
+        return $redirect;
     }
 
     public function destroy(Request $request, Property $property)

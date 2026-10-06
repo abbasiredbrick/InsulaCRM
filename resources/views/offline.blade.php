@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0054a6">
+    <meta name="theme-color" content="#17212f">
     <title>Offline - {{ config('app.name') }}</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -50,7 +50,7 @@
         .brand {
             font-size: 0.875rem;
             font-weight: 700;
-            color: #0054a6;
+            color: #17212f;
             letter-spacing: 0.05em;
             text-transform: uppercase;
             margin-bottom: 1rem;
@@ -71,7 +71,7 @@
 
         .btn-retry {
             display: inline-block;
-            background: #0054a6;
+            background: #17212f;
             color: #fff;
             border: none;
             padding: 0.75rem 2rem;

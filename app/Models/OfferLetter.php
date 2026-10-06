@@ -43,6 +43,30 @@ class OfferLetter extends Model
         'contract_end_date',
         'payment_period',
         'contract_years',
+        'verification_token',
+        'signature_request_token',
+        'signature_requested_at',
+        'signature_requested_by',
+        'signature_request_expires_at',
+        'signature_reminded_at',
+        'signature_request_email',
+        'occupant_signature_method',
+        'occupant_signature_path',
+        'occupant_signer_name',
+        'occupant_signed_at',
+        'occupant_signed_ip',
+        'occupant_signed_ua',
+        'occupant_content_hash',
+        'bank_details_source',
+        'bank_details',
+        'occupant_name',
+        'emirates_id',
+        'security_deposit_mode',
+        'rent_payable_to',
+        'deposit_payable_to',
+        'commission_payable_to',
+        'admin_fee_payable_to',
+        'contract_fee_payable_to',
         'documents_required',
         'original_amount',
         'discount_amount',
@@ -97,6 +121,10 @@ class OfferLetter extends Model
             'contract_fee_vat' => 'decimal:2',
             'contract_fee_total' => 'decimal:2',
             'signed_at' => 'datetime',
+            'signature_requested_at' => 'datetime',
+            'signature_request_expires_at' => 'datetime',
+            'signature_reminded_at' => 'datetime',
+            'occupant_signed_at' => 'datetime',
             'declined_at' => 'datetime',
             'withdrawn_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -133,6 +161,14 @@ class OfferLetter extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    /**
+     * The requests raised to change this letter's approved terms.
+     */
+    public function changeRequests()
+    {
+        return $this->hasMany(OfferLetterChangeRequest::class);
+    }
+
     public function isSigned(): bool
     {
         return $this->status === 'signed';
@@ -141,6 +177,51 @@ class OfferLetter extends Model
     public function isApproved(): bool
     {
         return in_array($this->status, ['issued', 'signed'], true);
+    }
+
+    /**
+     * Whether this letter may be sent to the occupant for signature.
+     *
+     * Requires approval: sending an unapproved letter would have the client
+     * agreeing to terms a manager has not seen, and the signature would then be
+     * attached to terms that are still allowed to change.
+     */
+    public function canRequestSignature(): bool
+    {
+        return $this->isApproved() && ! $this->isSigned();
+    }
+
+    /**
+     * Whether a signing link has been issued and is still usable.
+     *
+     * An expired link is treated as closed rather than as "send it again for
+     * free": the occupant may already have read the letter, and silently
+     * re-opening it would let a withdrawn-in-fact offer be agreed to late.
+     */
+    public function signatureRequestIsOpen(): bool
+    {
+        return filled($this->signature_request_token)
+            && ! $this->signatureRequestIsExpired()
+            && ! $this->isSigned();
+    }
+
+    public function signatureRequestIsExpired(): bool
+    {
+        return filled($this->signature_request_expires_at)
+            && $this->signature_request_expires_at->isPast();
+    }
+
+    public function signatureRequestIsSent(): bool
+    {
+        return filled($this->signature_request_token);
+    }
+
+    /**
+     * The occupant signed remotely rather than an agent scanning a copy.
+     */
+    public function wasSignedByOccupant(): bool
+    {
+        return filled($this->occupant_signed_at);
     }
 
     public function hasDiscount(): bool
@@ -185,6 +266,7 @@ class OfferLetter extends Model
         $commissionVat = (float) $this->commission_vat;
 
         $lines = [[
+            'key' => 'commission',
             'label' => $this->isCommissionOnValue() ? __('Commission') : __('Commission @ :rate%', ['rate' => rtrim(rtrim(number_format((float) $this->commission_rate_pct, 2, '.', ''), '0'), '.')]),
             'net' => $commissionNet,
             'vat' => $commissionVat,
@@ -199,6 +281,7 @@ class OfferLetter extends Model
             }
 
             $lines[] = [
+                'key' => $column,
                 'label' => $label,
                 'net' => $net,
                 'vat' => (float) ($this->{$column.'_vat'} ?? 0),
@@ -207,6 +290,93 @@ class OfferLetter extends Model
         }
 
         return $lines;
+    }
+
+    /**
+     * Every amount the tenant owes, as one list, each naming who collects it.
+     *
+     * The letter used to split these across two tables — the rent and deposit in
+     * one, the agency's own charges in another — which read as two separate
+     * obligations. They are one set of numbers, and what actually changes
+     * between letters is who collects each line, so the table is built here with
+     * the party carried per row rather than baked into which table it fell in.
+     *
+     * Rent and the deposit carry no VAT (a residential lease is not VATable in
+     * the UAE), so they get zero rather than a hidden column.
+     */
+    public function payableLines(): array
+    {
+        $lines = [];
+        $isRent = ($this->deal?->dealType() ?? 'rent') === 'rent';
+        $lines = [];
+        $tenantName = $this->tenant?->name ?? '';
+        $landlordName = $this->deal?->property?->owner_name
+            ?: ($isRent ? __('Landlord') : __('Seller'));
+
+        if ($isRent) {
+            $lines[] = [
+                'key' => 'rent',
+                'label' => __('Rental Amount').($this->paymentPeriodLabel() ? ' — '.$this->paymentPeriodLabel() : ''),
+                'net' => (float) $this->approved_amount,
+                'vat' => 0.0,
+                'total' => (float) $this->approved_amount,
+                'vat_charges' => false,
+                'payee' => $this->payableToName('rent', $landlordName),
+            ];
+
+            if ((float) $this->security_deposit > 0) {
+                $lines[] = [
+                    'key' => 'deposit',
+                    'label' => __('Security Deposit').($this->approved_amount > 0
+                        ? ' ('.__('5% of annual rent').')' : ''),
+                    'net' => (float) $this->security_deposit,
+                    'vat' => 0.0,
+                    'total' => (float) $this->security_deposit,
+                    'vat_charges' => false,
+                    'payee' => $this->payableToName('deposit', $landlordName),
+                ];
+            }
+        } else {
+            $lines[] = [
+                'key' => 'rent',
+                'label' => __('Sales Amount'),
+                'net' => (float) $this->approved_amount,
+                'vat' => 0.0,
+                'total' => (float) $this->approved_amount,
+                'vat_charges' => false,
+                'payee' => $this->payableToName('rent', $landlordName),
+            ];
+        }
+
+        foreach ($this->serviceCharges() as $charge) {
+            $lines[] = [
+                'key' => $charge['key'],
+                'label' => $charge['label'],
+                'net' => (float) $charge['net'],
+                'vat' => (float) $charge['vat'],
+                'total' => (float) $charge['total'],
+                'vat_charges' => true,
+                // Still the landlord is the fallback party: a service line routed
+                // away from the agency is collected by the landlord, so naming
+                // ourselves there would contradict the selection.
+                'payee' => $this->payableToName($charge['key'], $landlordName),
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Who collects a line: the named party when they take it, the agency when
+     * the letter routes it through us.
+     */
+    protected function payableToName(string $line, string $partyName): string
+    {
+        $key = $line.'_payable_to';
+
+        return in_array($this->{$key}, ['landlord', 'broker'], true) && $this->{$key} === 'broker'
+            ? ($this->tenant?->name ?? __('the Agency'))
+            : $partyName;
     }
 
     /**
@@ -250,6 +420,27 @@ class OfferLetter extends Model
         return $raw;
     }
 
+    /**
+     * The five payable-to columns as a map, for the edit form.
+     *
+     * Falls back to the conventional default per line so an old letter written
+     * before these columns existed still opens on a sane selection rather than
+     * a blank one.
+     */
+    public function payableToAttributes(): array
+    {
+        $out = [];
+
+        foreach (['rent', 'deposit', 'commission', 'admin_fee', 'contract_fee'] as $line) {
+            $key = $line.'_payable_to';
+            $out[$key] = in_array($this->{$key}, ['landlord', 'broker'], true)
+                ? $this->{$key}
+                : \App\Services\OfferLetterService::PAYABLE_DEFAULTS[$line];
+        }
+
+        return $out;
+    }
+
     public function canWithdraw(): bool
     {
         return in_array($this->status, ['draft', 'pending_approval', 'issued'], true);
@@ -258,5 +449,17 @@ class OfferLetter extends Model
     public function canDelete(): bool
     {
         return $this->isEditable();
+    }
+
+    /**
+     * Whether a specific user may hard-delete this letter. Apart from the
+     * Owner, the `isEditable()` rule stands: only a letter that has not yet
+     * been approved may be deleted. The Owner can also clear a letter that has
+     * already progressed (including a signed one), in which case the offer is
+     * removed together with the activity and audit trail that mention it.
+     */
+    public function canDeleteBy(User $user): bool
+    {
+        return $user->isOwner() || $this->canDelete();
     }
 }

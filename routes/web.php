@@ -44,6 +44,8 @@ use App\Http\Controllers\ListingsController;
 use App\Http\Controllers\MarketController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfferLetterController;
+use App\Http\Controllers\OfferSignatureController;
+use App\Http\Controllers\OfferVerificationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OpenHouseController;
 use App\Http\Controllers\PdfExportController;
@@ -52,10 +54,14 @@ use App\Http\Controllers\PortalIntegrationController;
 use App\Http\Controllers\PortalReadinessController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\PublicServiceProviderController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SequenceController;
+use App\Http\Controllers\ServiceProviderController;
+use App\Http\Controllers\ServiceProviderLinkController;
+use App\Http\Controllers\ServiceProviderReviewController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShowingController;
 use App\Http\Controllers\SsoController;
@@ -106,6 +112,7 @@ Route::get('/p/{slug}/properties', [BuyerPortalController::class, 'properties'])
 
 // Public shared-inventory links (client can verify / self-register, then browse & flag interest)
 Route::get('/s/{slug}', [\App\Http\Controllers\ClientShareController::class, 'index'])->name('share.inventory');
+Route::get('/s/{slug}/manifest.webmanifest', [\App\Http\Controllers\ClientShareController::class, 'manifest'])->name('share.manifest');
 Route::post('/s/{slug}/verify', [\App\Http\Controllers\ClientShareController::class, 'verify'])->middleware('throttle:10,1')->name('share.verify');
 Route::post('/s/{slug}/interest/{property}', [\App\Http\Controllers\ClientShareController::class, 'interest'])->middleware('throttle:30,1')->name('share.interest');
 Route::post('/s/{slug}/logout', [\App\Http\Controllers\ClientShareController::class, 'logout'])->name('share.logout');
@@ -123,6 +130,34 @@ Route::get('/calendar/feed/{token}.ics', [CalendarSyncController::class, 'icalFe
 // SSO routes (no auth required — user is logging in)
 Route::get('/sso/{driver}/redirect', [SsoController::class, 'redirect'])->name('sso.redirect');
 Route::match(['get', 'post'], '/sso/{driver}/callback', [SsoController::class, 'callback'])->name('sso.callback');
+
+// Occupant signing. Also outside `guest`: this is not a login flow, and a
+// signed-in employee following the link to check it must not be redirected.
+// `signed` proves the link is ours and is tied to one letter; the token inside
+// it is rotated on every resend, so a forwarded old email is already dead.
+// Throttled because the endpoint is public.
+Route::get('/offer/{token}/sign', [OfferSignatureController::class, 'show'])
+    ->middleware('signed')
+    ->name('offers.sign');
+Route::post('/offer/{token}/sign', [OfferSignatureController::class, 'submit'])
+    ->middleware(['signed', 'throttle:12,10'])
+    ->name('offers.sign.submit');
+
+// Offer letter verification. Deliberately OUTSIDE the `guest` middleware group:
+// that group shares the session and would bounce a signed-in employee away from
+// a letter they are checking, and it does not belong to the auth flow at all.
+// `signed` proves the URL was minted by us and has not been edited.
+Route::get('/verify/offer/{token}', [OfferVerificationController::class, 'show'])
+    ->middleware('signed')
+    ->name('verify.offer');
+
+// Service provider registration — public on purpose. The token in the URL is a
+// stored credential: one per invitation, consumed on submission or after 30 days.
+Route::get('/service-providers/register/{token}', [PublicServiceProviderController::class, 'create'])->name('service-providers.public.create');
+Route::post('/service-providers/register/{token}', [PublicServiceProviderController::class, 'store'])->middleware('throttle:12,10')->name('service-providers.public.store');
+Route::get('/service-providers/provider/{editToken}', [PublicServiceProviderController::class, 'status'])->name('service-providers.public.status');
+Route::get('/service-providers/provider/{editToken}/edit', [PublicServiceProviderController::class, 'edit'])->middleware('throttle:12,10')->name('service-providers.public.edit');
+Route::post('/service-providers/provider/{editToken}/edit', [PublicServiceProviderController::class, 'update'])->middleware('throttle:12,10')->name('service-providers.public.update');
 
 // Guest routes
 Route::middleware('guest')->group(function () {
@@ -319,6 +354,26 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/inventory/sync-portal-status', [ListingController::class, 'syncPortalStatus'])->name('inventory.sync-portal-status');
     });
 
+    // ── Service providers (real estate agent mode) ─────────────
+    Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
+        Route::get('/service-providers/links', [ServiceProviderLinkController::class, 'index'])->name('service-providers.links');
+        Route::post('/service-providers/links', [ServiceProviderLinkController::class, 'store'])->name('service-providers.links.store');
+        Route::post('/service-providers/links/{link}/send', [ServiceProviderLinkController::class, 'send'])->name('service-providers.links.send');
+        Route::post('/service-providers/links/{link}/revoke', [ServiceProviderLinkController::class, 'revoke'])->name('service-providers.links.revoke');
+
+        Route::get('/service-providers', [ServiceProviderController::class, 'index'])->name('service-providers.index');
+
+        // Review queue — owner/admin only. Registered BEFORE the {provider} show
+        // route so /review is not swallowed by route-model binding.
+        Route::middleware('role:admin')->group(function () {
+            Route::get('/service-providers/review', [ServiceProviderReviewController::class, 'index'])->name('service-providers.review');
+            Route::post('/service-providers/review/{provider}', [ServiceProviderReviewController::class, 'store'])->name('service-providers.review.store');
+        });
+
+        Route::get('/service-providers/documents/{document}/download', [ServiceProviderController::class, 'download'])->name('service-providers.documents.download');
+        Route::get('/service-providers/{provider}', [ServiceProviderController::class, 'show'])->name('service-providers.show');
+    });
+
     // ── Availability sheet imports (PM companies) ─────────────
     Route::middleware(['role_or_permission:admin,agent,listing_agent,buyers_agent,properties.view', 'mode:realestate'])->group(function () {
         Route::get('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'index'])
@@ -329,6 +384,18 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
             ->name('availability-sources.template');
         Route::get('/availability-sources/guide', [\App\Http\Controllers\AvailabilitySourceController::class, 'guide'])
             ->name('availability-sources.guide');
+        Route::get('/availability-sources/locations', [\App\Http\Controllers\AvailabilitySourceController::class, 'locationsIndex'])
+            ->name('availability-sources.locations');
+        Route::post('/availability-sources/locations/apply', [\App\Http\Controllers\AvailabilitySourceController::class, 'applyLocation'])
+            ->name('availability-sources.locations-apply');
+        Route::get('/availability-sources/truerentor', [\App\Http\Controllers\AvailabilitySourceController::class, 'connectTruerentor'])
+            ->name('availability-sources.truerentor');
+        Route::post('/availability-sources/truerentor', [\App\Http\Controllers\AvailabilitySourceController::class, 'connectTruerentorStore'])
+            ->name('availability-sources.truerentor.store');
+        Route::post('/availability-sources/truerentor/oauth', [\App\Http\Controllers\AvailabilitySourceController::class, 'startTruerentorOAuth'])
+            ->name('availability-sources.truerentor.oauth');
+        Route::get('/availability-sources/truerentor/callback', [\App\Http\Controllers\AvailabilitySourceController::class, 'truerentorCallback'])
+            ->name('availability-sources.truerentor.callback');
         Route::post('/availability-sources', [\App\Http\Controllers\AvailabilitySourceController::class, 'store'])
             ->name('availability-sources.store');
         Route::get('/availability-sources/{source}/edit', [\App\Http\Controllers\AvailabilitySourceController::class, 'edit'])
@@ -544,12 +611,16 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/pipeline/{deal}/offer-letters', [OfferLetterController::class, 'store'])->name('deal.offers.store');
         Route::get('/offer-letters/{offerLetter}/print', [OfferLetterController::class, 'print'])->name('deal.offers.print');
         Route::get('/offer-letters/{offerLetter}/download-signed', [OfferLetterController::class, 'downloadSigned'])->name('deal.offers.downloadSigned');
+        Route::post('/offer-letters/{offerLetter}/request-signature', [OfferLetterController::class, 'requestSignature'])->name('deal.offers.requestSignature');
+        Route::post('/offer-letters/{offerLetter}/revoke-signature', [OfferLetterController::class, 'revokeSignature'])->name('deal.offers.revokeSignature');
         Route::post('/offer-letters/{offerLetter}/upload-signed', [OfferLetterController::class, 'uploadSigned'])->name('deal.offers.uploadSigned');
         Route::post('/offer-letters/{offerLetter}/approve', [OfferLetterController::class, 'approve'])->name('deal.offers.approve');
         Route::patch('/offer-letters/{offerLetter}', [OfferLetterController::class, 'update'])->name('deal.offers.update');
         Route::post('/offer-letters/{offerLetter}/withdraw', [OfferLetterController::class, 'withdraw'])->name('deal.offers.withdraw');
         Route::delete('/offer-letters/{offerLetter}', [OfferLetterController::class, 'destroy'])->name('deal.offers.destroy');
         Route::patch('/offer-letters/{offerLetter}/status', [OfferLetterController::class, 'updateStatus'])->name('deal.offers.status');
+        Route::post('/offer-letters/{offerLetter}/request-change', [OfferLetterController::class, 'requestChange'])->name('deal.offers.requestChange');
+        Route::post('/offer-letter-change-requests/{changeRequest}/review', [OfferLetterController::class, 'reviewChange'])->name('deal.offers.reviewChange');
 
         // Activities on deals
         Route::post('/pipeline/{deal}/activities', [ActivityController::class, 'storeDealActivity'])->name('deals.activities.store');
