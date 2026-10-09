@@ -288,8 +288,17 @@ class AvailabilityImportTest extends TestCase
         $this->assertNull($byRef['Retail 3']->bedrooms);
         $this->assertSame(1, $byRef['105']->bedrooms);
 
-        $this->assertSame('3BR Apartment for Rent in Al Hattan Residence', $byRef['803']->marketing_title);
+        // "+ Maid" names a feature, not a bedroom count — the counts above
+        // stay 3/2, and the maid's-room rows get the flag and the "+ Maid"
+        // title. "Retail 3" reads as commercial from its unit number alone.
+        $this->assertTrue($byRef['803']->maids_room);
+        $this->assertTrue($byRef['1007']->maids_room);
+        $this->assertFalse($byRef['1714']->maids_room);
+        $this->assertNull($byRef['Retail 3']->bedrooms);
+
+        $this->assertSame('3BR + Maid Apartment for Rent in Al Hattan Residence', $byRef['803']->marketing_title);
         $this->assertSame('1BR Apartment for Rent in Canal Residence', $byRef['1714']->marketing_title);
+        $this->assertSame('shop', $byRef['Retail 3']->property_category);
     }
 
     public function test_ams_partial_reimport_never_bulk_marks_units_leased(): void

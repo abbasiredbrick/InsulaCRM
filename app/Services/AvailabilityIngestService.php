@@ -45,7 +45,7 @@ class AvailabilityIngestService
                 'semicolon' => str_getcsv($line, ';'),
                 default => preg_split('/[ \t]{2,}/', trim($line)) ?: [],
             };
-            $cells = array_map(fn ($c) => trim((string) $c), $cells);
+            $cells = array_map(fn ($c) => $this->cleanCell((string) $c), $cells);
             if (count($cells) === 1 && $cells[0] === '') {
                 continue;
             }
@@ -56,7 +56,17 @@ class AvailabilityIngestService
     }
 
     /**
-     * Minimal dependency-free XLSX reader (shared strings + first worksheet).
+     * Minimal dependency-free XLSX reader: shared strings + every worksheet.
+     *
+     * Workbooks such as Colliers' split their availability into per-area sheets
+     * ("AUH1", "AL RAHA", "YAS"…) and put a banner block ("AVAILABILITY LIST…",
+     * "2 BEDROOMS") above each table's header row. Every worksheet is parsed
+     * through gridToRows() (which now finds the real header row below any
+     * banner) and the results are merged onto a union of column headers.
+     *
+     * Sheets whose name marks bulk staff accommodation are skipped: those rows
+     * are rooms ("FF-143", "Type2", "Private Bathroom") that carry no rent or
+     * community and are not market inventory.
      */
     public function parseXlsx(string $path, array $parseOptions): array
     {
@@ -69,37 +79,161 @@ class AvailabilityIngestService
             throw new RuntimeException('Unable to open Excel file.');
         }
 
+        $shared = $this->readSharedStrings($zip);
+        $sheets = $this->resolveWorkbookSheets($zip);
+        if ($sheets === []) {
+            $sheets = [[
+                'name' => null,
+                'target' => $zip->locateName('xl/worksheets/sheet1.xml') !== false
+                    ? 'xl/worksheets/sheet1.xml'
+                    : 'xl/worksheets/sheet.xml',
+            ]];
+        }
+
+        $header = [];
+        $parsedRows = [];
+        $contextUrl = null;
+
+        foreach ($sheets as $sheet) {
+            if (($sheet['name'] ?? null) !== null && preg_match('/staff|accommodation/i', (string) $sheet['name'])) {
+                continue;
+            }
+
+            $sheetXml = $zip->getFromName((string) $sheet['target']);
+            if ($sheetXml === false) {
+                continue;
+            }
+            $sheetNode = simplexml_load_string($sheetXml);
+            if ($sheetNode === false) {
+                continue;
+            }
+
+            $grid = $this->sheetXmlToGrid($sheetNode, $shared);
+            if ($grid === []) {
+                continue;
+            }
+
+            $parsed = $this->gridToRows($grid, $parseOptions);
+            if ($contextUrl === null) {
+                $contextUrl = $parsed['context_url'] ?? null;
+            }
+            foreach ($parsed['header'] as $name) {
+                if ($name !== '' && ! in_array($name, $header, true)) {
+                    $header[] = $name;
+                }
+            }
+            foreach ($parsed['rows'] as $row) {
+                $parsedRows[] = $row;
+            }
+        }
+
+        // Re-key every row against the FINAL union header. Merging to the header
+        // as it grows would leave rows[0] short of the later sheets' columns —
+        // and ingest derives its detection header from array_keys($rows[0]).
+        $rows = [];
+        foreach ($parsedRows as $row) {
+            $merged = [];
+            foreach ($header as $name) {
+                $merged[$name] = isset($row[$name]) ? $row[$name] : '';
+            }
+            $rows[] = $merged;
+        }
+
+        $zip->close();
+
+        if ($rows === []) {
+            throw new RuntimeException('Excel file contains no data.');
+        }
+
+        return ['header' => $header, 'rows' => $rows, 'context_url' => $contextUrl];
+    }
+
+    /**
+     * Load the shared strings table once (it is shared by all worksheets).
+     *
+     * @return array<int, string>
+     */
+    protected function readSharedStrings(ZipArchive $zip): array
+    {
         $shared = [];
         $ssXml = $zip->getFromName('xl/sharedStrings.xml');
-        if ($ssXml !== false) {
-            $ss = simplexml_load_string($ssXml);
-            if ($ss !== false) {
-                foreach ($ss->xpath('//*[local-name()="si"]') as $si) {
-                    $text = '';
-                    foreach ($si->xpath('.//*[local-name()="t"]') as $t) {
-                        $text .= (string) $t;
+        if ($ssXml === false) {
+            return $shared;
+        }
+
+        $ss = simplexml_load_string($ssXml);
+        if ($ss === false) {
+            return $shared;
+        }
+
+        foreach ($ss->xpath('//*[local-name()="si"]') as $si) {
+            $text = '';
+            foreach ($si->xpath('.//*[local-name()="t"]') as $t) {
+                $text .= (string) $t;
+            }
+            $shared[] = $text;
+        }
+
+        return $shared;
+    }
+
+    /**
+     * Resolve the workbook's sheets in tab order: names come from
+     * xl/workbook.xml, each sheet's r:id is mapped to its worksheet XML by
+     * xl/_rels/workbook.xml.rels.
+     *
+     * @return array<int, array{name: string|null, target: string}>
+     */
+    protected function resolveWorkbookSheets(ZipArchive $zip): array
+    {
+        $targets = [];
+        $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        if ($relsXml !== false) {
+            $rels = simplexml_load_string($relsXml);
+            if ($rels !== false) {
+                foreach ($rels->xpath('//*[local-name()="Relationship"]') as $rel) {
+                    if ((string) $rel['Type'] !== 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet') {
+                        continue;
                     }
-                    $shared[] = $text;
+                    $target = ltrim((string) $rel['Target'], '/');
+                    $targets[(string) $rel['Id']] = str_starts_with($target, 'xl/') ? $target : 'xl/'.$target;
                 }
             }
         }
 
-        $sheetPath = 'xl/worksheets/sheet1.xml';
-        if ($zip->locateName($sheetPath) === false) {
-            $sheetPath = 'xl/worksheets/sheet.xml';
+        $sheets = [];
+        $wbXml = $zip->getFromName('xl/workbook.xml');
+        if ($wbXml === false) {
+            return $sheets;
         }
-        $sheetXml = $zip->getFromName($sheetPath);
-        $zip->close();
-
-        if ($sheetXml === false) {
-            throw new RuntimeException('Excel file contains no worksheet.');
-        }
-
-        $sheet = simplexml_load_string($sheetXml);
-        if ($sheet === false) {
-            throw new RuntimeException('Excel file is unreadable.');
+        $wb = simplexml_load_string($wbXml);
+        if ($wb === false) {
+            return $sheets;
         }
 
+        $relsNs = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+        foreach ($wb->xpath('//*[local-name()="sheet"]') as $sheet) {
+            $rid = (string) $sheet->attributes($relsNs)['id'];
+            if ($rid === '') {
+                $rid = (string) $sheet['id'];
+            }
+            $target = $targets[$rid] ?? null;
+            if ($target === null) {
+                continue;
+            }
+            $sheets[] = ['name' => (string) $sheet['name'], 'target' => $target];
+        }
+
+        return $sheets;
+    }
+
+    /**
+     * Turn one worksheet into a grid of column-indexed cells.
+     *
+     * @return array<int, array<int, string>>
+     */
+    protected function sheetXmlToGrid(\SimpleXMLElement $sheet, array $shared): array
+    {
         $grid = [];
         foreach ($sheet->xpath('//*[local-name()="row"]') as $row) {
             $cells = [];
@@ -124,18 +258,14 @@ class AvailabilityIngestService
                 } else {
                     $value = $raw;
                 }
-                $cells[$idx] = trim($value);
+                $cells[$idx] = $this->cleanCell($value);
             }
             if ($cells) {
                 $grid[] = $cells;
             }
         }
 
-        if (! $grid) {
-            throw new RuntimeException('Excel file contains no data.');
-        }
-
-        return $this->gridToRows($grid, $parseOptions);
+        return $grid;
     }
 
     public function parseCsv(string $path, array $parseOptions): array
@@ -148,7 +278,7 @@ class AvailabilityIngestService
         $delimiter = $this->normalizeDelimiter($parseOptions['delimiter'] ?? null, $path);
         $grid = [];
         while (($line = fgetcsv($handle, 0, $delimiter)) !== false) {
-            $cells = array_map(fn ($c) => trim((string) $c), $line);
+            $cells = array_map(fn ($c) => $this->cleanCell((string) $c), $line);
             if (count($cells) === 1 && $cells[0] === '') {
                 continue;
             }
@@ -407,12 +537,18 @@ class AvailabilityIngestService
                 $amenitiesRaw = '';
                 $remarksRaw = '';
                 $rentRaw = '';
+                $bedroomsRaw = '';
+                $rentRaw = '';
+                $bedroomsRaw = '';
 
                 foreach ($columnMap as $header => $field) {
                     if (isset($row[$header])) {
                         $raw = trim((string) $row[$header]);
                         if ($raw === '') {
                             continue;
+                        }
+                        if ($field === 'bedrooms') {
+                            $bedroomsRaw = trim(($bedroomsRaw !== '' ? $bedroomsRaw.' / ' : '').$raw);
                         }
                         if ($field === 'features') {
                             $featuresRaw = trim(($featuresRaw !== '' ? $featuresRaw.' / ' : '').$raw);
@@ -464,7 +600,7 @@ class AvailabilityIngestService
 
                 $looksLikeUnit = $unitNo !== '' && (
                     preg_match('/[0-9]/', $unitNo)
-                    || preg_match('/^(villa|plot|office|retail|shop|showroom|unit|penthouse)/i', $unitNo)
+                    || preg_match('/^(villa|plot|office|retail|shop|showroom|store|kiosk|booth|commercial|unit|penthouse)/i', $unitNo)
                 );
                 if (! $looksLikeUnit) {
                     $skipped++;
@@ -488,7 +624,11 @@ class AvailabilityIngestService
                 if (($features['bedrooms'] ?? null) === null && $rentRaw !== '' && preg_match('/\b(\d+)\s*(?:BR|BD|BHK|BED(?:ROOM)?S?)/i', $rentRaw, $m)) {
                     $features['bedrooms'] = (int) $m[1];
                 }
-                $category = $data['property_category'] ?? ($source->default_category ?: $this->detectCategory($featuresRaw.' '.$building));
+                // Category detection sees the unit number too, not just the
+                // features and building: AMS writes "Retail 3" purely in the
+                // unit column, and a sheet with no type text would otherwise
+                // import every such row as an apartment.
+                $category = $data['property_category'] ?? ($source->default_category ?: $this->detectCategory(trim(implode(' ', array_filter([$featuresRaw, $building, $unitNo])))));
                 $category = $category ?: 'apartment';
 
                 $rawStatus = (string) ($data['status'] ?? $data['source_status'] ?? '');
@@ -539,6 +679,18 @@ class AvailabilityIngestService
                 }
                 $squareFootage = $data['square_footage'] ?? $features['square_footage'];
                 $furnishing = $data['furnishing'] ?? $features['furnishing'];
+
+                // A maid's room is read from the features/unit type first; the
+                // Bedrooms cell (AMS writes "3 BR + Maid - (309 SQM)") and the
+                // remarks prose are consulted when nothing was found there
+                // (RDK puts "2BHK + MAID - BALCONY" in the description).
+                $maidsRoom = ! empty($features['maids_room']);
+                if (! $maidsRoom && $this->mentionsMaid($bedroomsRaw)) {
+                    $maidsRoom = true;
+                }
+                if (! $maidsRoom && $this->mentionsMaid($remarksRaw.' '.$amenitiesRaw)) {
+                    $maidsRoom = true;
+                }
 
                 $parking = isset($data['parking']) && $data['parking'] !== '' ? $data['parking'] : null;
 
@@ -625,9 +777,12 @@ class AvailabilityIngestService
                     }
                     $descriptionParts[] = implode(' | ', $bits);
                 }
+                if ($maidsRoom && ! $this->mentionsMaid(implode(' ', $descriptionParts))) {
+                    $descriptionParts[] = "Maid's room.";
+                }
                 $marketingDescription = implode(' ', array_filter($descriptionParts));
 
-                $marketingTitle = $this->buildMarketingTitle($bedrooms, $category, $building);
+                $marketingTitle = $this->buildMarketingTitle($bedrooms, $category, $building, $maidsRoom);
 
                 $address = trim(implode(' ', array_filter([
                     $unitNo,
@@ -662,6 +817,7 @@ class AvailabilityIngestService
                     'floor_no' => $data['floor_no'] ?? null,
                     'plot_no' => $data['plot_no'] ?? null,
                     'bedrooms' => $bedrooms !== null ? (int) $bedrooms : null,
+                    'maids_room' => $maidsRoom,
                     'square_footage' => $squareFootage,
                     'furnishing' => $furnishing,
                     'parking' => $parking,
@@ -739,13 +895,16 @@ class AvailabilityIngestService
 
                 if ($building !== '' && $building !== null && ! isset($ensuredBuildings[$building])) {
                     $ensuredBuildings[$building] = true;
-                    app(MapLocationService::class)->ensureMapLocation(
+                    $location = app(MapLocationService::class)->ensureMapLocation(
                         $tenantId,
                         $building,
                         $community,
                         $city,
                         $sourceMapUrl
                     );
+                    if ($location) {
+                        app(MapLocationService::class)->linkBuildingUnits($tenantId, $building, $location);
+                    }
                 }
 
                 $seenRefs["{$building}|{$unitNo}"] = true;
@@ -819,6 +978,7 @@ class AvailabilityIngestService
             'skipped_examples' => $skippedExamples,
             'reconciliation_skipped' => $reconciliationSkipped,
             'mapping_rebuilt' => $mappingRebuilt,
+            'column_map' => $columnMap,
         ];
     }
 
@@ -1153,17 +1313,32 @@ class AvailabilityIngestService
         if (str_contains($value, 'villa compound')) {
             return 'villa_compound';
         }
-        if (str_contains($value, 'villa') || str_contains($value, 'plot')) {
-            return str_contains($value, 'villa') ? 'villa' : 'land';
-        }
         if (str_contains($value, 'penthouse')) {
             return 'penthouse';
+        }
+        // A whole commercial building ("ICT Commercial's 'Full Building' row,
+        // 78k sq ft) is commercial, not a collection of flats. It must win
+        // before the generic office/commercial branch below.
+        if (str_contains($value, 'full building')) {
+            return 'commercial_building';
+        }
+        if (str_contains($value, 'showroom')) {
+            return 'showroom';
+        }
+        if (str_contains($value, 'storage') || str_contains($value, 'warehouse')) {
+            return 'warehouse';
+        }
+        if (str_contains($value, 'factory')) {
+            return 'factory';
         }
         if (str_contains($value, 'office') || str_contains($value, 'commercial')) {
             return str_contains($value, 'retail') || str_contains($value, 'shop') ? 'shop' : 'office';
         }
         if (str_contains($value, 'retail') || str_contains($value, 'shop')) {
             return 'shop';
+        }
+        if (str_contains($value, 'villa') || str_contains($value, 'plot')) {
+            return str_contains($value, 'villa') ? 'villa' : 'land';
         }
 
         // "Studio" is a size, not a category - it stays an apartment and is
@@ -1172,10 +1347,26 @@ class AvailabilityIngestService
     }
 
     /**
-     * Derive bedrooms / area / furnishing / a readable one-line summary from a
-     * free-text features column such as "4 BR + Maids room 352 Sq Mtr / 3744 Sq Foot".
+     * Whether a features/free-text value names a maid's room. Sheets spell it
+     * every way: "2BHK + MAID", "2 BR + Maids - Sea View", "Flat Maids
+     * Room/Terrace", "BALCONY,MAID'S ROOM". "+M" alone is accepted only as a
+     * short form of the same token.
+     */
+    protected function mentionsMaid(string $value): bool
+    {
+        if (preg_match('/\+\s*m(?:aid|aids|aid\s*room|aids\s*room)?\b/i', $value)) {
+            return true;
+        }
+
+        return (bool) preg_match("/\bmaid(?:s|'?s)?\s+room\b/i", $value);
+    }
+
+    /**
+     * Derive bedrooms / area / furnishing / maid's room / a readable one-line
+     * summary from a free-text features column such as
+     * "4 BR + Maids room 352 Sq Mtr / 3744 Sq Foot".
      *
-     * @return array{bedrooms: ?int, is_studio: bool, square_footage: ?int, furnishing: ?string, summary: string}
+     * @return array{bedrooms: ?int, is_studio: bool, maids_room: bool, square_footage: ?int, furnishing: ?string, summary: string}
      */
     protected function featuresFromRaw(string $raw): array
     {
@@ -1204,19 +1395,21 @@ class AvailabilityIngestService
         return [
             'bedrooms' => $bedrooms,
             'is_studio' => $isStudio,
+            'maids_room' => $this->mentionsMaid($raw),
             'square_footage' => $squareFootage,
             'furnishing' => $furnishing,
             'summary' => $summary,
         ];
     }
 
-    protected function buildMarketingTitle(?int $bedrooms, string $category, string $building): string
+    protected function buildMarketingTitle(?int $bedrooms, string $category, string $building, bool $maidsRoom = false): string
     {
         $label = Property::CATEGORIES[$category] ?? ucwords(str_replace('_', ' ', $category));
 
         // Read the size through the same helper the UI uses, so an imported
-        // title and a computed one can never disagree ("3BR" vs "3 BR").
-        $bed = (new Property)->forceFill(['bedrooms' => $bedrooms])->bedroomLabel();
+        // title and a computed one can never disagree ("3BR" vs "3 BR") and a
+        // maid's room lands on the title exactly where the label prints it.
+        $bed = (new Property)->forceFill(['bedrooms' => $bedrooms, 'maids_room' => $maidsRoom])->sizeLabel();
 
         return trim(($bed !== '' ? $bed.' ' : '')."{$label} for Rent in {$building}");
     }
@@ -1367,13 +1560,26 @@ class AvailabilityIngestService
     }
 
     /**
+     * Trim a cell the way Excel users mean it. trim() is byte-oriented, so the
+     * UTF-8 non-breaking space (\xC2\xA0) needs an explicit charlist entry —
+     * ColliersMAP URLs arrive with a leading \xA0 and would otherwise fail the
+     * URL check and land as unmappable text.
+     */
+    protected function cleanCell(string $value): string
+    {
+        return trim($value, " \t\n\r\0\x0B\xC2\xA0");
+    }
+
+    /**
      * Normalize a column header so it is easy to map and match: strip the BOM,
-     * trim surrounding whitespace and collapse any inner runs (Excel cells keep
-     * embedded newlines, e.g. "Location (please\nclick)").
+     * trim surrounding whitespace (incl. NBSP) and collapse any inner runs
+     * (Excel cells keep embedded newlines, e.g. "Location (please\nclick)").
+     * The /u flag makes \s include \xC2\xA0, so a header padded with
+     * non-breaking spaces normalizes too.
      */
     protected function normalizeHeaderName(string $value): string
     {
-        return preg_replace('/\s+/', ' ', trim($this->stripBom($value))) ?: '';
+        return preg_replace('/\s+/u', ' ', $this->cleanCell($this->stripBom($value))) ?: '';
     }
 
     /**
@@ -1405,6 +1611,10 @@ class AvailabilityIngestService
             'number of bedrooms' => 'bedrooms',
             'bedrooms' => 'bedrooms',
             'beds' => 'bedrooms',
+            'no. of br' => 'bedrooms',
+            'no of br' => 'bedrooms',
+            'number of br' => 'bedrooms',
+            'number of beds' => 'bedrooms',
             'bathrooms' => 'bathrooms',
             'bath' => 'bathrooms',
             'unit features' => 'features',
@@ -1423,6 +1633,9 @@ class AvailabilityIngestService
             'rent price' => 'rent',
             'asking rent' => 'rent',
             'annual rent' => 'rent',
+            'annual rent (aed)' => 'rent',
+            'monthly rent' => 'rent',
+            'monthly rent (aed)' => 'rent',
             'listing price' => 'rent',
             'listing price (aed)' => 'rent',
             'deposit' => 'deposit',
@@ -1458,12 +1671,16 @@ class AvailabilityIngestService
             'handover date' => 'handover_date',
             'remarks' => 'remarks',
             'notes' => 'remarks',
+            'keys availability' => 'remarks',
             'city' => 'city',
             'map link' => 'map_url',
             'maps link' => 'map_url',
             'location link' => 'map_url',
             'location url' => 'map_url',
             'map url' => 'map_url',
+            'map' => 'map_url',
+            'gps map' => 'map_url',
+            'gps location' => 'map_url',
             'gps link' => 'map_url',
             'google maps link' => 'map_url',
         ];
@@ -1515,6 +1732,20 @@ class AvailabilityIngestService
     }
 
     /**
+     * Public wrapper for detectHeaderMap() so the review screen can show the
+     * mapping a fresh sheet will get before the import actually runs (the run
+     * itself rebuilds the same map when the saved one shares no columns).
+     *
+     * @param  array<int, string>  $header
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<string, string>
+     */
+    public function detectColumnMap(array $header, array $rows = []): array
+    {
+        return $this->detectHeaderMap($header, $rows);
+    }
+
+    /**
      * Whether a column's values are dominated by http(s) links — the reliable
      * way to recognise a map/location column whose header text varies per
      * source. Looks at up to the first 25 non-empty cells; a link wins when
@@ -1527,7 +1758,7 @@ class AvailabilityIngestService
         $matches = 0;
         $total = 0;
         foreach ($rows as $row) {
-            $value = trim((string) ($row[$name] ?? ''));
+            $value = $this->cleanCell((string) ($row[$name] ?? ''));
             if ($value === '') {
                 continue;
             }
@@ -1545,6 +1776,8 @@ class AvailabilityIngestService
 
     protected function looksLikeUrl(string $value): bool
     {
+        $value = $this->cleanCell($value);
+
         return preg_match('#^https?://|^www\.#i', $value) === 1
             && filter_var($value, FILTER_VALIDATE_URL) !== false;
     }
@@ -1566,6 +1799,9 @@ class AvailabilityIngestService
             '/expected\s*(?:vacan(?:t|cy)|vacating|availability|available|move[\s-]?in)/' => 'key_date',
             '/listing\s*price/' => 'rent',
             '/asking\s*(?:rent|price)/' => 'rent',
+            '/annual\s*rent|monthly\s*rent/' => 'rent',
+            '/no\.?\s*of\s*brs?\b|number\s*of\s*brs?\b/' => 'bedrooms',
+            '/keys\s*availability/' => 'remarks',
             '/security\s*deposit/' => 'deposit',
             '/square\s*(?:foot|feet|meter)|sq\.?\s*(?:ft|m)/' => 'square_footage',
             '/bedrooms?/' => 'bedrooms',
@@ -1576,24 +1812,63 @@ class AvailabilityIngestService
     }
 
     /**
-     * Decide whether the first grid row is a header row rather than data (used
-     * when a source's saved parse_options say "no header" but the uploaded
-     * file actually starts with named columns, e.g. an Excel-exported CSV).
+     * First grid row that reads as a header: at least three non-empty cells and
+     * two or more recognised column names (exact synonyms or fuzzy patterns).
+     * Returns null for a headerless grid so the legacy positional "colN"
+     * behaviour around it is preserved untouched.
+     *
+     * @param  array<int, array<int|string, mixed>>  $grid
+     */
+    protected function findHeaderRowIndex(array $grid): ?int
+    {
+        foreach ($grid as $index => $cells) {
+            $nonEmpty = count(array_filter($cells, fn ($cell) => $this->cleanCell((string) $cell) !== ''));
+            if ($nonEmpty < 3) {
+                continue;
+            }
+            if ($this->countRecognizedHeaderNames($cells) < 2) {
+                continue;
+            }
+
+            return $index;
+        }
+
+        return null;
+    }
+
+    /**
+     * How many cells in a row match a known or fuzzy column name. The
+     * amenities sub-header Colliers prints ("Swimming Pool / Gym / Parking")
+     * and the "STUDIOS"/"VILLAS" section banners score zero, so they can never
+     * be mistaken for a header.
      *
      * @param  array<int, mixed>  $cells
      */
-    protected function looksLikeHeaderRow(array $cells): bool
+    protected function countRecognizedHeaderNames(array $cells): int
     {
         $known = $this->knownFieldColumns();
+        $fuzzy = $this->fuzzyFieldColumns();
         $hits = 0;
+
         foreach (array_slice($cells, 0, 20) as $cell) {
-            $name = $this->normalizeHeaderName((string) $cell);
-            if ($name !== '' && isset($known[strtolower($name)])) {
+            $key = strtolower($this->normalizeHeaderName((string) $cell));
+            if ($key === '') {
+                continue;
+            }
+            if (isset($known[$key])) {
                 $hits++;
+
+                continue;
+            }
+            foreach ($fuzzy as $pattern => $field) {
+                if (preg_match($pattern, $key)) {
+                    $hits++;
+                    break;
+                }
             }
         }
 
-        return $hits >= 2;
+        return $hits;
     }
 
     protected function gridToRows(array $grid, array $parseOptions): array
@@ -1611,7 +1886,11 @@ class AvailabilityIngestService
         // Sources created for the old paste-text format store "has_header: false".
         // If the file actually starts with recognizable named columns, promote it
         // to a header row so columns line up instead of shifting data around.
-        if (! $hasHeader && $grid !== [] && $this->looksLikeHeaderRow($grid[0])) {
+        // The scan covers the ENTIRE grid, not just row 0: Colliers-style block
+        // workbooks print banner/title rows ("AVAILABILITY LIST…", "2 BEDROOMS")
+        // above the column names, and the real header must be found below them.
+        $headerIndex = $this->findHeaderRowIndex($grid);
+        if (! $hasHeader && $headerIndex !== null) {
             $hasHeader = true;
         }
 
@@ -1621,13 +1900,33 @@ class AvailabilityIngestService
         }
 
         if ($hasHeader) {
-            $headerRow = array_slice((array) (array_shift($grid) ?? []), 0, $max);
+            // Drop any banner rows above the located header so the table starts
+            // exactly at the column names. Falls back to row 0 (the historic
+            // behaviour) when no row qualified as a header.
+            $grid = array_slice($grid, $headerIndex ?? 0);
+            $headerRow = (array) (array_shift($grid) ?? []);
+            // The header row may start at a non-zero column (Colliers prints a
+            // blank column A), and array_slice() would re-index it back to 0 —
+            // silently dropping that offset while the data rows below keep their
+            // true column keys, shifting every value one column left of its name.
+            // Capture the offset here and read the header AND the rows through it.
+            $offset = $headerRow !== [] ? min(array_keys($headerRow)) : 0;
+            // Span the header by its true column keys, not by count(): trailing
+            // gaps (unwritten/empty cells) would otherwise truncate the last
+            // columns before they ever got a name.
+            $lastIndex = $headerRow !== [] ? max(array_keys($headerRow)) : $offset;
+            foreach ($grid as $cells) {
+                if ($cells !== []) {
+                    $lastIndex = max($lastIndex, max(array_keys($cells)));
+                }
+            }
             $header = [];
-            for ($i = 0; $i < $max; $i++) {
+            for ($i = $offset; $i <= $lastIndex; $i++) {
                 $name = $this->normalizeHeaderName((string) ($headerRow[$i] ?? ''));
-                $header[] = $name !== '' ? $name : 'col'.$i;
+                $header[] = $name !== '' ? $name : 'col'.($i - $offset);
             }
         } else {
+            $offset = 0;
             $header = [];
             for ($i = 0; $i < $max; $i++) {
                 $header[] = 'col'.$i;
@@ -1638,7 +1937,7 @@ class AvailabilityIngestService
         foreach ($grid as $cells) {
             $row = [];
             foreach ($header as $i => $col) {
-                $row[$col] = trim((string) ($cells[$i] ?? ''));
+                $row[$col] = $this->cleanCell((string) ($cells[$i + $offset] ?? ''));
             }
             if (empty(array_filter($row))) {
                 continue;

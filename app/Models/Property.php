@@ -76,12 +76,14 @@ class Property extends Model
     protected $fillable = [
         'tenant_id',
         'lead_id',
+        'map_location_id',
         'address',
         'city',
         'state',
         'zip_code',
         'property_type',
         'bedrooms',
+        'maids_room',
         'bathrooms',
         'square_footage',
         'year_built',
@@ -179,6 +181,7 @@ class Property extends Model
             'propertyfinder_listed_at' => 'datetime',
             'availability_synced_at' => 'datetime',
             'assign_leads_to_owner' => 'boolean',
+            'maids_room' => 'boolean',
         ];
     }
 
@@ -222,6 +225,11 @@ class Property extends Model
     public function assignedAgent()
     {
         return $this->belongsTo(User::class, 'assigned_agent_id');
+    }
+
+    public function mapLocation()
+    {
+        return $this->belongsTo(MapLocation::class, 'map_location_id');
     }
 
     public function media()
@@ -288,6 +296,7 @@ class Property extends Model
             'community',
             'sub_community',
             'bedrooms',
+            'maids_room',
             'bathrooms',
             'unit_no',
             'intent',
@@ -345,6 +354,26 @@ class Property extends Model
         return $this->bedrooms.__('BR');
     }
 
+    /**
+     * The size half of a unit label, carrying the maid's-room suffix so every
+     * surface prints it in the same place: "2BR + Maid". A maid's room is a
+     * premium feature — it goes on the label (client share, inventory, pickers)
+     * and on the marketing title at import time.
+     *
+     * Unrecorded sizes stay empty here; the category word is the caller's
+     * fallback (see unitLabel()).
+     */
+    public function sizeLabel(): string
+    {
+        $size = $this->bedroomLabel();
+
+        if ($this->maids_room && $size !== '') {
+            $size .= ' + '.__('Maid');
+        }
+
+        return $size;
+    }
+
     public function isStudio(): bool
     {
         if ($this->bedrooms !== null && (int) $this->bedrooms === 0) {
@@ -367,14 +396,15 @@ class Property extends Model
      *   "3BR for Rent in Reem Hills, Yas Island"
      *   "Studio for Rent in Bloom Towers B, Bloom Towers"
      *   "2BR for Sale in Yas Island"           (no sub-community on file)
-     *   "for Rent in Reem Hills, Yas Island"   (size simply not recorded)
+     *   "Shop for Rent in Marafid, Al Reem Island"   (no size recorded —
+     *        the category word stands in, so a shop/office/showroom never
+     *        renders as a bare "for Rent in ...")
+     *   "2BR + Maid for Rent in Marafid, Al Reem Island"   (maid's room kept
+     *        on the label — it is what makes the unit worth sharing)
      *
      * Deliberately NOT marketing_title: that is the agent's portal copy and it
      * reads as a headline, not as a list label. It is still published to the
      * portals and the XML feed through listingTitle().
-     *
-     * An unrecorded size prints nothing rather than a guessed number - "null
-     * must never read as a studio" applies here too.
      */
     public function unitLabel(): string
     {
@@ -389,7 +419,15 @@ class Property extends Model
             ? "{$this->sub_community}, {$this->community}"
             : $place;
 
-        $size = $this->bedroomLabel();
+        $size = $this->sizeLabel();
+        if ($size === '') {
+            // No size on file — say what kind of unit it is instead. A shop
+            // ("Shop for Rent in Marafid") otherwise rendered as a bare
+            // "for Rent in Marafid", which is why commercial rows looked
+            // wrong on the share page. "null must never read as a studio"
+            // still holds: the category is not a guessed size.
+            $size = self::CATEGORIES[$this->property_category] ?? ucwords(str_replace('_', ' ', (string) $this->property_category));
+        }
         $intent = match ($this->intent) {
             'sale' => __('Sale'),
             'both' => __('Rent / Sale'),

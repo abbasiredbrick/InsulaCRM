@@ -52,6 +52,15 @@ class InventorySearchParser
             }
         }
 
+        // "maid", "maids room", "maid's room", "+ maid" filter to units with a
+        // maid's room — a sharpener for the customer who wants staff quarters.
+        if (preg_match('/(?:^|\s)(?:maid(?:s|\'?s)?(?:\s+room)?|\+\s*m(?:aid|aids)?)(?=\s|$)/i', $normalized, $m)) {
+            $query->where('maids_room', true);
+            // Drop the token plus stray punctuation ("+", apostrophes) so the
+            // remaining words search the usual text fields.
+            $normalized = trim((string) preg_replace('/[^a-zA-Z0-9\s]/', ' ', str_replace($m[0], ' ', $normalized)));
+        }
+
         $normalized = trim(preg_replace('/\s+/', ' ', $normalized) ?? '');
 
         if ($bedrooms !== null) {
@@ -64,7 +73,7 @@ class InventorySearchParser
 
         foreach (preg_split('/\s+/', $normalized) as $word) {
             $word = trim($word);
-            if ($word === '') {
+            if ($word === '' || ! preg_match('/[a-z0-9]/i', $word)) {
                 continue;
             }
             $query->where(function ($q) use ($word) {

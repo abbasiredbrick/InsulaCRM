@@ -58,6 +58,63 @@ class ClientShareTest extends TestCase
         });
     }
 
+    public function test_share_link_attributes_a_new_lead_to_the_sharing_agent(): void
+    {
+        $this->availableUnit();
+        $sharer = $this->createUserWithRole('agent');
+
+        $response = $this->post('/s/test-company/verify?agent='.$sharer->agent_code, [
+            'first_name' => 'Mona',
+            'last_name' => 'Ali',
+            'phone' => '+971511111111',
+        ]);
+
+        $response->assertRedirect('/s/test-company?agent='.$sharer->agent_code);
+
+        $lead = Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+        $this->assertSame($sharer->id, $lead->agent_id);
+        $this->assertSame($sharer->agent_code, $lead->custom_fields['share_link_agent_code']);
+        // Attribution is transport, not a filter.
+        $this->assertArrayNotHasKey('agent', $lead->custom_fields['share_link_filters']);
+    }
+
+    public function test_share_link_credit_respects_the_receives_leads_switch(): void
+    {
+        $this->availableUnit();
+        $optedOut = $this->createUserWithRole('agent', ['receives_leads' => false]);
+        $this->createUserWithRole('agent');
+
+        $response = $this->post('/s/test-company/verify?agent='.$optedOut->agent_code, [
+            'first_name' => 'Lina',
+            'phone' => '+971522222222',
+        ]);
+
+        $response->assertRedirect('/s/test-company?agent='.$optedOut->agent_code);
+
+        $lead = Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+        $this->assertNotNull($lead);
+        $this->assertNotNull($lead->agent_id);
+        // The opted-out sharer is not credited; the lead falls through to the rotation.
+        $this->assertNotSame($optedOut->id, $lead->agent_id);
+        $this->assertArrayNotHasKey('share_link_agent_code', $lead->custom_fields);
+    }
+
+    public function test_share_link_ignores_an_unknown_agent_code(): void
+    {
+        $this->availableUnit();
+        $this->createUserWithRole('agent');
+
+        $this->post('/s/test-company/verify?agent=ZZ', [
+            'first_name' => 'Omar',
+            'phone' => '+971533333333',
+        ])->assertRedirect('/s/test-company?agent=ZZ');
+
+        $lead = Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->first();
+        $this->assertNotNull($lead);
+        $this->assertNotNull($lead->agent_id);
+        $this->assertArrayNotHasKey('share_link_agent_code', $lead->custom_fields);
+    }
+
     public function test_verification_creates_a_new_lead_with_captured_filters(): void
     {
         $unit = $this->availableUnit();
@@ -190,6 +247,31 @@ class ClientShareTest extends TestCase
             'first_name' => 'Ahmad',
             'last_name' => 'Raza',
             'phone' => '+971509988776',
+        ])->assertRedirect(route('share.inventory', 'test-company'));
+
+        $this->assertSame(1, Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
+        $this->assertDatabaseHas('audit_log', [
+            'tenant_id' => $this->tenant->id,
+            'action' => 'lead.verified_share_link',
+            'model_id' => $existing->id,
+        ]);
+    }
+
+    public function test_verification_matches_a_legacy_lead_whose_phone_kept_its_spaces(): void
+    {
+        $existing = Lead::withoutGlobalScopes()->create([
+            'tenant_id' => $this->tenant->id,
+            'first_name' => 'Omar',
+            'last_name' => 'Farouk',
+            'phone' => '+971 50 123 4567',
+            'lead_source' => 'property_finder',
+            'status' => 'new',
+        ]);
+
+        $response = $this->post('/s/test-company/verify', [
+            'first_name' => 'Omar',
+            'last_name' => 'Farouk',
+            'phone' => '+971501234567',
         ])->assertRedirect(route('share.inventory', 'test-company'));
 
         $this->assertSame(1, Lead::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)->count());
@@ -369,7 +451,7 @@ class ClientShareTest extends TestCase
             ->get('/s/test-company');
 
         $inventory->assertOk()
-            ->assertSee('د.إ75,000')
+            ->assertSee("\u{20C3}75,000")
             ->assertDontSee('$75,000')
             ->assertSee('Max Rent (AED)');
     }

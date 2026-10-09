@@ -21,18 +21,46 @@ use Illuminate\Support\Str;
 class PortalLeadSyncService
 {
     /**
-     * A pull is overdue once the cursor is older than this. Deliberately looser
-     * than the scheduler's five-minute cadence so a run that failed, or a box
-     * whose scheduler has been down, catches up on the next page view instead
-     * of waiting for a tick that may not be coming.
+     * How far each pull reaches back beyond the cursor. Portal APIs do not
+     * guarantee that every lead is listed the moment its createdAt passes the
+     * cursor — Property Finder's messaging/replied WhatsApp leads in
+     * particular can surface well after the fact. A window that only ever
+     * moves forward skips those forever. Each pull re-requests this overlap;
+     * createFromPayload() de-duplicates by portal reference, so re-reading the
+     * tail is cheap and idempotent.
      */
-    public const OVERDUE_AFTER_MINUTES = 15;
+    public const PULL_OVERLAP_MINUTES = 180;
+
+    /**
+     * The cursor only moves on a clean run, so even WITHOUT the overlap a hard
+     * failure re-reads the same window next time; the overlap additionally
+     * re-covers leads the portal itself was late to serve.
+     */
+    public function __construct(
+        protected int $overlapMinutes = self::PULL_OVERLAP_MINUTES,
+    ) {}
+
+    /**
+     * A pull is overdue once the cursor is older than this. Matches the
+     * catch-up middleware's three-minute throttle so a page view can top up a
+     * fresh integration, while the scheduler keeps forcing a pull on its own
+     * cadence regardless.
+     */
+    public const OVERDUE_AFTER_MINUTES = 3;
 
     /**
      * A portal that has never synced is always overdue - a fresh integration
      * must not wait for its first schedule tick.
      */
     public const NEVER = 'never';
+
+    /**
+     * When the settings screen calls the pull "stale". Deliberately far looser
+     * than OVERDUE_AFTER_MINUTES so a healthy integration is not shown as
+     * broken minutes after a clean sync just because the tight pull window
+     * elapsed - the two concerns are separate, and each has its own constant.
+     */
+    public const STALE_AFTER_MINUTES = 60;
 
     /**
      * Whether this integration has the credentials its portal needs to pull
@@ -110,9 +138,19 @@ class PortalLeadSyncService
     protected function doPull(PortalIntegration $integration): array
     {
         try {
+            // Re-cover the last PULL_OVERLAP_MINUTES on every run so a lead the
+            // portal was late to list is still re-requested once the cursor has
+            // moved past its createdAt. A cursor older than the overlap (dead
+            // sync) still pulls from the cursor itself, never pruning history.
+            $since = $integration->leads_last_synced_at;
+            $overlap = now()->subMinutes($this->overlapMinutes);
+            if ($since !== null && $since->gt($overlap)) {
+                $since = $overlap;
+            }
+
             $result = $integration->portal === 'bayut'
-                ? (new BayutLeadsPullService($integration))->pull($integration->leads_last_synced_at)
-                : (new PropertyFinderPortalService($integration))->pullLeads($integration->leads_last_synced_at);
+                ? (new BayutLeadsPullService($integration))->pull($since)
+                : (new PropertyFinderPortalService($integration))->pullLeads($since);
         } catch (\Throwable $e) {
             Log::error('Portal lead pull failed', [
                 'integration_id' => $integration->id,
@@ -184,10 +222,21 @@ class PortalLeadSyncService
             $integration->id => [
                 'state' => $integration->leads_last_synced_at === null
                     ? self::NEVER
-                    : ($this->isDue($integration) ? 'stale' : 'ok'),
+                    : ($this->isStale($integration) ? 'stale' : 'ok'),
                 'at' => $integration->leads_last_synced_at,
             ],
         ])->all();
+    }
+
+    /**
+     * Whether the cursor looks abandoned to a human on the settings screen.
+     * Deliberately decoupled from isDue(): the sync window is tight (3 minutes)
+     * and elapses on every healthy integration between pulls, so the display
+     * "stale" verdict must come from its own far looser threshold.
+     */
+    public function isStale(PortalIntegration $integration): bool
+    {
+        return $integration->leads_last_synced_at?->lt(now()->subMinutes(self::STALE_AFTER_MINUTES)) ?? true;
     }
 
     protected function lockKey(PortalIntegration $integration): string

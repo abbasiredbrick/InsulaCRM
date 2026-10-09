@@ -5,10 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AvailabilityImportRun;
 use App\Models\AvailabilityReview;
 use App\Models\AvailabilitySource;
-use App\Models\MapLocation;
-use App\Models\Property;
 use App\Services\AvailabilityIngestService;
-use App\Services\MapLocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -421,6 +418,18 @@ class AvailabilitySourceController extends Controller
                 $mappedHeaders[] = $header;
             }
         }
+        // A brand-new file-based source has no saved mapping yet, and a refreshed
+        // sheet can carry a completely different layout. The run rebuilds the map
+        // from the header names anyway (mapping_rebuilt), so surface the same map
+        // here — otherwise the "Run Import" gate stays disabled forever.
+        $savedMapKeys = array_filter(array_keys($columnMap), fn ($key) => ! preg_match('/^col\d+$/i', (string) $key));
+        if ($savedMapKeys === [] || array_intersect($savedMapKeys, $preview['header']) === []) {
+            $detected = $this->ingest->detectColumnMap($preview['header'], $preview['rows']);
+            if ($detected !== []) {
+                $columnMap = $detected;
+                $mappedHeaders = array_keys($detected);
+            }
+        }
         foreach ($preview['rows'] as $row) {
             $hasUnit = false;
             foreach ($mappedHeaders as $header) {
@@ -504,6 +513,12 @@ class AvailabilitySourceController extends Controller
                 ));
         }
 
+        if (! empty($result['mapping_rebuilt'])) {
+            // Persist the auto-detected map so the Edit screen shows what the
+            // file actually uses and the next re-import parses the same way.
+            $source->update(['column_map' => $result['column_map'] ?? []]);
+        }
+
         $summary = sprintf(
             '%d created, %d updated, %d marked unlisted (%d left in the sheet were skipped).',
             $result['created'],
@@ -529,137 +544,6 @@ class AvailabilitySourceController extends Controller
         }
 
         return redirect()->route('availability-sources.index')->with('success', $summary);
-    }
-
-    /**
-     * Manual location/map-link screen: every building (sub_community) the
-     * tenant has units for, with its current map link, so a missing or wrong
-     * location can be fixed by hand without re-importing the sheet.
-     */
-    public function locationsIndex()
-    {
-        $tenantId = auth()->user()->tenant_id;
-        $maps = app(MapLocationService::class);
-
-        $groups = Property::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->whereNotNull('sub_community')
-            ->where('sub_community', '<>', '')
-            ->selectRaw('sub_community, MAX(community) as community, MAX(city) as city, COUNT(*) as unit_count')
-            ->groupBy('sub_community')
-            ->orderByDesc('unit_count')
-            ->get();
-
-        $locations = MapLocation::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->get()
-            ->keyBy('sub_community');
-
-        $missing = 0;
-        foreach ($groups as $group) {
-            $location = $locations[$group->sub_community] ?? null;
-            $group->map_url = $location?->map_url;
-            $group->map_query = $location?->map_query;
-            $group->suggested = $maps->searchUrl($maps->queryFor([$group->sub_community, $group->community, $group->city]));
-            $group->prefill = $group->map_url ?: $group->suggested;
-            $group->current_query = $group->map_query;
-            if (! $location || $location->map_url === null) {
-                $missing++;
-            }
-        }
-
-        return view('availability.locations', [
-            'groups' => $groups,
-            'maps' => $maps,
-            'missing' => $missing,
-        ]);
-    }
-
-    /**
-     * Apply a location/map link to a building (sub_community).
-     *
-     * mode=save   — "location" is a full http(s) link (stored verbatim) or a
-     *               place name (turned into a Google Maps search link).
-     * mode=auto   — build a search link for the building when it has none yet.
-     * mode=clear  — drop the location from the building.
-     */
-    public function applyLocation(Request $request)
-    {
-        $data = $request->validate([
-            'building' => 'required|string|max:255',
-            'community' => 'nullable|string|max:255',
-            'city' => 'nullable|string|max:255',
-            'location' => 'nullable|string|max:2048',
-            'mode' => 'required|in:save,clear,auto',
-        ]);
-
-        $tenantId = auth()->user()->tenant_id;
-        $maps = app(MapLocationService::class);
-
-        if ($data['mode'] === 'auto' && $data['building'] === '__all__') {
-            $updated = $maps->backfillForTenant($tenantId);
-
-            return back()->with(
-                $updated > 0 ? 'success' : 'info',
-                __('Generated map links for :count building(s).', ['count' => $updated])
-            );
-        }
-
-        $location = MapLocation::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('sub_community', $data['building'])
-            ->first();
-
-        if ($data['mode'] === 'clear') {
-            if ($location) {
-                $location->update(['map_url' => null, 'map_query' => null]);
-
-                return back()->with('success', __('Location cleared for :building.', ['building' => $data['building']]));
-            }
-
-            return back()->with('info', __('No location to clear for :building.', ['building' => $data['building']]));
-        }
-
-        $queryParts = [$data['building'], $data['community'] ?? null, $data['city'] ?? null];
-
-        if ($data['mode'] === 'auto') {
-            if ($location && $location->map_url !== null) {
-                return back()->with('info', __(':building already has a location.', ['building' => $data['building']]));
-            }
-            $query = $maps->queryFor($queryParts);
-            $mapUrl = $maps->searchUrl($query);
-            $mapQuery = $query !== '' ? $query : null;
-        } else {
-            $input = trim((string) ($data['location'] ?? ''));
-            $clean = $maps->cleanUrl($input);
-            if ($clean !== null) {
-                $mapUrl = $clean;
-                $query = $maps->queryFor($queryParts);
-                $mapQuery = $query !== '' ? $query : null;
-            } else {
-                $mapUrl = $maps->searchUrl($input);
-                $mapQuery = $input !== '' ? $input : null;
-            }
-        }
-
-        if ($mapUrl === null && $mapQuery === null) {
-            return back()->with('error', __('No map link understood from that input for :building.', ['building' => $data['building']]));
-        }
-
-        if ($location) {
-            $location->update(['map_url' => $mapUrl, 'map_query' => $mapQuery]);
-        } else {
-            MapLocation::create([
-                'tenant_id' => $tenantId,
-                'sub_community' => $data['building'],
-                'community' => $data['community'] ?: null,
-                'city' => $data['city'] ?: null,
-                'map_url' => $mapUrl,
-                'map_query' => $mapQuery,
-            ]);
-        }
-
-        return back()->with('success', __('Saved location for :building.', ['building' => $data['building']]));
     }
 
     /**

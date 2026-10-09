@@ -23,8 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // slow pull and the next tick fight over the same leads_last_synced_at
         // cursor. onOneServer needs a shared cache lock store - on a single box
         // it is a no-op, and on more than one it stops the duplicate.
-        $schedule->command('portals:pull-bayut-leads')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
-        $schedule->command('portals:pull-propertyfinder-leads')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+        // Every three minutes, to match the in-app catch-up window.
+        $schedule->command('portals:pull-bayut-leads')->everyThreeMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('portals:pull-propertyfinder-leads')->everyThreeMinutes()->withoutOverlapping()->onOneServer();
 
         $schedule->command('calendar:send-reminders')->everyMinute();
         $schedule->command('sequences:process')->daily();

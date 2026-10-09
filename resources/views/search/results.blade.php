@@ -7,6 +7,14 @@
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">{{ __(':count results found', ['count' => $results->count()]) }}</h3>
+        @if($results->where('type', 'property')->isNotEmpty() && auth()->user()->tenant && auth()->user()->tenant->slug)
+        <button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-share-results
+                data-url="{{ route('share.inventory', auth()->user()->tenant->slug) }}?search={{ urlencode($query) }}&agent={{ auth()->user()->agent_code ?? '' }}"
+                data-label="{{ __('Available units matching') }} &quot;{{ $query }}&quot;">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.7 10.7l6.6 -3.4"/><path d="M8.7 13.3l6.6 3.4"/></svg>
+            {{ __('Share availability') }}
+        </button>
+        @endif
     </div>
     @if($results->count())
     <div class="list-group list-group-flush">

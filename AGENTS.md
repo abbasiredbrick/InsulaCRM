@@ -46,8 +46,14 @@ used to drift apart per trigger.
   `portals:pull-propertyfinder-leads` / `portals:pull-bayut-leads`
   (`force: true` — the schedule *is* the primary trigger), and the in-app
   catch-up `SyncOverduePortalLeads`, dispatched after the response by the
-  `CatchUpPortalLeads` middleware (throttled to 1×/5 min, pulls only
-  integrations overdue past `OVERDUE_AFTER_MINUTES`).
+  `CatchUpPortalLeads` middleware (throttled to 1×/3 min, pulls only
+  integrations overdue past `OVERDUE_AFTER_MINUTES`). The pull window and the
+  settings-screen "stale" verdict are decoupled: `PortalLeadSyncService` pulls
+  once the cursor is 3 min old (`OVERDUE_AFTER_MINUTES = 3`, matching the
+  middleware throttle `THROTTLE_SECONDS = 180` and the `everyThreeMinutes`
+  schedule), but the badge only cries stale after `STALE_AFTER_MINUTES = 60`
+  so a healthy integration is not labelled broken every few minutes. Never
+  reuse the sync window for display, or tighten one without the other.
 - **The catch-up exists because the prod box had no cron entry** — leads only
   appeared after a manual sync. Keep it, and keep the cron documented in
   PROD-DEPLOY.md. `CatchUpPortalLeads::shouldCheck()` skips under
@@ -56,6 +62,24 @@ used to drift apart per trigger.
 - **Cursor rule:** `leads_last_synced_at` advances only when `$result['error']`
   is null. A partial page failure must surface as an error so the window is
   re-read — never step the cursor over leads that were never fetched.
+- **The pull window overlaps by `PULL_OVERLAP_MINUTES = 180`:** each pull
+  re-requests up to 3 h *before* the cursor (`$since->min(now() − overlap)`),
+  because Property Finder is not guaranteed to list a messaging/"replied"
+  WhatsApp lead in the first poll after its `createdAt` — a window that only
+  moves forward silently skips those forever (`message_lead_32872954`, the
+  "Amer" lead, was exactly that). Overlap re-reads are idempotent because
+  `createFromPayload()` de-duplicates by `portal_reference`. Do not remove the
+  overlap to save requests, and do not shrink it below what a late-listed lead
+  can take to appear.
+- **Portal phones are stored canonical, one shape for every number:** every
+  inbound route (webhook, PF/Bayut pull) goes through
+  `PortalLeadService::canonicalPhone()`, which lands on
+  `'+' . ContactNormalizer::phone(...)` — `+971529603039`, never
+  `+971 529 603 039`. A share link stores the same compact form, so the same
+  client cannot duplicate just because one row kept the separators.
+  `ClientShareController::verify()` additionally matches *legacy* rows the
+  portal wrote with spaces (a `REPLACE`-digits fallback beside the exact
+  match) so a client typing the compact number still lands on the old lead.
 - `PortalIntegration` has no `TenantScope`; tenancy is always an explicit
   `where('tenant_id', …)`.
 
@@ -72,10 +96,23 @@ used to drift apart per trigger.
 **Every automatic path must use `User::scopeReceivingLeads()`** (or
 `isInLeadRotation()`), which is `is_active AND receives_leads`. It currently
 covers `LeadDistributionService::rotation()` (roundRobin + aiSmart),
-`AssignUnclaimedLeads`, and `PortalLeadService::findAgentByCode()` — that last
-one matters because portal leads route by the agent code embedded in the
-listing reference, bypassing the distribution formula entirely. Do not
-hand-roll `where('is_active', true)` on an assignment query again.
+`AssignUnclaimedLeads`, `PortalLeadService::findAgentByCode()`, and
+`ClientShareController::attributedAgent()` — the last two matter because they
+route leads by the agent code embedded in a public touchpoint (portal listing
+reference, shared availability link), bypassing the distribution formula
+entirely. Do not hand-roll `where('is_active', true)` on an assignment query
+again.
+
+**Share links carry attribution, old links do not.** The inventory "Copy share
+link" button appends `?agent=<agent_code>` to the URL it builds. A lead created
+through a link WITH that parameter goes onto the sharer's book directly
+(bypassing the rotation); a link WITHOUT it behaves exactly as before and the
+lead goes through normal distribution — never "fix" pre-shared links, and never
+change how an unattributed verify performs. The parameter is transport, not a
+filter: it is stripped from `share_link_filters`/the lead note, kept on the
+redirect URL so a visitor stays on the exact link they were shared, and recorded
+as `share_link_agent_code`. `attributedAgent()` only credits an active member
+who has not opted out (`receives_leads`), mirroring `findAgentByCode`.
 
 Defaults are deliberately asymmetric, because an unchecked checkbox sends
 nothing: `inviteAgent` treats an absent field as **on** (matching the column
@@ -90,6 +127,41 @@ which set `receives_leads => $adminRole->name !== 'owner'`, plus migration
 owner accounts. Don't try to add an owner special case to `inviteAgent`: the
 role cannot be posted there. It is a default, not a lockout — an owner can still
 opt in from the edit modal, and `isInLeadRotation()` honours that.
+
+## Map Locations — the communities ⇢ buildings master
+
+Settings → Map Locations is admin-only and independent of inventory sources
+(which once owned this screen itself). `map_locations` rows are the
+building/tower master, `properties` rows are units. New FKs —
+`properties.map_location_id → map_locations` and
+`map_locations.community_id → communities`, both `nullOnDelete` — are the
+source of truth for management; the `sub_community`/`community`/`city` strings
+on `properties` stay as snapshots.
+
+- No `TenantScope` on `MapLocation`/`Community`; tenancy is an explicit
+  `where('tenant_id', …)` everywhere (`MapLocationService`, and the controller
+  guards `ownedLocation()`/`ownedCommunity()` which 403 otherwise). Route-bound
+  models must never be trusted tenant-scoped.
+- De-dup is **normalized-exact, first-write-wins**: `normalizeName()` collapses
+  case/whitespace, `findByName()` matches on it, `ensureMapLocation()` returns
+  the existing row so a corrected spelling folds onto it. Re-import never
+  duplicates a building; aggressive auto-merge is deliberately avoided — the
+  merge screen is where a human collapses near-duplicates.
+- Rename cascades to every unit, FK-linked *and* legacy string-linked.
+  `rename()` answers `['conflict' => true, 'target' => …]` when the new name
+  already belongs to another building (blocked — merge instead). Community
+  rename cascades to the locations' `community` and to legacy unit strings.
+- Merge re-points `map_location_id`, rewrites linked + legacy unit strings to
+  the kept row, then deletes the discard. Deleting a building is blocked while
+  it still has units (FK *or* legacy count).
+- New units are linked on save: `withMapLocationNotice()` →
+  `linkBuildingUnits()`, warning only when the location was just created.
+- The New Unit form has ONE searchable picker (`x-searchable-select`, remote
+  `inventory.locations-search` → `{results:[{value,label}]}` with label
+  `sub_community · community · city — N units`). Picking a building overwrites
+  the typed city/community/sub-community server-side
+  (`applyPickedBuilding`); the picker contract is what we will reuse to map
+  units onto Bayut/PF portal locations.
 
 ## Search / Filter UI — the live-filter convention
 

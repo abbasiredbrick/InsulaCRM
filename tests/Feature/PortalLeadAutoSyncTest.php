@@ -332,6 +332,40 @@ class PortalLeadAutoSyncTest extends TestCase
             ->assertDontSee('This is overdue');
     }
 
+    public function test_the_pull_is_due_after_the_three_minute_sync_window(): void
+    {
+        $service = app(PortalLeadSyncService::class);
+
+        $due = $this->createIntegration(['leads_last_synced_at' => now()->subMinutes(4)]);
+        $fresh = $this->createIntegration(['portal' => 'bayut', 'api_token' => null, 'api_secret' => null, 'leads_api_token' => 'bayut-token', 'leads_last_synced_at' => now()->subMinutes(2)]);
+
+        $this->assertTrue($service->isDue($due));
+        $this->assertFalse($service->isDue($fresh));
+    }
+
+    public function test_settings_staleness_uses_the_display_window_not_the_sync_window(): void
+    {
+        // Ten minutes ago the pull is already due again under the 3-minute
+        // sync window, but the settings screen must not call a working
+        // integration "stale" until the far looser display window passes.
+        $integration = $this->createIntegration(['leads_last_synced_at' => now()->subMinutes(10)]);
+
+        $service = app(PortalLeadSyncService::class);
+
+        $this->assertTrue($service->isDue($integration));
+        $this->assertSame('ok', $service->staleness()[$integration->id]['state']);
+    }
+
+    public function test_the_catch_up_middleware_throttle_is_three_minutes(): void
+    {
+        // The middleware never fires inside the suite (runningUnitTests guard),
+        // so pin the window as a constant: a tighter catch-up is only useful if
+        // it is still aligned with OVERDUE_AFTER_MINUTES.
+        $reflected = new \ReflectionClass(\App\Http\Middleware\CatchUpPortalLeads::class);
+
+        $this->assertSame(180, $reflected->getConstant('THROTTLE_SECONDS'));
+    }
+
     public function test_settings_page_prompts_a_first_pull_for_a_configured_integration(): void
     {
         $this->createIntegration(['leads_last_synced_at' => null]);

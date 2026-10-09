@@ -32,7 +32,7 @@ class TenantFormatHelper
         'CZK' => 'Kč',
         'HUF' => 'Ft',
         'RON' => 'lei',
-        'AED' => 'د.إ',
+        'AED' => "\u{20C3}",
         'SAR' => '﷼',
         'PHP' => '₱',
         'THB' => '฿',
@@ -83,6 +83,7 @@ class TenantFormatHelper
 
         if (auth()->check() && auth()->user()->tenant) {
             static::$cachedTenant = auth()->user()->tenant;
+
             return static::$cachedTenant;
         }
 
@@ -119,7 +120,7 @@ class TenantFormatHelper
             $decimals = 0;
         }
 
-        return $symbol . number_format($amount ?? 0, $decimals);
+        return $symbol.number_format($amount ?? 0, $decimals);
     }
 
     /**
@@ -129,6 +130,7 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $code = $tenant->currency ?? 'USD';
+
         return static::$currencySymbols[$code] ?? $code;
     }
 
@@ -138,6 +140,7 @@ class TenantFormatHelper
     public static function currencyCode(): string
     {
         $tenant = static::tenant();
+
         return $tenant->currency ?? 'USD';
     }
 
@@ -146,14 +149,17 @@ class TenantFormatHelper
      */
     public static function area(float|int|null $value): string
     {
-        if (!$value) return '-';
+        if (! $value) {
+            return '-';
+        }
         $tenant = static::tenant();
         $system = $tenant->measurement_system ?? 'imperial';
 
         if ($system === 'metric') {
-            return number_format($value) . ' m²';
+            return number_format($value).' m²';
         }
-        return number_format($value) . ' sq ft';
+
+        return number_format($value).' sq ft';
     }
 
     /**
@@ -163,6 +169,7 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $system = $tenant->measurement_system ?? 'imperial';
+
         return $system === 'metric' ? 'm²' : 'sq ft';
     }
 
@@ -173,6 +180,7 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $system = $tenant->measurement_system ?? 'imperial';
+
         return $system === 'metric' ? 'Area (m²)' : 'Square Footage';
     }
 
@@ -181,14 +189,17 @@ class TenantFormatHelper
      */
     public static function lotSize(float|int|null $value): string
     {
-        if (!$value) return '-';
+        if (! $value) {
+            return '-';
+        }
         $tenant = static::tenant();
         $system = $tenant->measurement_system ?? 'imperial';
 
         if ($system === 'metric') {
-            return number_format($value, 2) . ' ha';
+            return number_format($value, 2).' ha';
         }
-        return number_format($value, 2) . ' acres';
+
+        return number_format($value, 2).' acres';
     }
 
     /**
@@ -198,6 +209,7 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $system = $tenant->measurement_system ?? 'imperial';
+
         return $system === 'metric' ? 'Lot Size (hectares)' : 'Lot Size (acres)';
     }
 
@@ -206,7 +218,9 @@ class TenantFormatHelper
      */
     public static function date($date): string
     {
-        if (!$date) return '-';
+        if (! $date) {
+            return '-';
+        }
         $tenant = static::tenant();
         $format = $tenant->date_format ?? 'm/d/Y';
 
@@ -225,7 +239,7 @@ class TenantFormatHelper
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
 
-        return match($country) {
+        return match ($country) {
             'US' => 'State',
             'CA' => 'Province',
             'GB', 'IE' => 'County',
@@ -253,7 +267,7 @@ class TenantFormatHelper
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
 
-        return match($country) {
+        return match ($country) {
             'US' => 'Zip Code',
             'CA' => 'Postal Code',
             'GB', 'IE' => 'Postcode',
@@ -278,7 +292,7 @@ class TenantFormatHelper
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
 
-        return match($country) {
+        return match ($country) {
             'US' => 2,
             'CA' => 2,
             'AU' => 3,
@@ -294,7 +308,7 @@ class TenantFormatHelper
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
 
-        return match($country) {
+        return match ($country) {
             'US' => 10,
             'CA' => 7,
             'GB' => 8,
@@ -309,6 +323,7 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
+
         return static::$countryLocaleMap[$country] ?? 'en-US';
     }
 
@@ -318,6 +333,7 @@ class TenantFormatHelper
     public static function isUS(): bool
     {
         $tenant = static::tenant();
+
         return ($tenant->country ?? 'US') === 'US';
     }
 
@@ -329,7 +345,7 @@ class TenantFormatHelper
         $tenant = static::tenant();
         $country = $tenant->country ?? 'US';
 
-        return match($country) {
+        return match ($country) {
             'US' => 'TCPA',
             'CA' => 'CASL',
             'GB', 'IE' => 'PECR/GDPR',
@@ -365,7 +381,7 @@ class TenantFormatHelper
             'CZK' => 'CZK (Kč)',
             'HUF' => 'HUF (Ft)',
             'RON' => 'RON (lei)',
-            'AED' => 'AED (د.إ)',
+            'AED' => 'AED ('."\u{20C3}".')',
             'SAR' => 'SAR (﷼)',
             'PHP' => 'PHP (₱)',
             'THB' => 'THB (฿)',

@@ -44,6 +44,17 @@
             this.setupNavStateRestore();
             this.syncNotifications();
             this.checkIosInstallGuide();
+
+            // The full search results page ("View all →") can carry a share
+            // availability action for the results whose units were found.
+            document.addEventListener('click', function(e) {
+                var trigger = e.target && e.target.closest('[data-share-results]');
+                if (!trigger) return;
+                e.preventDefault();
+                var url = trigger.getAttribute('data-url');
+                if (!url) return;
+                MobileApp.shareUrl(url, trigger.getAttribute('data-label') || '');
+            });
         },
 
         /**
@@ -439,6 +450,22 @@
                     self.performLiveSearch(query);
                 }, 280);
             });
+
+            // Sharing a live search result: the inventory search preview can
+            // turn the typed query into a public availability link the agent
+            // can send straight from the phone.
+            if (searchList) {
+                searchList.addEventListener('click', function(e) {
+                    var trigger = e.target && e.target.closest('[data-inventory-share]');
+                    if (!trigger) return;
+                    e.preventDefault();
+                    var query = searchInput ? searchInput.value.trim() : '';
+                    self.shareAvailability(
+                        { search: query },
+                        query !== '' ? 'Available units matching "' + query + '"' : 'Available units'
+                    );
+                });
+            }
         },
 
         performLiveSearch: function(query) {
@@ -475,10 +502,16 @@
                     return;
                 }
 
+                var hasUnits = items.some(function(r) { return r && r.type === 'property'; });
                 var output = '<div class="p-2">' +
                     '<div class="mb-2 d-flex justify-content-between align-items-center px-1">' +
                     '<span class="small fw-bold text-muted">' + items.length + ' in ' + self.searchScopeLabel() + ' &middot; "' + MobileApp.escapeHtml(query) + '"</span>' +
-                    '<a href="' + fullUrl + '" class="small text-primary fw-bold">View all &rarr;</a>' +
+                    '<span class="d-flex align-items-center gap-3" style="flex:0 0 auto;">' +
+                        (hasUnits
+                            ? '<a href="#" data-inventory-share class="small text-primary fw-bold">Share availability</a>'
+                            : '') +
+                        '<a href="' + fullUrl + '" class="small text-primary fw-bold">View all &rarr;</a>' +
+                    '</span>' +
                     '</div>';
 
                 items.forEach(function(r) {
@@ -600,6 +633,148 @@
             var div = document.createElement('div');
             div.textContent = text || '';
             return div.innerHTML;
+        },
+
+        /**
+         * Build the agent-tagged public availability link for the current
+         * visitor: /s/{tenant-slug}?<extra>…&agent=<code>. The parameter is
+         * attribution transport, exactly as the desktop "Copy share link"
+         * button embeds it, so leads that come back through the mobile-shared
+         * link land on the sharer's book.
+         */
+        buildAvailabilityUrl: function(extra) {
+            var body = document.body;
+            var slug = body && body.getAttribute('data-share-slug');
+            if (!slug) return null;
+
+            var params = {};
+            var given = extra || {};
+            Object.keys(given).forEach(function(k) {
+                var v = String(given[k] == null ? '' : given[k]).trim();
+                if (v !== '') params[k] = v;
+            });
+            var code = body ? body.getAttribute('data-agent-code') : '';
+            if (code && !params.agent) params.agent = code;
+
+            var parts = Object.keys(params).map(function(k) {
+                return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+            });
+
+            return (window.location.origin || '') + '/s/' + slug + (parts.length ? '?' + parts.join('&') : '');
+        },
+
+        /**
+         * Share the availability link the way the platform expects on the
+         * device at hand: the native share sheet on phones/tablets and in
+         * standalone PWA windows (copy is one of its actions), clipboard copy
+         * on desktops, and a manual overlay only when neither works.
+         */
+        shareAvailability: function(extra, label) {
+            var url = this.buildAvailabilityUrl(extra);
+            if (!url) return;
+            this.shareUrl(url, label);
+        },
+
+        /**
+         * Share a ready-made availability link the way the platform expects on
+         * the device at hand: the native share sheet on phones/tablets and in
+         * standalone PWA windows (copy is one of its actions), clipboard copy
+         * on desktops, and a manual overlay only when neither works.
+         */
+        shareUrl: function(url, label) {
+            var mobile = window.matchMedia && window.matchMedia('(max-width: 991.98px)').matches;
+            var standalone = navigator.standalone === true
+                || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+
+            if (navigator.share && (mobile || standalone)) {
+                navigator.share({
+                    title: label || (document.title || ''),
+                    text: label || '',
+                    url: url
+                }).catch(function() { /* user cancelled the share sheet */ });
+                return;
+            }
+
+            var self = this;
+            this.copyToClipboard(url).then(function() {
+                self.flashMsg('Share link copied');
+            }, function() {
+                self.promptLink(url, label);
+            });
+        },
+
+        copyToClipboard: function(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(text).catch(function() {
+                    return this.execCopy(text);
+                }.bind(this));
+            }
+            return this.execCopy(text);
+        },
+
+        execCopy: function(text) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            ta.setSelectionRange(0, ta.value.length);
+            var ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+            ta.remove();
+            if (ok) return Promise.resolve();
+            return Promise.reject(new Error('clipboard unavailable'));
+        },
+
+        flashMsg: function(message) {
+            var el = document.createElement('div');
+            el.textContent = message;
+            el.style.cssText = 'position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));' +
+                'transform:translateX(-50%);z-index:1200;background:#17212f;color:#fff;padding:10px 16px;' +
+                'border-radius:999px;font-size:0.85rem;box-shadow:0 8px 20px rgba(0,0,0,0.25);' +
+                'pointer-events:none;white-space:nowrap;';
+            document.body.appendChild(el);
+            setTimeout(function() { el.remove(); }, 1800);
+        },
+
+        /**
+         * Last-resort fallback when neither the Web Share API nor the
+         * clipboard is usable: show the link in a selectable field.
+         */
+        promptLink: function(url, label) {
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:1300;' +
+                'display:flex;align-items:center;justify-content:center;padding:1rem;';
+            var card = document.createElement('div');
+            card.style.cssText = 'background:#fff;color:#17212f;border-radius:16px;padding:1.25rem;' +
+                'max-width:92vw;width:400px;box-shadow:0 20px 50px rgba(0,0,0,0.3);';
+            card.innerHTML = '<div style="font-weight:600;margin-bottom:0.4rem;">' +
+                (label ? MobileApp.escapeHtml(label) : 'Share this link') + '</div>' +
+                '<div style="font-size:0.82rem;color:#667382;margin-bottom:0.75rem;">' +
+                'Copy the link below to send it.' + '</div>' +
+                '<input type="text" readonly style="width:100%;padding:0.6rem 0.75rem;border:1px solid #d9dee3;' +
+                'border-radius:10px;font-size:0.85rem;margin-bottom:0.75rem;">' +
+                '<div style="display:flex;gap:0.5rem;">' +
+                '<button type="button" data-copy style="flex:1;background:#2563eb;color:#fff;border:none;' +
+                'border-radius:10px;padding:0.6rem;">Copy</button>' +
+                '<button type="button" data-close style="flex:1;background:#eef1f4;color:#17212f;border:none;' +
+                'border-radius:10px;padding:0.6rem;">Close</button>' +
+                '</div>';
+
+            overlay.appendChild(card);
+            var input = card.querySelector('input');
+            input.value = url;
+            card.querySelector('[data-copy]').addEventListener('click', function() {
+                MobileApp.copyToClipboard(url);
+                MobileApp.flashMsg('Copied');
+            });
+            card.querySelector('[data-close]').addEventListener('click', function() { overlay.remove(); });
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+            document.body.appendChild(overlay);
+            input.focus();
+            input.select();
         }
     };
 

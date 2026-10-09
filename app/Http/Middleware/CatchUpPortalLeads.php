@@ -25,9 +25,12 @@ use Symfony\Component\HttpFoundation\Response;
 class CatchUpPortalLeads
 {
     /**
-     * How often, at most, a request is allowed to consider a catch-up.
+     * How often, at most, a request is allowed to consider a catch-up. Three
+     * minutes - tight enough that a page view tops up a fresh integration, and
+     * aligned with PortalLeadSyncService::OVERDUE_AFTER_MINUTES so a due pull
+     * is not throttled away behind its own window.
      */
-    protected const THROTTLE_SECONDS = 300;
+    protected const THROTTLE_SECONDS = 180;
 
     /**
      * The marker is set before the job is dispatched, not after, so a burst of

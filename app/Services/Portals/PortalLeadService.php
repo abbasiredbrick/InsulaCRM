@@ -40,7 +40,7 @@ class PortalLeadService
         $tenant = $integration->tenant;
 
         [$first, $last] = $this->splitName($data['name'] ?? '');
-        $phone = $this->cleanPhone($data['phone'] ?? null);
+        $phone = $this->canonicalPhone($data['phone'] ?? null, $tenant);
         $email = trim((string) ($data['email'] ?? ''));
 
         if ($phone === null && $email === '') {
@@ -407,6 +407,28 @@ class PortalLeadService
         }
 
         return $phone;
+    }
+
+    /**
+     * Canonical stored phone for a portal lead. However the portal formatted
+     * it ("+971 529 603 039", "971529603039", "052960603039", "00 971 …"), it
+     * lands as the same E.164-style "+971529603039" that the share-link form
+     * stores, so the same client cannot exist twice just because one row kept
+     * the separators and the other did not. The digits-only form is what
+     * findExistingContact() compares on either way; this is just the one
+     * storage shape for every number.
+     */
+    protected function canonicalPhone($phone, Tenant $tenant): ?string
+    {
+        $phone = $this->cleanPhone($phone);
+
+        if ($phone === null) {
+            return null;
+        }
+
+        $digits = app(ContactNormalizer::class)->phone($phone, $tenant->country);
+
+        return $digits !== null ? '+'.$digits : null;
     }
 
     protected function matchProperty(PortalIntegration $integration, ?string $reference): ?Property

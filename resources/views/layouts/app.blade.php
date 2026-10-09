@@ -80,7 +80,9 @@
     };
     </script>
 </head>
-<body class="layout-fluid" data-bs-theme="{{ auth()->check() && auth()->user()->theme === 'dark' ? 'dark' : 'light' }}">
+<body class="layout-fluid" data-bs-theme="{{ auth()->check() && auth()->user()->theme === 'dark' ? 'dark' : 'light' }}"
+      data-share-slug="{{ auth()->check() ? auth()->user()->tenant?->slug : '' }}"
+      data-agent-code="{{ auth()->check() ? auth()->user()->agent_code : '' }}">
     <a href="#main-content" class="visually-hidden-focusable">{{ __('Skip to main content') }}</a>
     @if(session('impersonating'))
     <div class="alert alert-warning text-center mb-0 rounded-0">

@@ -81,6 +81,9 @@
                         <li class="nav-item">
                             <a href="{{ route('availability-sources.index') }}" class="nav-link">{{ __('Inventory Sources') }}</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route('settings.map-locations.index') }}" class="nav-link">{{ __('Map Locations') }}</a>
+                        </li>
                         @endif
                         <li class="nav-item">
                             <a href="#tab-storage" class="nav-link" data-bs-toggle="tab">{{ __('Storage') }}</a>
@@ -290,8 +293,8 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">{{ __('Google Maps Embed API key') }}</label>
-                            <input type="text" name="google_maps_embed_key" class="form-control" value="{{ $tenant->google_maps_embed_key }}" placeholder="{{ __('Paste a Maps Embed API key to show the inline map on shared inventory links') }}">
-                            <small class="form-hint d-block mt-2">{{ __('Used to render the map on the public share page. Create a "Maps Embed API" key in Google Cloud Console (free). Leave blank to hide the inline map.') }}</small>
+                            <input type="text" name="google_maps_embed_key" class="form-control" value="{{ $tenant->google_maps_embed_key }}" placeholder="{{ __('Optional — the map now renders without a key') }}">
+                            <small class="form-hint d-block mt-2">{{ __('The inline map on shared inventory links uses the keyless embed and shows automatically. This field is kept for legacy setups; a misconfigured key (API not enabled or referrer-restricted) previously blanked the map.') }}</small>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>

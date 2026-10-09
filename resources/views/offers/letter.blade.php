@@ -12,8 +12,35 @@
     <title>{{ __('Offer Letter') }} {{ $offer->offer_no }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 500 700;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 800 900;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif, "Dirham";
             font-size: 12.5px;
             line-height: 1.45;
             color: #1a1a1a;

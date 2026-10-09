@@ -7,6 +7,7 @@ use App\Models\Lead;
 use App\Models\MapLocation;
 use App\Models\Property;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Notifications\ShareInterest;
 use App\Services\LeadDistributionService;
 use App\Services\TenantMailConfigurator;
@@ -142,6 +143,10 @@ class ClientShareController extends Controller
             $query->where('furnishing', $request->furnishing);
         }
 
+        if ($request->filled('maids_room')) {
+            $query->where('maids_room', true);
+        }
+
         if ($request->filled('category')) {
             $query->where('property_category', $request->category);
         }
@@ -217,8 +222,9 @@ class ClientShareController extends Controller
         $interested = $lead->properties()->pluck('properties.id')->all();
 
         // Location per building (sub_community), not per unit: every unit under
-        // a sub_community shares the same map link. Resolve each building once,
-        // and key the embedded map to the first one that has a location.
+        // a sub_community shares the same place. One pin per building; hovering
+        // a pin shows how many of the currently visible units are available
+        // there, and clicking offers Google Maps / Waze directions.
         $maps = app(\App\Services\MapLocationService::class);
         $subCommunities = $units->pluck('sub_community')->filter()->unique()->values();
         $mapLocations = MapLocation::withoutGlobalScopes()
@@ -227,15 +233,38 @@ class ClientShareController extends Controller
             ->get()
             ->keyBy('sub_community');
 
+        $unitCounts = $units->groupBy('sub_community')->map->count();
+
+        $mapPins = [];
+        foreach ($unitCounts as $building => $count) {
+            $location = $mapLocations[$building] ?? null;
+            if ($location === null || $location->latitude === null || $location->longitude === null) {
+                continue;
+            }
+
+            $query = $location->map_query ?: $maps->queryForLocation($location);
+
+            $mapPins[] = [
+                'lat' => (float) $location->latitude,
+                'lng' => (float) $location->longitude,
+                'name' => $building,
+                'count' => $count,
+                'query' => $query,
+                'google' => $maps->directionsUrl($query),
+                'waze' => $maps->wazeUrl($location),
+            ];
+        }
+
+        // Fallback for tenants with no geocoded building yet: still show a
+        // keyless embed of the first located building rather than nothing.
         $mapEmbed = null;
-        $embedKey = $tenant->mapsEmbedKey();
-        if ($embedKey !== null) {
+        if ($mapPins === []) {
             foreach ($units as $unit) {
                 $location = $unit->sub_community ? ($mapLocations[$unit->sub_community] ?? null) : null;
                 if ($location && $location->map_query !== null && $location->map_query !== '') {
                     $mapEmbed = [
                         'query' => $location->map_query,
-                        'embed' => $maps->embedUrl($location->map_query, $embedKey),
+                        'embed' => $maps->embedUrl($location->map_query),
                     ];
                     break;
                 }
@@ -250,6 +279,7 @@ class ClientShareController extends Controller
             'buildings' => $buildings,
             'interested' => $interested,
             'filters' => $request->query(),
+            'mapPins' => $mapPins,
             'mapEmbed' => $mapEmbed,
             'mapLocations' => $mapLocations,
             'maps' => $maps,
@@ -283,13 +313,33 @@ class ClientShareController extends Controller
             ]);
         }
 
+        // The agent who generated the share link is recorded as ?agent=<code>.
+        // Their credit only counts while they are an active, lead-receiving
+        // member (see attributedAgent()); otherwise the lead falls through to
+        // the normal distribution.
+        $sharer = $this->attributedAgent($tenant, trim((string) ($request->query('agent') ?? '')));
+
+        // Attribution is transport, not a filter: keep it out of the lead's
+        // note and captured filters. The URL still carries it afterwards, so
+        // the visitor stays on the exact link they were shared and any lead
+        // that comes back through it keeps what attribution it is entitled to.
+        $agentParam = $request->query('agent');
         $filters = $request->query();
+        unset($filters['agent']);
 
         $lead = null;
         if (! empty($phone)) {
+            // Portal-synced leads used to carry the number exactly as the
+            // portal sent it, spaces and all ("+971 50 123 4567"). Match those
+            // legacy rows on their digits too, or a client who types the
+            // compact number on a share link spawns a duplicate of himself.
+            $digits = preg_replace('/\D+/', '', $phone);
             $lead = Lead::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)
-                ->where('phone', $phone)
+                ->where(function ($q) use ($phone, $digits) {
+                    $q->where('phone', $phone)
+                        ->orWhereRaw('REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, "+", ""), " ", ""), "-", ""), "(", ""), ")", "") = ?', [$digits]);
+                })
                 ->first();
         }
         if (! $lead && ! empty($validated['email'])) {
@@ -306,9 +356,14 @@ class ClientShareController extends Controller
                 'action' => 'lead.verified_share_link',
                 'model_type' => Lead::class,
                 'model_id' => $lead->id,
-                'new_values' => ['filters' => $filters],
+                'new_values' => ['filters' => $filters, 'agent_code' => $sharer?->agent_code],
             ]);
         } else {
+            $customFields = ['share_link_filters' => $this->cleanFilters($filters)];
+            if ($sharer) {
+                $customFields['share_link_agent_code'] = $sharer->agent_code;
+            }
+
             $lead = Lead::withoutGlobalScopes()->create([
                 'tenant_id' => $tenant->id,
                 'first_name' => $validated['first_name'],
@@ -323,9 +378,7 @@ class ClientShareController extends Controller
                 'notes' => $this->filterNote($filters)
                     ? 'Came in from the shared availability link. Looking for: '.$this->filterNote($filters).'.'
                     : 'Came in from the shared availability link.',
-                'custom_fields' => [
-                    'share_link_filters' => $this->cleanFilters($filters),
-                ],
+                'custom_fields' => $customFields,
             ]);
 
             AuditLog::withoutGlobalScopes()->create([
@@ -334,19 +387,59 @@ class ClientShareController extends Controller
                 'action' => 'lead.created_via_share_link',
                 'model_type' => Lead::class,
                 'model_id' => $lead->id,
-                'new_values' => ['filters' => $this->cleanFilters($filters)],
+                'new_values' => [
+                    'filters' => $this->cleanFilters($filters),
+                    'agent_code' => $sharer?->agent_code,
+                ],
             ]);
 
-            try {
-                app(LeadDistributionService::class)->distribute($lead, $tenant);
-            } catch (\Throwable $e) {
-                Log::warning('Share link lead distribution failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            if ($sharer) {
+                // The sharer's own link is a directed referral: the lead goes
+                // straight onto their book, bypassing the rotation exactly as
+                // portal listing enquiries route by agent code.
+                $lead->agent_id = $sharer->id;
+                $lead->save();
+            } else {
+                try {
+                    app(LeadDistributionService::class)->distribute($lead, $tenant);
+                } catch (\Throwable $e) {
+                    Log::warning('Share link lead distribution failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+                }
             }
         }
 
         $this->remember($lead);
 
-        return redirect()->route('share.inventory', array_merge(['slug' => $tenant->slug], $filters));
+        return redirect()->route('share.inventory', array_merge(
+            ['slug' => $tenant->slug],
+            $filters,
+            $agentParam !== null ? ['agent' => (string) $agentParam] : []
+        ));
+    }
+
+    /**
+     * The agent a share link attributes its leads to, resolved from the
+     * ?agent=<code> parameter embedded by the inventory "Copy share link"
+     * button.
+     *
+     * Mirrors the portal listing rule (PortalLeadService::findAgentByCode):
+     * only an active member who has not opted out of incoming leads is
+     * credited. A member who switched receives_leads off must not be handed
+     * share-link leads behind the distribution formula's back, so they fall
+     * through to the rotation instead.
+     */
+    protected function attributedAgent(Tenant $tenant, string $agentCode): ?User
+    {
+        if ($agentCode === '') {
+            return null;
+        }
+
+        return User::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->id)
+            ->where('agent_code', $agentCode)
+            ->where('is_active', true)
+            ->where('receives_leads', true)
+            ->first();
     }
 
     /**
@@ -464,6 +557,9 @@ class ClientShareController extends Controller
         }
         if (isset($filters['furnishing']) && $filters['furnishing'] !== '') {
             $bits[] = ucfirst(str_replace('_', ' ', (string) $filters['furnishing']));
+        }
+        if (isset($filters['maids_room']) && $filters['maids_room'] !== '') {
+            $bits[] = __("Maid's room");
         }
 
         return implode(' · ', $bits);

@@ -105,7 +105,7 @@ class PortalIntegrationTest extends TestCase
             'tenant_id' => $this->tenant->id,
             'first_name' => 'Ahmed',
             'last_name' => 'Khan',
-            'phone' => '+971 50 111 2222',
+            'phone' => '+971501112222',
             'lead_source' => 'dubizzle',
         ]);
 
@@ -168,7 +168,7 @@ class PortalIntegrationTest extends TestCase
         $this->assertDatabaseHas('leads', [
             'tenant_id' => $this->tenant->id,
             'first_name' => 'Priya',
-            'phone' => '+971 55 888 7777',
+            'phone' => '+971558887777',
             'lead_source' => 'propertyfinder',
         ]);
     }
@@ -590,7 +590,7 @@ class PortalIntegrationTest extends TestCase
         $this->assertDatabaseHas('leads', [
             'tenant_id' => $this->tenant->id,
             'first_name' => 'Rania',
-            'phone' => '+971 50 123 9999',
+            'phone' => '+971501239999',
             'lead_source' => 'property_finder',
         ]);
 
@@ -652,7 +652,7 @@ class PortalIntegrationTest extends TestCase
         $this->assertNotNull($lead);
         $this->assertSame('Omar', $lead->first_name);
         $this->assertSame('Farouk', $lead->last_name);
-        $this->assertSame('+971 50 123 4567', $lead->phone);
+        $this->assertSame('+971501234567', $lead->phone);
         $this->assertSame('omar@example.com', $lead->email);
         $this->assertSame('77', $lead->custom_fields['listing_reference'] ?? null);
     }

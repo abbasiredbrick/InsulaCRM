@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\AvailabilitySource;
+use App\Models\Community;
 use App\Models\MapLocation;
 use App\Models\Property;
 use App\Services\AvailabilityIngestService;
 use App\Services\MapLocationService;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class InventoryMapLocationTest extends TestCase
@@ -255,9 +257,13 @@ class InventoryMapLocationTest extends TestCase
             'https://www.google.com/maps/dir/?api=1&destination='.rawurlencode($query),
             $maps->directionsUrl($query)
         );
-        $this->assertStringContainsString('output=embed', $maps->embedUrl($query));
-        $this->assertStringContainsString('embed/v1/place', $maps->embedUrl($query, 'KEY123'));
-        $this->assertStringContainsString('key=KEY123', $maps->embedUrl($query, 'KEY123'));
+        $this->assertSame(
+            'https://maps.google.com/maps?z=16&q='.rawurlencode($query).'&output=embed',
+            $maps->embedUrl($query)
+        );
+        // A shared key must not change the embed: the legacy output=embed
+        // endpoint ignores keys, and the keyed v1/place API 403s otherwise.
+        $this->assertSame('https://maps.google.com/maps?z=16&q='.rawurlencode($query).'&output=embed', $maps->embedUrl($query, 'KEY123'));
         $this->assertSame('Bey View Tower, Abu Dhabi', $maps->queryFor(['Bey View Tower', 'Bey View Tower', 'Other', 'Abu Dhabi']));
     }
 
@@ -285,28 +291,19 @@ class InventoryMapLocationTest extends TestCase
     public function test_admin_can_save_clear_and_auto_generate_a_building_location(): void
     {
         $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
+        $location = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi Mall');
 
         // Save by hand — a place name turns into a search link.
-        $this->post(route('availability-sources.locations-apply'), [
-            'building' => 'Bey View Tower',
-            'community' => 'Abu Dhabi Mall',
-            'city' => 'Abu Dhabi',
-            'location' => 'Bey View Tower, Abu Dhabi Mall',
+        $this->post(route('settings.map-locations.set-location', $location), [
             'mode' => 'save',
+            'location' => 'Bey View Tower, Abu Dhabi Mall',
         ])->assertSessionHasNoErrors();
 
-        $location = MapLocation::withoutGlobalScopes()
-            ->where('tenant_id', $this->tenant->id)
-            ->where('sub_community', 'Bey View Tower')
-            ->first();
-        $this->assertNotNull($location);
+        $this->assertNotNull($location->refresh()->map_url);
         $this->assertStringContainsString('api=1&query=', $location->map_url);
 
         // Clear drops it.
-        $this->post(route('availability-sources.locations-apply'), [
-            'building' => 'Bey View Tower',
-            'community' => 'Abu Dhabi Mall',
-            'city' => 'Abu Dhabi',
+        $this->post(route('settings.map-locations.set-location', $location), [
             'mode' => 'clear',
             'location' => '',
         ]);
@@ -314,10 +311,7 @@ class InventoryMapLocationTest extends TestCase
         $this->assertNull($location->refresh()->map_url);
 
         // Auto regenerates for the building now that it has none.
-        $this->post(route('availability-sources.locations-apply'), [
-            'building' => 'Bey View Tower',
-            'community' => 'Abu Dhabi Mall',
-            'city' => 'Abu Dhabi',
+        $this->post(route('settings.map-locations.set-location', $location), [
             'mode' => 'auto',
             'location' => '',
         ]);
@@ -330,11 +324,8 @@ class InventoryMapLocationTest extends TestCase
     {
         $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
 
-        $this->post(route('availability-sources.locations-apply'), [
-            'building' => '__all__',
-            'mode' => 'auto',
-            'location' => '',
-        ])->assertSessionHasNoErrors();
+        $this->post(route('settings.map-locations.generate-all'))
+            ->assertSessionHasNoErrors();
 
         $location = MapLocation::withoutGlobalScopes()
             ->where('tenant_id', $this->tenant->id)
@@ -350,7 +341,7 @@ class InventoryMapLocationTest extends TestCase
         $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
         $this->location('Bey View Tower', 'https://www.google.com/maps/place/Al+Ghadeer', 'Bey View Tower, Abu Dhabi Mall');
 
-        $this->get(route('availability-sources.locations'))
+        $this->get(route('settings.map-locations.index'))
             ->assertOk()
             ->assertSee('Bey View Tower')
             ->assertSee('Al+Ghadeer', false);
@@ -372,8 +363,12 @@ class InventoryMapLocationTest extends TestCase
         $html = $this->withCookie($cookie->getName(), $cookie->getValue())
             ->get('/s/test-company')
             ->assertOk()
-            ->assertSee('embed/v1/place', false)
-            ->assertSee('key=TEST_EMBED_KEY', false)
+            // The embed is keyless on purpose: the keyed v1/place API 403s
+            // unless the key is fully enabled and referrer-whitelisted, so a
+            // shared key must never change the URL back to the keyed endpoint.
+            ->assertSee('maps.google.com/maps?z=16&q=')
+            ->assertSee('output=embed', false)
+            ->assertDontSee('key=TEST_EMBED_KEY', false)
             ->assertSee('View on map')
             ->assertSee('Directions')
             ->assertSee('Bey View Tower, Abu Dhabi Mall, Abu Dhabi');
@@ -382,7 +377,7 @@ class InventoryMapLocationTest extends TestCase
         $html->assertSee('I\'m interested in this unit');
     }
 
-    public function test_the_share_page_hides_the_embed_without_an_api_key(): void
+    public function test_the_share_page_shows_the_keyless_embed_even_without_an_api_key(): void
     {
         $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
         $this->location('Bey View Tower', 'https://www.google.com/maps/place/Al+Ghadeer', 'Bey View Tower, Abu Dhabi Mall, Abu Dhabi');
@@ -397,8 +392,9 @@ class InventoryMapLocationTest extends TestCase
         $this->withCookie($cookie->getName(), $cookie->getValue())
             ->get('/s/test-company')
             ->assertOk()
-            ->assertDontSee('output=embed', false)
-            ->assertDontSee('embed/v1/place', false)
+            ->assertSee('maps.google.com/maps?z=16&q=')
+            ->assertSee('output=embed', false)
+            ->assertSee('Open in Google Maps')
             ->assertSee('View on map');
     }
 
@@ -427,5 +423,360 @@ class InventoryMapLocationTest extends TestCase
         $this->assertNotNull($location);
         $this->assertSame($maps->searchUrl('Skyline Heights, Downtown, Abu Dhabi'), $location->map_url);
         $this->assertSame('Skyline Heights, Downtown, Abu Dhabi', $location->map_query);
+    }
+
+    public function test_coordinates_are_extracted_from_google_maps_link_variants(): void
+    {
+        $maps = app(MapLocationService::class);
+
+        $this->assertSame([25.204847, 55.270782], $maps->coordsFromUrl('https://www.google.com/maps/place/DUBAI/@25.204847,55.270782,17z/data=...'));
+        $this->assertSame([24.4539, 54.3773], $maps->coordsFromUrl('https://goo.gl/maps/x?data=!3d24.4539!4d54.3773'));
+        $this->assertSame([25.20, 55.27], $maps->coordsFromUrl('https://www.google.com/maps/search/?api=1&query=x&ll=25.20,55.27'));
+        $this->assertNull($maps->coordsFromUrl('https://www.google.com/maps/place/Al+Ghadeer'));
+        $this->assertNull($maps->coordsFromUrl(null));
+    }
+
+    public function test_geocode_resolves_a_query_through_nominatim(): void
+    {
+        Http::fake(function ($request) {
+            return $request['q'] === 'Nowhere, QC'
+                ? Http::response('[]', 200)
+                : Http::response([
+                    ['lat' => '24.4539', 'lon' => '54.3773', 'display_name' => 'Bey View Tower, Abu Dhabi'],
+                ]);
+        });
+
+        $maps = app(MapLocationService::class);
+
+        $this->assertSame([24.4539, 54.3773], $maps->geocode('Bey View Tower, Abu Dhabi Mall, Abu Dhabi'));
+
+        // A failed lookup must not throw and must not cache a hit.
+        $this->assertNull($maps->geocode('Nowhere, QC'));
+        $this->assertNull($maps->geocode('Nowhere, QC'));
+    }
+
+    public function test_resolve_coordinates_prefers_stored_then_link_embedded_then_geocode(): void
+    {
+        $maps = app(MapLocationService::class);
+
+        // Stored coordinates win; nothing else is consulted.
+        $stored = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi');
+        $stored->update(['latitude' => 1.0, 'longitude' => 2.0]);
+        $this->assertSame([1.0, 2.0], $maps->resolveCoordinates($stored->fresh()));
+
+        // A link that embeds coordinates is used and persisted without HTTP.
+        Http::preventStrayRequests();
+        try {
+            $embedded = $this->location('Al Rihan Heights', 'https://www.google.com/maps/place/X/@25.204847,55.270782,17z', 'Al Rihan Heights, Abu Dhabi');
+            $this->assertSame([25.204847, 55.270782], $maps->resolveCoordinates($embedded->fresh()));
+            $embedded->refresh();
+            $this->assertSame(25.204847, (float) $embedded->latitude);
+            $this->assertSame(55.270782, (float) $embedded->longitude);
+        } finally {
+            Http::preventStrayRequests(false);
+        }
+        Http::assertNothingSent();
+
+        // Otherwise the query is geocoded.
+        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([['lat' => '24.4', 'lon' => '54.3']])]);
+        $geocoded = $this->location('Reem Island', null, 'Reem Island, Abu Dhabi');
+        $this->assertSame([24.4, 54.3], $maps->resolveCoordinates($geocoded->fresh()));
+        $geocoded->refresh();
+        $this->assertSame(24.4, (float) $geocoded->latitude);
+    }
+
+    public function test_backfill_coordinates_geocodes_only_the_missing_ones(): void
+    {
+        Http::fake(function ($request) {
+            return $request['q'] === 'Al Rihan Heights, Abu Dhabi'
+                ? Http::response([['lat' => '24.48', 'lon' => '54.37', 'display_name' => 'Al Rihan Heights, Abu Dhabi']])
+                : Http::response('[]', 200);
+        });
+
+        $this->location('Bey View Tower', 'https://www.google.com/maps/place/X/@25.2,55.27,17z', 'Bey View Tower, Abu Dhabi');
+        $this->location('Al Rihan Heights', null, 'Al Rihan Heights, Abu Dhabi');
+        $this->location('Reem Island', 'https://www.google.com/maps/place/K', null);
+
+        $maps = app(MapLocationService::class);
+        $updated = $maps->backfillCoordinates($this->tenant->id);
+
+        // The embedded-link + the query locations gain coordinates; a bare
+        // link falls back to the generated building query and, when that does
+        // not resolve, stays put.
+        $this->assertSame(2, $updated);
+        $this->assertSame(25.2, (float) MapLocation::withoutGlobalScopes()->where('sub_community', 'Bey View Tower')->first()->latitude);
+        $this->assertSame(24.48, (float) MapLocation::withoutGlobalScopes()->where('sub_community', 'Al Rihan Heights')->first()->latitude);
+        $this->assertNull(MapLocation::withoutGlobalScopes()->where('sub_community', 'Reem Island')->first()->latitude);
+    }
+
+    public function test_waze_url_prefers_coordinates_and_falls_back_to_query(): void
+    {
+        $maps = app(MapLocationService::class);
+
+        $withCoords = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi');
+        $withCoords->update(['latitude' => 25.2, 'longitude' => 55.27]);
+
+        $this->assertSame(
+            'https://www.waze.com/ul?ll=25.2,55.27&navigate=yes',
+            $maps->wazeUrl($withCoords->fresh())
+        );
+
+        $withoutCoords = $this->location('Al Rihan Heights', null, 'Al Rihan Heights, Abu Dhabi');
+        $this->assertSame(
+            'https://www.waze.com/ul?q=Al%20Rihan%20Heights%2C%20Abu%20Dhabi&navigate=yes',
+            $maps->wazeUrl($withoutCoords->fresh())
+        );
+    }
+
+    public function test_the_share_page_drops_a_pin_with_unit_count_and_direction_links(): void
+    {
+        $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
+        $this->unit('Bey View Tower', '1302', 'Abu Dhabi Mall');
+        $this->unit('Al Rihan Heights', '902', 'Al Rihan Heights');
+
+        $bey = $this->location('Bey View Tower', 'https://www.google.com/maps/place/X/@25.2,55.27,17z', 'Bey View Tower, Abu Dhabi Mall');
+        $bey->update(['latitude' => 25.2, 'longitude' => 55.27]);
+        // Al Rihan Heights is deliberately not geocoded — it must not pin.
+
+        $verify = $this->post('/s/test-company/verify', [
+            'first_name' => 'Sara',
+            'last_name' => 'Khan',
+            'phone' => '+971501234567',
+        ]);
+        $cookie = collect($verify->headers->getCookies())->first(fn ($cookie) => str_starts_with($cookie->getName(), 'keystone_share'));
+
+        $html = $this->withCookie($cookie->getName(), $cookie->getValue())
+            ->get('/s/test-company')
+            ->assertOk()
+            ->assertSee('id="share-map"', false)
+            // Pin payload: only the geocoded building, with its count.
+            ->assertSee('"name":"Bey View Tower"', false)
+            ->assertSee('"count":2', false)
+            ->assertDontSee('"name":"Al Rihan Heights"', false)
+            // The pin URLs live in the @json-encoded payload, whose forward
+            // slashes are escaped as \/.
+            ->assertSee('google.com\\/maps\\/dir', false)
+            ->assertSee('waze.com\\/ul', false)
+            // Leaflet is self-hosted (no third-party CDN in the critical
+            // map path) and the map must actually draw: OSM tile layer plus
+            // CSS pins are contract, not decoration.
+            ->assertSee('/vendor/leaflet/leaflet.min.js', false)
+            ->assertSee('/vendor/leaflet/leaflet.min.css', false)
+            ->assertSee('tile.openstreetmap.org', false)
+            ->assertSee('insulacrm-pin', false)
+            // The keyless-iframe fallback is not rendered while pins exist
+            // (its heading only exists in the @elseif branch).
+            ->assertDontSee('Where the available units are');
+
+        $html->assertSee('Bey View Tower', false);
+    }
+
+    public function test_a_reimport_that_only_changes_building_spelling_reuses_the_location(): void
+    {
+        $source = $this->createSource(['column_map' => [
+            'Building' => 'building',
+            'Unit No' => 'unit_no',
+            'Features' => 'features',
+            'Rent' => 'rent',
+        ]]);
+        $service = new AvailabilityIngestService;
+
+        $sheet1 = $service->parseText(implode("\n", [
+            "Building\tUnit No\tFeatures\tRent",
+            "Bey View Tower\t1301\t4 BR\t240,000",
+        ]), ['delimiter' => 'tab', 'has_header' => true]);
+        $service->ingest($source, $sheet1['rows'], $this->tenant->id);
+
+        // The PM corrects the spelling (extra space, different case) — the
+        // normalized-exact de-dup must fold it back onto the existing row.
+        $sheet2 = $service->parseText(implode("\n", [
+            "Building\tUnit No\tFeatures\tRent",
+            "BEY  VIEW TOWER\t1301\t4 BR\t240,000",
+        ]), ['delimiter' => 'tab', 'has_header' => true]);
+        $service->ingest($source, $sheet2['rows'], $this->tenant->id);
+
+        $rows = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->get(['sub_community']);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('Bey View Tower', $rows->first()->sub_community);
+    }
+
+    public function test_renaming_a_building_cascades_to_every_unit(): void
+    {
+        $unit = $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
+        $location = $this->location('Bey View Tower', 'https://www.google.com/maps/place/X', 'Bey View Tower, Abu Dhabi Mall');
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Bey View Tower', $location);
+
+        $this->post(route('settings.map-locations.rename', $location), [
+            'name' => 'Al Aryam Tower',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Al Aryam Tower', $location->refresh()->sub_community);
+        $this->assertSame('Al Aryam Tower', $unit->refresh()->sub_community);
+        $this->assertSame($location->id, $unit->refresh()->map_location_id);
+    }
+
+    public function test_renaming_onto_an_existing_building_is_blocked(): void
+    {
+        $first = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi');
+        $second = $this->location('Al Aryam Tower', null, 'Al Aryam, Abu Dhabi');
+
+        $this->post(route('settings.map-locations.rename', $second), [
+            'name' => 'Bey View Tower',
+        ])->assertSessionHas('error');
+
+        $this->assertSame('Bey View Tower', $first->refresh()->sub_community);
+        $this->assertSame('Al Aryam Tower', $second->refresh()->sub_community);
+    }
+
+    public function test_merging_two_buildings_folds_units_into_the_kept_one(): void
+    {
+        $kept = $this->location('Bey View Tower', 'https://www.google.com/maps/place/Keep+Me', 'Bey View Tower, Abu Dhabi');
+        $discard = $this->location('BEY VIEW TOWER', 'https://www.google.com/maps/place/Discard+Me', 'Bey View Tower, Abu Dhabi');
+
+        $unitOnKept = $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
+        $unitOnDiscard = $this->unit('BEY VIEW TOWER', '1302', 'Abu Dhabi Mall');
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Bey View Tower', $kept);
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'BEY VIEW TOWER', $discard);
+
+        $this->post(route('settings.map-locations.merge'), [
+            'keep_id' => $kept->id,
+            'discard_id' => $discard->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($discard->fresh());
+        $this->assertSame('Bey View Tower', $unitOnKept->refresh()->sub_community);
+        $this->assertSame($kept->id, $unitOnKept->refresh()->map_location_id);
+        $this->assertSame('Bey View Tower', $unitOnDiscard->refresh()->sub_community);
+        $this->assertSame($kept->id, $unitOnDiscard->refresh()->map_location_id);
+    }
+
+    public function test_a_building_with_units_cannot_be_removed_but_an_empty_one_can(): void
+    {
+        $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');
+        $occupied = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi');
+        $empty = $this->location('Empty Tower', null, 'Empty, Abu Dhabi');
+
+        $this->delete(route('settings.map-locations.buildings.destroy', $occupied))
+            ->assertSessionHas('error');
+        $this->assertNotNull($occupied->fresh());
+
+        $this->delete(route('settings.map-locations.buildings.destroy', $empty))
+            ->assertSessionHas('success');
+        $this->assertNull($empty->fresh());
+    }
+
+    public function test_communities_can_be_created_and_renamed_cascading_to_buildings_and_units(): void
+    {
+        $this->post(route('settings.map-locations.communities.store'), [
+            'name' => 'Al Ryada',
+            'city' => 'Abu Dhabi',
+        ])->assertSessionHasNoErrors();
+
+        $community = Community::where('tenant_id', $this->tenant->id)->firstOrFail();
+        $this->assertSame('Al Ryada', $community->name);
+
+        $unit = $this->unit('Bey View Tower', '1301', 'Al Ryada');
+        $location = $this->location('Bey View Tower', null, 'Al Ryada', 'Abu Dhabi');
+        $location->update(['community_id' => $community->id]);
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Bey View Tower', $location);
+
+        $this->put(route('settings.map-locations.communities.update', $community), [
+            'name' => 'Al Ryada Central',
+            'city' => 'Abu Dhabi',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Al Ryada Central', $community->refresh()->name);
+        $this->assertSame('Al Ryada Central', $location->refresh()->community);
+        $this->assertSame('Al Ryada Central', $unit->refresh()->community);
+    }
+
+    public function test_a_community_with_buildings_cannot_be_deleted(): void
+    {
+        $community = Community::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Al Ryada',
+            'city' => 'Abu Dhabi',
+        ]);
+        $this->location('Bey View Tower', null, 'Al Ryada', 'Abu Dhabi')->update(['community_id' => $community->id]);
+
+        $this->delete(route('settings.map-locations.communities.destroy', $community))
+            ->assertSessionHas('error');
+
+        $this->assertNotNull($community->fresh());
+    }
+
+    public function test_manually_creating_a_unit_links_it_to_its_building(): void
+    {
+        $this->post(route('inventory.store'), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'availability' => 'draft',
+            'sub_community' => 'Skyline Heights',
+            'community' => 'Downtown',
+            'city' => 'Abu Dhabi',
+            'unit_no' => 'A1201',
+            'bedrooms' => 2,
+            'rent_price' => 150000,
+        ])->assertRedirect();
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Skyline Heights')
+            ->firstOrFail();
+
+        $property = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Skyline Heights')
+            ->firstOrFail();
+
+        $this->assertSame($location->id, $property->map_location_id);
+    }
+
+    public function test_picking_a_building_wins_over_the_typed_location_fields(): void
+    {
+        $this->location('Skyline Heights', null, 'Skyline Heights, Al Ryada', 'Al Ryada', 'Abu Dhabi');
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Skyline Heights')
+            ->firstOrFail();
+
+        $this->post(route('inventory.store'), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'availability' => 'draft',
+            'map_location_id' => (string) $location->id,
+            'sub_community' => 'Something Else',
+            'community' => 'Downtown',
+            'city' => 'Dubai',
+            'unit_no' => 'A1201',
+            'bedrooms' => 2,
+            'rent_price' => 150000,
+        ])->assertRedirect();
+
+        $property = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('unit_no', 'A1201')
+            ->firstOrFail();
+
+        $this->assertSame((int) $location->id, $property->map_location_id);
+        $this->assertSame('Skyline Heights', $property->sub_community);
+        $this->assertSame('Al Ryada', $property->community);
+        $this->assertSame('Abu Dhabi', $property->city);
+    }
+
+    public function test_the_new_unit_building_picker_searches_locations(): void
+    {
+        $this->location('Bey View Tower', null, 'Bey View Tower, Al Ryada', 'Al Ryada', 'Abu Dhabi');
+
+        $this->get(route('inventory.locations-search').'?q=bey')
+            ->assertOk()
+            ->assertJsonPath('results.0.value', (string) MapLocation::withoutGlobalScopes()->firstOrFail()->id)
+            ->assertJsonPath('results.0.label', 'Bey View Tower · Al Ryada · Abu Dhabi');
     }
 }

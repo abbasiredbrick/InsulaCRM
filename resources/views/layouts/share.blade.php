@@ -17,11 +17,39 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler-vendors.min.css">
     <style>
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 500 700;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
+        @font-face {
+            font-family: "Dirham";
+            src: url("{{ asset('fonts/dirham.woff2') }}?v=4") format("woff2"),
+                 url("{{ asset('fonts/dirham.woff') }}?v=4") format("woff");
+            font-weight: 800 900;
+            font-style: normal;
+            font-display: swap;
+            unicode-range: U+20C3;
+        }
         body {
             background: var(--tblr-bg-surface-secondary, #f0f2f7);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            font-family: var(--tblr-font-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif), "Dirham";
         }
         .share-brandbar {
             background: #17212f;
@@ -48,20 +76,29 @@
             background: #17212f;
             color: #aab4c2;
         }
-        .unit-thumb {
-            height: 170px;
+        .unit-thumb-sm {
+            width: 68px;
+            height: 52px;
             background: var(--tblr-bg-surface-secondary, #f0f2f7);
             display: flex;
             align-items: center;
             justify-content: center;
             color: #94a3b8;
-            font-size: 2rem;
+            font-size: 1.25rem;
             overflow: hidden;
+            border-radius: .5rem;
         }
-        .unit-thumb img {
+        .unit-thumb-sm img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        .share-unit-row {
+            cursor: pointer;
+            transition: background-color .12s ease;
+        }
+        .share-unit-row:hover {
+            background-color: var(--tblr-bg-surface-secondary, #f0f2f7);
         }
         .unit-price {
             font-size: 1.15rem;

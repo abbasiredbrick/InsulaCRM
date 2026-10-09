@@ -394,11 +394,44 @@ class InventoryStudioTest extends TestCase
         $this->assertSame(1, substr_count($label, 'Dubai Marina'));
     }
 
-    public function test_an_unrecorded_size_prints_nothing(): void
+    /**
+     * An unrecorded size falls back to the category word, never to a guessed
+     * bedroom count — so a shop with no size on file reads "Shop for Rent in
+     * Marafid", not a bare "for Rent in Marafid".
+     */
+    public function test_an_unrecorded_size_falls_back_to_the_category_label(): void
     {
         $property = new Property(['property_category' => 'apartment', 'bedrooms' => null, 'sub_community' => 'Reem Hills']);
 
         $this->assertSame('', $property->bedroomLabel());
-        $this->assertSame('for Rent in Reem Hills', $property->display_name);
+        $this->assertSame('Apartment for Rent in Reem Hills', $property->display_name);
+
+        $shop = new Property(['property_category' => 'shop', 'bedrooms' => null, 'sub_community' => 'Marafid']);
+        $this->assertSame('Shop for Rent in Marafid', $shop->display_name);
+    }
+
+    /**
+     * A maid's room is a premium feature, so its "+ Maid" sits on the label
+     * and on the marketing title in the same place.
+     */
+    public function test_a_maids_room_is_carried_on_the_label_and_title(): void
+    {
+        $property = new Property([
+            'property_category' => 'apartment',
+            'bedrooms' => 2,
+            'maids_room' => true,
+            'sub_community' => 'Burj Al Shams',
+            'community' => 'Al Reem Island',
+        ]);
+
+        $this->assertSame('2BR + Maid', $property->sizeLabel());
+        $this->assertSame('2BR + Maid for Rent in Burj Al Shams, Al Reem Island', $property->display_name);
+
+        $service = new \App\Services\AvailabilityIngestService;
+        $method = (new \ReflectionClass($service))->getMethod('buildMarketingTitle');
+        $method->setAccessible(true);
+
+        $this->assertSame('2BR + Maid Apartment for Rent in Burj Al Shams', $method->invoke($service, 2, 'apartment', 'Burj Al Shams', true));
+        $this->assertSame('2BR Apartment for Rent in Burj Al Shams', $method->invoke($service, 2, 'apartment', 'Burj Al Shams', false));
     }
 }

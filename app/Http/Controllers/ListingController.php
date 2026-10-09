@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\MapLocation;
 use App\Models\Property;
 use App\Models\PropertyMedia;
 use App\Services\MapLocationService;
@@ -133,6 +134,10 @@ class ListingController extends Controller
             $query->whereHas('media', function ($q) {
                 $q->where('type', 'photo');
             });
+        }
+
+        if ($request->filled('maids_room')) {
+            $query->where('maids_room', true);
         }
 
         if ($request->filled('has_portal_live')) {
@@ -387,15 +392,26 @@ class ListingController extends Controller
 
     public function create(Request $request)
     {
+        $property = new Property(['availability' => 'draft']);
+
         return view('inventory.create', [
-            'property' => new Property(['availability' => 'draft']),
+            'property' => $property,
             'agents' => $this->agents(),
+            'building_options' => $this->buildingOptions($property),
+            'building_search_url' => route('inventory.locations-search'),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate($this->rules());
+
+        if ($request->filled('map_location_id')) {
+            $data = $this->applyPickedBuilding($request, $data);
+            if ($data === null) {
+                return back()->withErrors(['map_location_id' => __('Pick a building from the list.')])->withInput();
+            }
+        }
 
         if (empty(trim((string) ($data['address'] ?? '')))) {
             $data['address'] = trim(implode(' ', array_filter([
@@ -413,6 +429,7 @@ class ListingController extends Controller
         $data['city'] = $data['city'] ?? ($data['community'] ?? '');
         $data['state'] = $data['state'] ?? '';
         $data['zip_code'] = $data['zip_code'] ?? '';
+        $data['maids_room'] = $request->boolean('maids_room');
 
         $property = Property::create([
             'tenant_id' => auth()->user()->tenant_id,
@@ -465,12 +482,21 @@ class ListingController extends Controller
         return view('inventory.edit', [
             'property' => $property,
             'agents' => $this->agents(),
+            'building_options' => $this->buildingOptions($property),
+            'building_search_url' => route('inventory.locations-search'),
         ]);
     }
 
     public function update(Request $request, Property $property)
     {
         $data = $request->validate($this->rules());
+
+        if ($request->filled('map_location_id')) {
+            $data = $this->applyPickedBuilding($request, $data);
+            if ($data === null) {
+                return back()->withErrors(['map_location_id' => __('Pick a building from the list.')])->withInput();
+            }
+        }
 
         if (empty(trim((string) ($data['address'] ?? '')))) {
             $data['address'] = trim(implode(' ', array_filter([
@@ -488,6 +514,7 @@ class ListingController extends Controller
         $data['city'] = $data['city'] ?? ($data['community'] ?? '');
         $data['state'] = $data['state'] ?? '';
         $data['zip_code'] = $data['zip_code'] ?? '';
+        $data['maids_room'] = $request->boolean('maids_room');
 
         $property->update($data);
 
@@ -504,8 +531,9 @@ class ListingController extends Controller
     /**
      * Ensure the unit's building (sub_community) has a map location, generating
      * a Google Maps search link from its name when it is a building we have not
-     * seen before. Returns the redirect, carrying a heads-up when a new entry
-     * was created so the user knows they can refine it in Settings.
+     * seen before, and link the unit to it. Returns the redirect, carrying a
+     * heads-up when a new entry was created so the user knows they can refine
+     * it in Settings.
      */
     protected function withMapLocationNotice($redirect, Property $property)
     {
@@ -514,7 +542,8 @@ class ListingController extends Controller
             return $redirect;
         }
 
-        $location = app(MapLocationService::class)->ensureMapLocation(
+        $maps = app(MapLocationService::class);
+        $location = $maps->ensureMapLocation(
             $property->tenant_id,
             $sub,
             $property->community,
@@ -522,11 +551,66 @@ class ListingController extends Controller
             null
         );
 
-        if ($location && $location->wasRecentlyCreated) {
-            $redirect->with('warning', __('Map location for ":building" was generated from its name. Review or correct it in Settings → Inventory Sources → Map Locations.', ['building' => $sub]));
+        if ($location) {
+            $maps->linkBuildingUnits($property->tenant_id, $sub, $location);
+            if ((int) $property->map_location_id !== (int) $location->id) {
+                $property->update(['map_location_id' => $location->id]);
+            }
+            if ($location->wasRecentlyCreated) {
+                $redirect->with('warning', __('Map location for ":building" was generated from its name. Review or correct it in Settings → Map Locations.', ['building' => $sub]));
+            }
         }
 
         return $redirect;
+    }
+
+    /**
+     * A picked building (New Unit form) is the source of truth for the location
+     * fields: its sub_community/community/city are written onto the unit so
+     * manual entries cannot drift from the building master.
+     *
+     * Returns the amended data array, or null when the posted id is not a
+     * building of the tenant.
+     */
+    protected function applyPickedBuilding(Request $request, array $data): ?array
+    {
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->find((int) $request->input('map_location_id'));
+
+        if (! $location) {
+            return null;
+        }
+
+        $data['map_location_id'] = (int) $location->id;
+        $data['sub_community'] = $location->sub_community;
+        $data['community'] = $location->community;
+        $data['city'] = $location->city;
+
+        return $data;
+    }
+
+    /**
+     * Preselected option for the building picker when editing an existing unit.
+     */
+    protected function buildingOptions(Property $property): array
+    {
+        if (! $property->map_location_id) {
+            return [];
+        }
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', auth()->user()->tenant_id)
+            ->find($property->map_location_id);
+
+        if (! $location) {
+            return [];
+        }
+
+        $place = collect([$location->community, $location->city])->filter()->implode(' · ');
+        $label = $location->sub_community.($place !== '' ? ' · '.$place : '');
+
+        return [['value' => (string) $location->id, 'label' => $label]];
     }
 
     public function destroy(Request $request, Property $property)
@@ -977,6 +1061,7 @@ class ListingController extends Controller
             'unit_no' => 'nullable|string|max:60',
             'floor_no' => 'nullable|string|max:60',
             'bedrooms' => 'nullable|integer|min:0|max:20',
+            'maids_room' => 'nullable|boolean',
             'bathrooms' => 'nullable|integer|min:0',
             'square_footage' => 'nullable|numeric|min:0',
             'parking' => 'nullable|integer|min:0',

@@ -98,7 +98,9 @@
                 {{ __('Copy share link') }}
             </button>
             <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
-            <a href="{{ route('availability-sources.locations') }}" class="btn btn-sm btn-outline-secondary">{{ __('Map Locations') }}</a>
+            @if(auth()->user()->hasRole('admin'))
+            <a href="{{ route('settings.map-locations.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Map Locations') }}</a>
+            @endif
             <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
         </div>
     </div>
@@ -137,7 +139,7 @@
                 </div>
             </div>
 
-            <div id="advancedSearch" class="collapse mt-3 {{ request()->hasAny(['market_class','category','furnishing','rent_period','community','sub_community','building_no','floor_no','bedrooms_min','bedrooms_max','bathrooms','rent_min','rent_max','sale_min','sale_max','area_min','area_max','developer_name','rera_permit_no','title_deed_no','plot_no','owner_name','has_photos','has_portal_live','parking','source','agent']) ? 'show' : '' }}">
+            <div id="advancedSearch" class="collapse mt-3 {{ request()->hasAny(['market_class','category','furnishing','rent_period','community','sub_community','building_no','floor_no','bedrooms_min','bedrooms_max','bathrooms','rent_min','rent_max','sale_min','sale_max','area_min','area_max','developer_name','rera_permit_no','title_deed_no','plot_no','owner_name','has_photos','has_portal_live','maids_room','parking','source','agent']) ? 'show' : '' }}">
                 <div class="border rounded p-3 bg-light">
                     <div class="row g-2 align-items-end">
                         <div class="col-md-2">
@@ -314,6 +316,12 @@
                                 <span class="form-check-label">{{ __('Live on a portal') }}</span>
                             </label>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" name="maids_room" value="1" {{ request('maids_room') ? 'checked' : '' }}>
+                                <span class="form-check-label">{{ __("Maid's room") }}</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -342,6 +350,9 @@
                         <div class="fw-bold"><a href="{{ route('inventory.show', $unit) }}">{{ $unit->display_name }}</a></div>
                         @if($unit->unit_no)
                             <div class="text-muted small">{{ __('Unit') }} {{ $unit->unit_no }}</div>
+                        @endif
+                        @if($unit->maids_room)
+                            <span class="badge bg-pink-lt mt-1">{{ __("Maid's room") }}</span>
                         @endif
                     </td>
                     <td>
@@ -421,6 +432,11 @@ document.getElementById('copy-share-link')?.addEventListener('click', function (
     grab('category', 'category');
     grab('rent_max', 'max_rent');
 
+    // Leads that come in through the copied link go to the agent who copies
+    // it. Old links without this parameter keep their current behaviour.
+    const agentCode = '{{ auth()->user()->agent_code ?? '' }}';
+    if (agentCode) params.agent = agentCode;
+
     const bedsMin = form.querySelector('[name="bedrooms_min"]');
     const bedsMax = form.querySelector('[name="bedrooms_max"]');
     if (bedsMin && bedsMax && bedsMin.value !== '' && bedsMin.value === bedsMax.value) {
@@ -430,6 +446,14 @@ document.getElementById('copy-share-link')?.addEventListener('click', function (
     const base = '{{ route('share.inventory', auth()->user()->tenant->slug) }}';
     const qs = new URLSearchParams(params).toString();
     const url = base + (qs ? '?' + qs : '');
+
+    // On phones and in the standalone PWA the native share sheet wins (its
+    // actions include copy); desktop keeps the one-click clipboard copy. The
+    // shared helper builds the same agent-tagged link either way.
+    if (window.MobileApp && typeof MobileApp.shareAvailability === 'function') {
+        MobileApp.shareAvailability(params);
+        return;
+    }
 
     const btn = this;
     navigator.clipboard.writeText(url).then(function () {

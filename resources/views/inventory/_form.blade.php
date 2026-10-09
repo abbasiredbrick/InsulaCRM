@@ -62,6 +62,12 @@
                                         <label class="form-check-label small" for="isStudio">{{ __('Studio') }}</label>
                                     </div>
                                 </div>
+                                <div class="input-group-text">
+                                    <div class="form-check form-check-inline m-0">
+                                        <input class="form-check-input mt-0" type="checkbox" id="hasMaidsRoom" name="maids_room" value="1" {{ (bool) old('maids_room', $property->maids_room) ? 'checked' : '' }}>
+                                        <label class="form-check-label small" for="hasMaidsRoom">{{ __("Maid's room") }}</label>
+                                    </div>
+                                </div>
                             </div>
                             @error('bedrooms') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
@@ -134,22 +140,37 @@
                 <div class="card-header"><h4 class="card-title">{{ __('Location & Title') }}</h4></div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-5">
+                            <label class="form-label">{{ __('Building (tower)') }}</label>
+                            <x-searchable-select
+                                name="map_location_id"
+                                :options="$buildingOptions ?? []"
+                                :selected="(string) ($property->map_location_id ?? '')"
+                                :remote="$buildingSearchUrl ?? route('inventory.locations-search')"
+                                :placeholder="__('Choose / search a building...')"
+                                :search-placeholder="__('Type building, community or city...')"
+                            />
+                            <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community below, and drives the map pin and portal listing location. A new name typed in Sub-community is created on save.') }}</div>
+                        </div>
+                        <div class="col-md-7">
                             <label class="form-label">{{ __('Address') }}</label>
                             <input type="text" name="address" class="form-control @error('address') is-invalid @enderror" value="{{ old('address', $property->address) }}" placeholder="{{ __('Street address (or community is enough)') }}">
                             @error('address') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">{{ __('City') }}</label>
-                            <input type="text" name="city" class="form-control" value="{{ old('city', $property->city) }}" placeholder="{{ __('Dubai') }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">{{ __('Community') }}</label>
-                            <input type="text" name="community" class="form-control" value="{{ old('community', $property->community) }}" placeholder="{{ __('Dubai Marina') }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">{{ __('Sub-community') }}</label>
-                            <input type="text" name="sub_community" class="form-control" value="{{ old('sub_community', $property->sub_community) }}" placeholder="{{ __('Marina Heights') }}">
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('Community') }}</label>
+                                    <input type="text" name="community" class="form-control" value="{{ old('community', $property->community) }}" placeholder="{{ __('Dubai Marina') }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('City') }}</label>
+                                    <input type="text" name="city" class="form-control" value="{{ old('city', $property->city) }}" placeholder="{{ __('Dubai') }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('Sub-community') }}</label>
+                                    <input type="text" name="sub_community" class="form-control" value="{{ old('sub_community', $property->sub_community) }}" placeholder="{{ __('Marina Heights') }}">
+                                    <div class="form-hint">{{ __('Leave blank when picking a building above.') }}</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="row mt-3">

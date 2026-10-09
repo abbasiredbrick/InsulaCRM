@@ -25,7 +25,9 @@
     <div class="text-nowrap">
         <a href="{{ route('availability-sources.guide') }}" class="btn btn-outline-secondary">{{ __('Import Guide') }}</a>
         <a href="{{ route('availability-sources.template') }}" class="btn btn-outline-secondary">{{ __('Sample CSV') }}</a>
-        <a href="{{ route('availability-sources.locations') }}" class="btn btn-outline-secondary">{{ __('Map Locations') }}</a>
+        @if(auth()->user()->hasRole('admin'))
+        <a href="{{ route('settings.map-locations.index') }}" class="btn btn-outline-secondary">{{ __('Map Locations') }}</a>
+        @endif
         <a href="{{ route('availability-sources.create') }}" class="btn btn-primary">{{ __('Add Source') }}</a>
         <a href="{{ route('availability-sources.truerentor') }}" class="btn btn-primary">{{ __('Connect TrueRentor') }}</a>
     </div>
