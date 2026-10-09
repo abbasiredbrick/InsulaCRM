@@ -9,6 +9,7 @@ use App\Models\Property;
 use App\Services\AvailabilityIngestService;
 use App\Services\MapLocationService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class InventoryMapLocationTest extends TestCase
@@ -242,6 +243,33 @@ class InventoryMapLocationTest extends TestCase
         $this->assertNull($maps->cleanUrl('javascript:alert(1)'));
         $this->assertNull($maps->cleanUrl('data:text/html,hi'));
         $this->assertNull($maps->cleanUrl('Bey View Tower'));
+    }
+
+    public function test_map_location_url_columns_are_text_so_long_google_links_survive(): void
+    {
+        // A real Google "place" URL embeds the pin, zoom and query in the path
+        // and overran the old VARCHAR(500) on MySQL, failing the save outright.
+        // SQLite ignores declared lengths, so guard the column type directly.
+        $this->assertSame('text', Schema::getColumnType('map_locations', 'map_url'));
+        $this->assertSame('text', Schema::getColumnType('map_locations', 'map_query'));
+    }
+
+    public function test_a_long_google_place_url_is_saved_whole(): void
+    {
+        $this->unit('Bloom Living Cordoba', '101', 'Bloom Living');
+        $location = $this->location('Bloom Living Cordoba', null, null, 'Bloom Living');
+
+        $url = 'https://www.google.com/maps/place/Bloom+Living+Cordoba/@24.4165173,54.5546245,21587m/'
+            .'data=!3m1!1e3'.str_repeat('!4m10!1m2!2m1!1sBloom+Living+-+Cordoba,+Zayed+City', 10);
+
+        $this->assertGreaterThan(500, strlen($url));
+
+        $this->post(route('settings.map-locations.set-location', $location), [
+            'mode' => 'save',
+            'location' => $url,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($url, $location->refresh()->map_url);
     }
 
     public function test_map_links_populate_from_search_queries_and_render_public_links(): void
