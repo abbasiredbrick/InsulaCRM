@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keystone — CRM for Property Brokers</title>
+<style>
+  :root {
+    --ink: #0e1120;
+    --ink-panel: #151a2d;
+    --panel-line: rgba(255,255,255,.13);
+    --text: #ffffff;
+    --text-2: #c9cede;
+    --muted: #8f97ab;
+    --gold: #d4af37;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: 1280px 800px; margin: 0; }
+  html, body { background: var(--ink); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .slide {
+    width: 1280px;
+    height: 800px;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(1200px 620px at 82% -12%, #1b2440 0%, transparent 58%),
+      radial-gradient(760px 380px at 6% 110%, rgba(212,175,55,.13), transparent 60%),
+      var(--ink);
+    color: var(--text);
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide:last-child { page-break-after: auto; }
+
+  .cover { justify-content: space-between; padding: 70px 80px 56px; }
+  .wordmark { display: flex; align-items: baseline; gap: 12px; font-weight: 800; font-size: 40px; letter-spacing: -0.5px; }
+  .wordmark .lite { color: var(--gold); }
+  .cover-kicker { color: var(--gold); font-size: 15px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; margin-bottom: 18px; }
+  .cover h1 { font-size: 76px; line-height: 1.02; font-weight: 800; letter-spacing: -1.5px; max-width: 980px; margin-bottom: 22px; }
+  .cover h1 em { font-style: normal; color: var(--gold); }
+  .cover .tag { font-size: 22px; color: var(--text-2); max-width: 780px; line-height: 1.45; margin-bottom: 38px; }
+  .chips { display: flex; gap: 12px; flex-wrap: wrap; }
+  .chip { border: 1px solid rgba(255,255,255,.25); color: #eef0f5; padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+  .cover-foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 14px; }
+
+  .bar { display: flex; align-items: center; gap: 14px; padding: 26px 44px 0; }
+  .bar .logo { font-weight: 800; font-size: 18px; color: #fff; }
+  .bar .logo .lite { color: var(--gold); }
+  .bar .kicker { margin-left: auto; color: var(--gold); font-size: 12px; letter-spacing: 2.5px; text-transform: uppercase; font-weight: 700; }
+
+  .modelricher { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 28px 70px 10px; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 38px; }
+  .card3 { background: var(--ink-panel); border: 1px solid var(--panel-line); border-radius: 18px; padding: 28px; box-shadow: 0 18px 44px -24px rgba(0,0,0,.6); }
+  .card3 .n { color: var(--gold); font-weight: 800; font-size: 13px; letter-spacing: 2px; margin-bottom: 10px; }
+  .card3 h3 { font-size: 22px; margin-bottom: 10px; font-weight: 750; color: #fff; }
+  .card3 p { color: var(--text-2); font-size: 14.5px; line-height: 1.55; }
+
+  .atlasgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 30px; }
+  .atlas { background: var(--ink-panel); border: 1px solid var(--panel-line); border-radius: 12px; padding: 14px 14px; }
+  .atlas .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--gold); margin-bottom: 10px; }
+  .atlas h4 { font-size: 13.5px; margin-bottom: 5px; font-weight: 700; color: #fff; }
+  .atlas p { font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+
+  .halfgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 32px; }
+  .feat { background: var(--ink-panel); border: 1px solid var(--panel-line); border-radius: 14px; padding: 20px 20px; }
+  .feat .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--gold); margin-bottom: 12px; }
+  .feat h4 { font-size: 15.5px; margin-bottom: 6px; font-weight: 700; color: #fff; }
+  .feat p { font-size: 13px; line-height: 1.5; color: var(--text-2); }
+
+  .shot { flex: 1; display: flex; align-items: stretch; gap: 0; padding: 24px 36px 30px; }
+  .imgwrap { flex: 0 0 55%; display: flex; align-items: flex-start; justify-content: center; padding: 40px 8px 8px; }
+  .imgwrap img { max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 26px 60px -24px rgba(0,0,0,.7); border: 1px solid var(--panel-line); background: #fff; }
+  .meta { flex: 1; padding: 40px 20px 30px 44px; display: flex; flex-direction: column; }
+  .meta .num { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: var(--gold); margin-bottom: 14px; }
+  .meta h2 { font-size: 34px; line-height: 1.12; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 16px; color: #fff; }
+  .meta p { color: var(--text-2); font-size: 16px; line-height: 1.6; margin-bottom: 22px; }
+  .meta ul { list-style: none; }
+  .meta li { position: relative; padding-left: 22px; margin-bottom: 12px; color: var(--text-2); font-size: 14.5px; line-height: 1.45; }
+  .meta li::before { content: ""; position: absolute; left: 0; top: 8px; width: 10px; height: 2px; background: var(--gold); }
+
+  .footline { display: flex; justify-content: space-between; padding: 0 44px 22px; color: var(--muted); font-size: 12.5px; }
+
+  .closing { justify-content: space-between; padding: 70px 80px 56px; }
+  .closing h2 { font-size: 54px; line-height: 1.05; font-weight: 800; letter-spacing: -1px; max-width: 900px; }
+  .closing h2 .acc { color: var(--gold); }
+  .closing .trust { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 42px; }
+  .closing .trust li { list-style: none; font-size: 15px; color: var(--text-2); line-height: 1.5; padding-left: 22px; position: relative; }
+  .closing .trust li::before { content: ""; position: absolute; left: 0; top: 9px; width: 10px; height: 2px; background: var(--gold); }
+  .cta { margin-top: 46px; font-size: 18px; color: var(--gold); font-weight: 700; }
+</style>
+</head>
+<body>
+
+  <!-- 01 Cover -->
+  <section class="slide cover">
+    <div>
+      <div class="cover-kicker">CRM for Property Brokers &amp; Wholesalers</div>
+      <h1>Every lead, deal and commission — in one <em>command center</em>.</h1>
+      <p class="tag">Two products in one: wholesaling and brokerage. Live product screenshots inside.</p>
+      <div class="chips"><span class="chip">Self-hosted</span><span class="chip">Multi-tenant</span><span class="chip">AI-powered</span><span class="chip">Automation</span></div>
+    </div>
+    <div class="wordmark" style="margin-top:40px"><span>Keystone</span><span class="lite">·</span></div>
+    <div class="cover-foot"><span>Live product screenshots · tenant demo data</span><span>Keystone</span></div>
+  </section>
+
+  <!-- 02 Two products in one -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Two products · One platform</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:44px;font-weight:800;letter-spacing:-0.6px">Wholesaling and brokerage, <span style="color:var(--gold)">in one workspace</span></h2>
+      <div class="grid3">
+        <div class="card3"><div class="n">01</div><h3>Wholesaling</h3><p>Prospecting → disposition → assigned → closing. Disposition room, buyer matching, ARV/MAO worksheet, assignment fees and distress tracking.</p></div>
+        <div class="card3"><div class="n">02</div><h3>Brokerage</h3><p>Listing agreement → active listing → showing → closing. Listings, inventory, showings, open houses, leases, commissions and CMA tools.</p></div>
+        <div class="card3"><div class="n">03</div><h3>One workspace</h3><p>AI assistant, automation engine, reporting and a shared lead/deal core across both modes — teams work the way their market works.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>02</span></div>
+  </section>
+
+  <!-- 03 Feature atlas -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Complete platform</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:40px;font-weight:800;letter-spacing:-0.6px">One platform, <span style="color:var(--gold)">every module</span></h2>
+      <div class="atlasgrid">
+        <div class="atlas"><div class="dot"></div><h4>Lead management</h4><p>Kanban, dual scoring, filters, CSV import with AI mapping.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Deal pipeline</h4><p>Accordion Kanban, checklist, offers, per-deal documents.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Disposition room</h4><p>Matched buyers, outreach status and mass email/SMS.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Inventory &amp; listings</h4><p>Unit board, portal publishing to Bayut, Dubizzle, Property Finder.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Buyers</h4><p>Reliability scoring, POF verification, auto deal&ndash;buyer matching.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Calendar &amp; schedules</h4><p>Color-coded calendar, viewings, meetings, tasks, iCal sync.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Activity feed</h4><p>Calls, SMS, emails, WhatsApp, meetings — one audit inbox.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Automation</h4><p>Drip sequences, workflow engine, campaigns, webhooks.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>AI assistant (BYOK)</h4><p>OpenAI, Claude, Gemini, Ollama; 40+ AI features.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Reports</h4><p>Funnel, leaderboard, ROI, PDF &amp; CSV lead/pipeline/team reports.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>A2A contracts</h4><p>Commission-share contracts, print and signature tracking.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Portals</h4><p>Buyer portal, shared inventory links, embeddable webform.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Compliance</h4><p>DNC/TCPA, GDPR export &amp; deletion, timezone-based contact rules.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>Security</h4><p>2FA, audit log, multi-tenant isolation, backups, safe updates.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>i18n &amp; locales</h4><p>7 languages, 38 currencies, 50+ timezones, metric/imperial.</p></div>
+        <div class="atlas"><div class="dot"></div><h4>API &amp; integrations</h4><p>REST API + OpenAPI, webhooks, plugins, portal lead feeds.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>03</span></div>
+  </section>
+
+  <!-- 04 login -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">01 · SIGN IN</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/01-login.png" alt="Sign in" /></div>
+      <div class="meta"><div class="num">01 · SIGN IN</div><h2>Your entire workflow behind one login</h2>
+        <p>A single, secure sign-in to the whole platform — leads, deals, buyers, inventory, reports and settings.</p>
+        <ul><li>TOTP two-factor authentication with recovery codes</li><li>Optional SSO through plugins (Google / Azure / Okta)</li><li>Per-tenant isolation from the very first request</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>04</span></div>
+  </section>
+
+  <!-- 05 dashboard -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">02 · COMMAND CENTER</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/02-dashboard.png" alt="Dashboard" /></div>
+      <div class="meta"><div class="num">02 · COMMAND CENTER</div><h2>Your business, at a glance</h2>
+        <p>The dashboard surfaces the numbers that matter every morning — 27 leads this month, 77 in flight, and live activity across the team.</p>
+        <ul><li>Lead volume, active transactions and near-term pipeline</li><li>Customizable widget layout with per-role defaults</li><li>Charts and recent activity rendered instantly</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>05</span></div>
+  </section>
+
+  <!-- 06 leads table -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">03 · LEAD DATABASE</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/03-leads-table.png" alt="Leads" /></div>
+      <div class="meta"><div class="num">03 · LEAD DATABASE</div><h2>A lead database you can actually work in</h2>
+        <p>Every lead searchable, sortable and filterable by source, status, temperature and owner — with one-click export.</p>
+        <ul><li>DataTables with saved filter views per agent</li><li>Bulk actions: reassign, change status, delete</li><li>CSV import with AI column auto-mapping</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>06</span></div>
+  </section>
+
+  <!-- 07 kanban -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">04 · LEAD PIPELINE</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/04-leads-kanban.png" alt="Lead Kanban" /></div>
+      <div class="meta"><div class="num">04 · LEAD PIPELINE</div><h2>Move deals with drag &amp; drop</h2>
+        <p>A live Kanban board across your full pipeline — drop a lead into the next status and watch the whole funnel move.</p>
+        <ul><li>14 configurable status columns</li><li>Cards show score, source, agent and urgency</li><li>Quick-add right from the board</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>07</span></div>
+  </section>
+
+  <!-- 08 lead detail -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">05 · LEAD 360</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/05-lead-detail.png" alt="Lead detail" /></div>
+      <div class="meta"><div class="num">05 · LEAD 360</div><h2>The full lead, one screen</h2>
+        <p>Contact, score, source, photos and history around a single record — with the next action one click away.</p>
+        <ul><li>Call, Email and WhatsApp in one click</li><li>Dual motivation scores: system and AI, side by side</li><li>Full assignment and activity timeline</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>08</span></div>
+  </section>
+
+  <!-- 09 pipeline -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">06 · DEAL PIPELINE</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/06-pipeline.png" alt="Pipeline" /></div>
+      <div class="meta"><div class="num">06 · DEAL PIPELINE</div><h2>Every transaction, weighted and forecast</h2>
+        <p>The deal board rolls value up per stage — active deals, pipeline value and weighted forecast for the whole team.</p>
+        <ul><li>Accordion stages with counts, totals and fees</li><li>Native drag-and-drop between stages</li><li>Due-diligence countdown with urgency alerts</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>09</span></div>
+  </section>
+
+  <!-- 10 deal detail -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">07 · DEAL ROOM</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/07-deal-detail.png" alt="Deal detail" /></div>
+      <div class="meta"><div class="num">07 · DEAL ROOM</div><h2>A transaction as a living room</h2>
+        <p>Contracts, offers, documents, checklist and activity live on the deal — nothing scattered across emails and spreadsheets.</p>
+        <ul><li>Document uploads plus a generated-document flow</li><li>Transaction checklist and offer management</li><li>Every stage change logged automatically</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>10</span></div>
+  </section>
+
+  <!-- 11 disposition -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">08 · DISPOSITION ROOM</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/08-disposition.png" alt="Disposition room" /></div>
+      <div class="meta"><div class="num">08 · DISPOSITION ROOM</div><h2>Match buyers to deals, automatically</h2>
+        <p>Wholesale deals get a disposition room — matched buyers, outreach status and next actions in one view.</p>
+        <ul><li>Match statuses: contacted, interested, passed</li><li>Mass email / SMS outreach to matched buyers</li><li>Auto-matching when a deal reaches Dispositions</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>11</span></div>
+  </section>
+
+  <!-- 12 buyers -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">09 · BUYER DATABASE</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/09-buyers.png" alt="Buyers" /></div>
+      <div class="meta"><div class="num">09 · BUYER DATABASE</div><h2>Buyers with a reliability score</h2>
+        <p>Manage client demand — proof of funds, criteria and track record — all scored so you know who actually closes.</p>
+        <ul><li>Reliability scoring and POF verification</li><li>Structured criteria: property types, areas, price ranges</li><li>Import / export and full transaction history</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>12</span></div>
+  </section>
+
+  <!-- 13 inventory -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">10 · INVENTORY</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/10-inventory.png" alt="Inventory" /></div>
+      <div class="meta"><div class="num">10 · INVENTORY</div><h2>Hundreds of units, one live grid</h2>
+        <p>586 units in the demo tenant — filter, schedule and push to portals with status tracked per unit.</p>
+        <ul><li>454 active listings with type and price</li><li>Filter, search and bulk export</li><li>Portal-ready publishing: Bayut, Dubizzle, Property Finder</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>13</span></div>
+  </section>
+
+  <!-- 14 unit detail -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">11 · UNIT 360</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/11-unit.png" alt="Unit" /></div>
+      <div class="meta"><div class="num">11 · UNIT 360</div><h2>Every unit, front to back</h2>
+        <p>A complete record per unit — photos, beds/baths, price and portal status — ready to list the moment you are.</p>
+        <ul><li>Galleries with reorder and primary-photo control</li><li>List price and status tracking per unit</li><li>Per-portal publish status at a glance</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>14</span></div>
+  </section>
+
+  <!-- 15 listings -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">12 · LISTINGS &amp; MANDATES</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/12-listings.png" alt="Listings" /></div>
+      <div class="meta"><div class="num">12 · LISTINGS &amp; MANDATES</div><h2>From ready-to-list to live</h2>
+        <p>The listings pipeline separates what's listed, what's live on a portal, and what's ready to publish next.</p>
+        <ul><li>Live-on-portal vs ready-to-list at a glance</li><li>Average rent and listing volume summary</li><li>Readiness checklist before anything goes live</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>15</span></div>
+  </section>
+
+  <!-- 16 calendar -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">13 · CALENDAR</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/13-calendar.png" alt="Calendar" /></div>
+      <div class="meta"><div class="num">13 · CALENDAR</div><h2>The week, color-coded</h2>
+        <p>Meetings, viewings, calls and tasks on one calendar — click straight through to the related lead.</p>
+        <ul><li>Color-coded event types per team</li><li>iCal feed sync and Google / Microsoft import</li><li>Per-user calendar connections</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>16</span></div>
+  </section>
+
+  <!-- 17 schedules -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">14 · SCHEDULING HUB</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/14-schedules.png" alt="Scheduling" /></div>
+      <div class="meta"><div class="num">14 · SCHEDULING HUB</div><h2>Viewings, meetings and tasks in one hub</h2>
+        <p>17 upcoming and recent items in the demo tenant — every booking for the team, filtered any way you need.</p>
+        <ul><li>Schedule viewings, meetings and tasks</li><li>Agent and status filters</li><li>Created from a lead or any unit</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>17</span></div>
+  </section>
+
+  <!-- 18 activities -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">15 · ACTIVITY FEED</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/15-activities.png" alt="Activity feed" /></div>
+      <div class="meta"><div class="num">15 · ACTIVITY FEED</div><h2>Every touchpoint, audited</h2>
+        <p>The whole team's calls, SMS, emails, WhatsApp and meetings in one searchable inbox.</p>
+        <ul><li>Filter by type, agent, date and entity</li><li>Actionable directly from the feed</li><li>DNC flags enforced on every outreach</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>18</span></div>
+  </section>
+
+  <!-- 19 a2a -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">16 · A2A CONTRACTS</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/16-a2a-contract.png" alt="A2A contract" /></div>
+      <div class="meta"><div class="num">16 · A2A CONTRACTS</div><h2>Co-broke agreements, tracked</h2>
+        <p>Agent-to-agent commission-share contracts — parties, linked lead, share split, and sent/signed status.</p>
+        <ul><li>Create, print and Save-as-PDF built in</li><li>Track sent and signed per contract</li><li>Void and attach contracts to deals</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>19</span></div>
+  </section>
+
+  <!-- 20 reports -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">17 · REPORTS</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/17-reports.png" alt="Reports" /></div>
+      <div class="meta"><div class="num">17 · REPORTS</div><h2>Reporting that sells itself</h2>
+        <p>Lead, pipeline and team reports as printable PDFs or CSV — plus funnel, leaderboard and ROI widgets.</p>
+        <ul><li>PDF reports: leads, pipeline, team</li><li>Conversion funnel and team leaderboard</li><li>Lead-source ROI with cost tracking</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>20</span></div>
+  </section>
+
+  <!-- 21 workflows -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">18 · AUTOMATION</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/18-workflows.png" alt="Workflows" /></div>
+      <div class="meta"><div class="num">18 · AUTOMATION</div><h2>Automations that follow up for you</h2>
+        <p>Event-triggered workflows with steps, delays and full run logs — plus sequences, campaigns and webhooks.</p>
+        <ul><li>Workflow builder with templates and run logs</li><li>Drip sequences over SMS, email, call, mail</li><li>Outbound webhooks, HMAC-signed with retries</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>21</span></div>
+  </section>
+
+  <!-- 22 team -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">19 · TEAM &amp; ROLES</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/19-team.png" alt="Team" /></div>
+      <div class="meta"><div class="num">19 · TEAM &amp; ROLES</div><h2>A team that reports up, not sideways</h2>
+        <p>5 members, 63 open leads and 80 activities in 7 days — managers see the whole pipeline in one place.</p>
+        <ul><li>Manager hierarchy and team progress</li><li>Custom roles with 33 permissions</li><li>Safe member deletion with data reassignment</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>22</span></div>
+  </section>
+
+  <!-- 23 settings -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">20 · SETTINGS</span></div>
+    <div class="shot">
+      <div class="imgwrap"><img src="screenshots/20-settings.png" alt="Settings" /></div>
+      <div class="meta"><div class="num">20 · SETTINGS</div><h2>Deep control, per tenant</h2>
+        <p>Roles, integrations, business mode, portals, email, security and storage — every knob exposed.</p>
+        <ul><li>Roles &amp; permissions center</li><li>Portal integrations: Bayut, Dubizzle, Property Finder</li><li>Languages, SMS, storage and backup management</li></ul>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>23</span></div>
+  </section>
+
+  <!-- 24 AI assistant -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">AI assistant</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:38px;font-weight:800;letter-spacing:-0.6px">An AI native to your pipeline — <span style="color:var(--gold)">bring your own key</span></h2>
+      <div class="halfgrid">
+        <div class="feat"><div class="dot"></div><h4>Draft follow-ups</h4><p>SMS, email, voicemail, call script, direct mail, notes, meeting prep — caller identity injected.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Deal analysis</h4><p>Risk assessment, opportunity score, concerns and recommended next actions.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Independent lead scoring</h4><p>A separate AI pass on motivation plus smart hot / warm / cold qualification.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Buyer outreach</h4><p>Emails tailored to each buyer's preferences, with match explanations.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Works across models</h4><p>OpenAI, Anthropic Claude, Google Gemini, Ollama (local) and any OpenAI-compatible endpoint.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Weekly digest</h4><p>KPI review, pipeline health, ARV/comps intelligence and listing marketing kits.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>24</span></div>
+  </section>
+
+  <!-- 25 automation -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Automation</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:38px;font-weight:800;letter-spacing:-0.6px">Follow-up that <span style="color:var(--gold)">never sleeps</span></h2>
+      <div class="grid3" style="margin-top:34px">
+        <div class="card3"><div class="n">WORKFLOWS</div><h3>Event-triggered engine</h3><p>Steps, delays, reordering, manual triggers, pre-built templates and complete run logs.</p></div>
+        <div class="card3"><div class="n">SEQUENCES</div><h3>Multi-channel drips</h3><p>SMS, email, call, voicemail and direct mail steps with merge tags and enrollment widgets.</p></div>
+        <div class="card3"><div class="n">WEBHOOKS</div><h3>Connect your stack</h3><p>HMAC-signed events with retries and auto-disable — ready for Zapier, Make and n8n.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>25</span></div>
+  </section>
+
+  <!-- 26 portals -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Portals</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:38px;font-weight:800;letter-spacing:-0.6px">A portal for everyone <span style="color:var(--gold)">in the deal</span></h2>
+      <div class="grid3" style="margin-top:34px">
+        <div class="card3"><div class="n">BUYER PORTAL</div><h3>Public property showcase</h3><p>Brandable pages with self-registration and interest capture — leads land straight in the pipeline.</p></div>
+        <div class="card3"><div class="n">SHARED INVENTORY</div><h3>Curated links for clients</h3><p>Agents share filtered unit lists; identity-verified viewing requests create leads automatically.</p></div>
+        <div class="card3"><div class="n">EMBEDDABLE WEBFORM</div><h3>Lead capture anywhere</h3><p>A branded web form for any site, with duplicate detection and source resolution.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>26</span></div>
+  </section>
+
+  <!-- 27 compliance -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Compliance &amp; security</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:38px;font-weight:800;letter-spacing:-0.6px">Compliance and security built-in, <span style="color:var(--gold)">not bolted on</span></h2>
+      <div class="halfgrid">
+        <div class="feat"><div class="dot"></div><h4>DNC &amp; TCPA enforcement</h4><p>System-wide do-not-contact list, bulk import, automatic blocking, timezone-based hours.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Two-factor authentication</h4><p>TOTP with recovery codes, admin-enforced for the team, per-user reset.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Full audit log</h4><p>Searchable, before/after values, CSV export — who changed what, when.</p></div>
+        <div class="feat"><div class="dot"></div><h4>GDPR companion</h4><p>Data export and anonymized deletion for users and contacts.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Backups &amp; safe updates</h4><p>One-command backups, pre-update snapshots and recovery points.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Multi-tenant isolation</h4><p>Global scoping on every query — tenants only ever see their own data.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>27</span></div>
+  </section>
+
+  <!-- 28 platform -->
+  <section class="slide">
+    <div class="bar"><span class="logo">Key<span class="lite">stone</span></span><span class="kicker">Platform</span></div>
+    <div class="modelricher">
+      <h2 style="font-size:38px;font-weight:800;letter-spacing:-0.6px">Self-hosted, multilingual, <span style="color:var(--gold)">API-first</span></h2>
+      <div class="halfgrid">
+        <div class="feat"><div class="dot"></div><h4>Self-hosted &amp; Docker-ready</h4><p>Laravel 12 on MySQL/MariaDB, web installer and automatic updates.</p></div>
+        <div class="feat"><div class="dot"></div><h4>7 languages + editor</h4><p>English, Dutch, German, French, Spanish, Portuguese, Italian — add any via JSON.</p></div>
+        <div class="feat"><div class="dot"></div><h4>REST API &amp; OpenAPI</h4><p>20+ endpoints with per-tenant key auth and interactive API docs.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Portal publishing</h4><p>Bayut, Dubizzle and Property Finder listing push plus inbound lead feeds.</p></div>
+        <div class="feat"><div class="dot"></div><h4>PWA, offline, dark mode</h4><p>Installable, offline-capable and fully mobile-responsive.</p></div>
+        <div class="feat"><div class="dot"></div><h4>Localized everywhere</h4><p>38 currencies, 50+ timezones, metric/imperial, localized exports and prompts.</p></div>
+      </div>
+    </div>
+    <div class="footline"><span>Keystone</span><span>28</span></div>
+  </section>
+
+  <!-- 29 Closing -->
+  <section class="slide closing">
+    <div>
+      <h2>Ready to run your property business on <span class="acc">Keystone</span>?</h2>
+      <ul class="trust">
+        <li>Wholesaling and brokerage in one workspace — leads, deals, buyers and commissions</li>
+        <li>AI assistant and automation built in, with your own API key</li>
+        <li>Portal publishing to Bayut, Dubizzle and Property Finder</li>
+        <li>Self-hosted, multi-tenant, with 2FA and a full audit trail</li>
+      </ul>
+      <div class="cta">Book a demo · Keystone</div>
+    </div>
+    <div class="footline" style="color:#8f97ab"><span>Keystone — screenshots from the live product</span><span>29</span></div>
+  </section>
+
+</body>
+</html>
