@@ -881,4 +881,55 @@ class InventoryMapLocationTest extends TestCase
             ->assertOk()
             ->assertSee('data-creatable="1"', false);
     }
+
+    public function test_the_edit_form_shows_the_creatable_picker_and_hidden_location_fields(): void
+    {
+        $this->location('Skyline Heights', null, 'Skyline Heights, Al Ryada', 'Al Ryada', 'Abu Dhabi');
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Skyline Heights')
+            ->firstOrFail();
+
+        $property = $this->unit('Skyline Heights', 'A1201', 'Al Ryada', 'Abu Dhabi');
+        $property->update(['map_location_id' => $location->id]);
+
+        $this->get(route('inventory.edit', $property))
+            ->assertOk()
+            ->assertSee('data-creatable="1"', false)
+            ->assertSee('name="map_location_id"', false)
+            ->assertSee('name="community"', false)
+            ->assertSee('name="city"', false)
+            ->assertSee('name="sub_community"', false);
+    }
+
+    public function test_updating_a_unit_by_picking_a_building_overwrites_location_fields(): void
+    {
+        $this->location('Skyline Heights', null, 'Skyline Heights, Al Ryada', 'Al Ryada', 'Abu Dhabi');
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Skyline Heights')
+            ->firstOrFail();
+
+        $property = $this->unit('Old Building', 'A1202', 'Old Community', 'Dubai');
+
+        $this->put(route('inventory.update', $property), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'availability' => 'draft',
+            'map_location_id' => (string) $location->id,
+            'unit_no' => 'A1202',
+            'bedrooms' => 2,
+            'rent_price' => 150000,
+        ])->assertRedirect();
+
+        $property->refresh();
+
+        $this->assertSame((int) $location->id, $property->map_location_id);
+        $this->assertSame('Skyline Heights', $property->sub_community);
+        $this->assertSame('Al Ryada', $property->community);
+        $this->assertSame('Abu Dhabi', $property->city);
+    }
 }
