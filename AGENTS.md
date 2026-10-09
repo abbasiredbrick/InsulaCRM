@@ -185,18 +185,28 @@ on `properties` stay as snapshots.
 - **The hierarchy is City → Community → Sub-community, and the screen says so.**
   Settings → Locations' Communities panel is **grouped by city** (city header,
   then its communities; the unassigned bucket is last), so "city is main".
-  A community always sits under a city: the "Add Community" modal takes a
-  **required city dropdown** (same `citiesForTenant()` list) plus the name.
-  Each community row has **＋ Building**, which opens `inventory.locations-create`
-  with `?city=&community=` prefilled (the create page's `prefillCity`/
-  `prefillCommunity`), and returns to that community's filtered view. A
-  building's Community cell is a **move control** (`settings.map-locations.buildings.move`
-  → `MapLocationService::moveToCommunity()`), which re-parents the building and
-  cascades the new community **and its city** to every FK-linked unit and any
-  legacy unlinked unit of that building name. Creating the full chain is still
-  the one shared page (New Unit picker and "Add Location" both use it); the page
-  is the only place a *new* city enters the system, so the Add-Community city
-  dropdown can honestly say "add a location" to create one.
+  There is **one "Add Location" form** for the whole chain, opened by the header
+  "Add Location" button and by each community row's **＋ Building**, both on
+  `/settings/map-locations` (no navigation to the create page, no separate
+  "Add Community" modal). It posts to `settings.map-locations.locations.store`
+  (`MapLocationController::storeLocation`) and walks City → Community → Building:
+  the **City** is a dropdown from `citiesForTenant()` with an **＋ Add a new city**
+  option that reveals a text field; choosing a city enables the **Community**
+  dropdown, filtered client-side to that city's communities (`data-city`) and
+  carrying its own **＋ Add a new community** option; then the **Building** name
+  is typed. A brand-new city therefore forces a new community (an existing city
+  may still add one). The controller normalizes `__new__` + the typed field,
+  validates all three, then `ensureCommunity()` + `ensureMapLocation()`
+  (normalized-exact, first-write-wins). A building whose normalized name already
+  exists is **reused and reported** (`warning`), never silently duplicated. A
+  building's Community cell is a **move control**
+  (`settings.map-locations.buildings.move` → `MapLocationService::moveToCommunity()`),
+  which re-parents the building and cascades the new community **and its city**
+  to every FK-linked unit and any legacy unlinked unit of that building name.
+  The New Unit picker's **Create "<name>"** still opens `inventory.locations-create`
+  (that page's `prefillCity`/`prefillCommunity` are fed by the same builder
+  fields); its `city` is pinned to `citiesForTenant()` so that public path cannot
+  invent a city — only this Settings form may.
 
 ## Search / Filter UI — the live-filter convention
 

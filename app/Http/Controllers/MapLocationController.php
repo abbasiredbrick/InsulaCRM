@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
 /**
@@ -127,38 +128,74 @@ class MapLocationController extends Controller
         ]));
     }
 
-    public function storeBuilding(Request $request): RedirectResponse
+    /**
+     * The single "Add Location" form: City → Community → Building in one POST.
+     * The city may be an existing option or a brand-new one typed in; the
+     * community is then chosen under that city, or created if none fits. The
+     * building name is checked against existing rows (normalized-exact) so a
+     * near-duplicate is reused and reported rather than silently doubled.
+     */
+    public function storeLocation(Request $request): RedirectResponse
     {
         $tenantId = auth()->user()->tenant_id;
+        $maps = app(MapLocationService::class);
 
-        $data = $request->validate([
-            'sub_community' => 'required|string|max:255',
-            'community_id' => 'nullable|integer',
-            'city' => 'nullable|string|max:255',
-        ]);
-
-        $community = null;
-        if (filled($data['community_id'] ?? null)) {
-            $community = Community::where('tenant_id', $tenantId)->find((int) $data['community_id']);
-            abort_unless($community, 422);
+        // "city" is the dropdown value; "__new__" defers to the typed field.
+        $city = trim((string) $request->input('city'));
+        if ($city === '__new__') {
+            $city = trim((string) $request->input('new_city'));
         }
 
-        $maps = app(MapLocationService::class);
+        $communityName = trim((string) $request->input('community'));
+        if ($communityName === '__new__') {
+            $communityName = trim((string) $request->input('new_community'));
+        }
+
+        $data = Validator::make([
+            'city' => $city,
+            'community' => $communityName,
+            'sub_community' => trim((string) $request->input('sub_community')),
+        ], [
+            'city' => 'required|string|max:255',
+            'community' => 'required|string|max:255',
+            'sub_community' => 'required|string|max:255',
+        ])->validate();
+
+        $community = $maps->ensureCommunity($tenantId, $data['community'], $data['city']);
+
+        // Check for a similar building before writing, so the flash can say the
+        // existing one was reused instead of implying a second row was created.
+        $existing = $maps->findByName($tenantId, $data['sub_community']);
+
         $location = $maps->ensureMapLocation(
             $tenantId,
             $data['sub_community'],
-            $community?->name,
-            $data['city'] ?? $community?->city,
+            $community->name,
+            $data['city'],
             null
         );
 
-        if ($community && $location->community_id === null) {
+        if (! $location) {
+            return back()->withInput()->with('error', __('Could not create the building.'));
+        }
+
+        if (! $location->community_id) {
             $location->update(['community_id' => $community->id]);
         }
 
-        $maps->linkBuildingUnits($tenantId, $data['sub_community'], $location);
+        $maps->linkBuildingUnits($tenantId, $location->sub_community, $location);
 
-        return back()->with('success', __('Building ":building" is ready.', ['building' => $location->sub_community]));
+        if ($existing) {
+            return back()->with('warning', __('":name" already exists — it was reused, not duplicated.', [
+                'name' => $location->sub_community,
+            ]));
+        }
+
+        return back()->with('success', __('Building ":name" added under :community, :city.', [
+            'name' => $location->sub_community,
+            'community' => $community->name,
+            'city' => $data['city'],
+        ]));
     }
 
     public function setBuildingLocation(Request $request, MapLocation $mapLocation): RedirectResponse

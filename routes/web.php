@@ -844,7 +844,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
 
         // Locations (communities → buildings master)
         Route::get('/settings/map-locations', [MapLocationController::class, 'index'])->name('settings.map-locations.index');
-        Route::post('/settings/map-locations/buildings', [MapLocationController::class, 'storeBuilding'])->name('settings.map-locations.buildings.store');
+        Route::post('/settings/map-locations/locations', [MapLocationController::class, 'storeLocation'])->name('settings.map-locations.locations.store');
         Route::post('/settings/map-locations/buildings/{mapLocation}/location', [MapLocationController::class, 'setBuildingLocation'])->name('settings.map-locations.set-location');
         Route::post('/settings/map-locations/buildings/{mapLocation}/rename', [MapLocationController::class, 'renameBuilding'])->name('settings.map-locations.rename');
         Route::post('/settings/map-locations/buildings/{mapLocation}/move', [MapLocationController::class, 'moveBuilding'])->name('settings.map-locations.buildings.move');

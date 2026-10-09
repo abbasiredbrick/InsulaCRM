@@ -34,8 +34,7 @@
             {{ __('Generate for all missing') }}
         </button>
         @endif
-        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addCommunityModal">{{ __('Add Community') }}</button>
-        <a href="{{ route('inventory.locations-create', ['return' => route('settings.map-locations.index', [], false)]) }}" class="btn btn-outline-secondary">{{ __('Add Location') }}</a>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal">{{ __('Add Location') }}</button>
         <a href="{{ route('settings.index') }}" class="btn btn-link text-decoration-none text-muted">← {{ __('Back to settings') }}</a>
     </div>
 </div>
@@ -94,7 +93,7 @@
                                         <span class="badge bg-azure-lt">{{ $community->map_locations_count }}</span>
                                     </td>
                                     <td class="text-nowrap">
-                                        <a href="{{ route('inventory.locations-create', ['city' => $community->city, 'community' => $community->name, 'return' => route('settings.map-locations.index', ['community' => $community->id], false)]) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Add a building under :name', ['name' => $community->name]) }}">＋ {{ __('Building') }}</a>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addLocationModal" data-city="{{ $community->city }}" data-community="{{ $community->name }}" title="{{ __('Add a building under :name', ['name' => $community->name]) }}">＋ {{ __('Building') }}</button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editCommunityModal{{ $community->id }}">{{ __('Edit') }}</button>
                                         @if($communities->count() > 1)
                                         <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#mergeCommunityModal{{ $community->id }}">{{ __('Merge') }}</button>
@@ -325,38 +324,154 @@
     </div>
 </div>
 
-{{-- Add Community modal: a community always sits under a city --}}
-<div class="modal fade" id="addCommunityModal" tabindex="-1">
+{{-- The single "Add Location" form: City → Community → Building. The city is
+     picked from the list (or typed in), the community is then filtered to that
+     city (or created), and the building name is de-duplicated on save. --}}
+<div class="modal fade" id="addLocationModal" tabindex="-1">
     <div class="modal-dialog">
-        <form method="POST" action="{{ route('settings.map-locations.communities.store') }}">
+        <form method="POST" action="{{ route('settings.map-locations.locations.store') }}" id="addLocationForm">
             @csrf
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">{{ __('Add community') }}</h5>
+                    <h5 class="modal-title">{{ __('Add location') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="text-muted">
+                        {{ __('A building sits under a community, and a community under a city. Pick the city, then its community, then name the building — add a city or community on the fly if it is missing.') }}
+                    </p>
+
                     <div class="mb-3">
                         <label class="form-label required">{{ __('City') }}</label>
-                        <select name="city" class="form-select" required>
+                        <select name="city" id="addLocationCity" class="form-select" required>
                             <option value="">{{ __('Select a city...') }}</option>
                             @foreach($cities as $city)
                                 <option value="{{ $city }}">{{ $city }}</option>
                             @endforeach
+                            <option value="__new__">{{ __('＋ Add a new city…') }}</option>
                         </select>
-                        <div class="form-hint">{{ __('Cities come from your units and country. Missing one? Add a location — the city is created with it.') }}</div>
+                        <input type="text" name="new_city" id="addLocationNewCity" class="form-control mt-2 d-none" placeholder="{{ __('Type the new city name') }}">
                     </div>
+
                     <div class="mb-3">
                         <label class="form-label required">{{ __('Community') }}</label>
-                        <input type="text" name="name" class="form-control" placeholder="{{ __('e.g. Al Reem Island') }}" required>
+                        <select name="community" id="addLocationCommunity" class="form-select" required disabled>
+                            <option value="">{{ __('Choose a community…') }}</option>
+                            @foreach($communities as $community)
+                                <option value="{{ $community->name }}" data-city="{{ $community->city }}">{{ $community->name }}</option>
+                            @endforeach
+                            <option value="__new__">{{ __('＋ Add a new community…') }}</option>
+                        </select>
+                        <input type="text" name="new_community" id="addLocationNewCommunity" class="form-control mt-2 d-none" placeholder="{{ __('Type the new community name') }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required">{{ __('Building / Sub-community') }}</label>
+                        <input type="text" name="sub_community" class="form-control" placeholder="{{ __('e.g. Sky Tower') }}" required>
+                        <div class="form-hint">{{ __('If a building with a similar name already exists it is reused, never duplicated.') }}</div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('Add community') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('Save location') }}</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var modalEl = document.getElementById('addLocationModal');
+    if (!modalEl) { return; }
+
+    var city = document.getElementById('addLocationCity');
+    var newCity = document.getElementById('addLocationNewCity');
+    var community = document.getElementById('addLocationCommunity');
+    var newCommunity = document.getElementById('addLocationNewCommunity');
+    var options = Array.prototype.slice.call(community.querySelectorAll('option[data-city]'));
+
+    function toggleNew(input, show) {
+        input.classList.toggle('d-none', !show);
+        input.required = show;
+        if (!show) { input.value = ''; }
+    }
+
+    // Show only the communities of the chosen city; a brand-new city has none.
+    function setCommunityList(cityValue) {
+        var norm = cityValue === null ? null : cityValue.trim().toLowerCase();
+        options.forEach(function (option) {
+            var oc = (option.getAttribute('data-city') || '').trim().toLowerCase();
+            option.hidden = norm === null ? false : (norm === '' || norm === '__new__' ? true : oc !== norm);
+        });
+    }
+
+    function onCityChange() {
+        var value = city.value;
+        toggleNew(newCity, value === '__new__');
+
+        if (value === '') {
+            community.disabled = true;
+            community.value = '';
+            setCommunityList('');
+            toggleNew(newCommunity, false);
+            return;
+        }
+
+        community.disabled = false;
+
+        if (value === '__new__') {
+            setCommunityList('__new__');
+            community.value = '__new__';
+            toggleNew(newCommunity, true);
+        } else {
+            setCommunityList(value);
+            community.value = '';
+            toggleNew(newCommunity, false);
+        }
+    }
+
+    city.addEventListener('change', onCityChange);
+    community.addEventListener('change', function () {
+        toggleNew(newCommunity, community.value === '__new__');
+    });
+
+    function reset() {
+        city.value = '';
+        toggleNew(newCity, false);
+        community.disabled = true;
+        community.value = '';
+        setCommunityList('');
+        toggleNew(newCommunity, false);
+    }
+
+    modalEl.addEventListener('show.bs.modal', function (event) {
+        reset();
+
+        var trigger = event.relatedTarget;
+        if (trigger) {
+            var c = trigger.getAttribute('data-city') || '';
+            var com = trigger.getAttribute('data-community') || '';
+
+            if (c) {
+                city.value = c;
+                onCityChange();
+                if (com) {
+                    community.value = com;
+                    toggleNew(newCommunity, false);
+                }
+            } else if (com) {
+                community.disabled = false;
+                setCommunityList(null);
+                community.value = com;
+            }
+        }
+
+        var building = modalEl.querySelector('[name="sub_community"]');
+        if (building) { building.focus(); }
+    });
+})();
+</script>
+@endpush
