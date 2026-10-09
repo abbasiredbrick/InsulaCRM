@@ -843,18 +843,18 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/settings/portal-integrations/bayut/search-locations', [PortalIntegrationController::class, 'searchLocations'])->name('portal-integrations.search-locations');
 
         // Locations (communities → buildings master)
-        Route::get('/settings/map-locations', [MapLocationController::class, 'index'])->name('settings.map-locations.index');
-        Route::post('/settings/map-locations/locations', [MapLocationController::class, 'storeLocation'])->name('settings.map-locations.locations.store');
-        Route::post('/settings/map-locations/buildings/{mapLocation}/location', [MapLocationController::class, 'setBuildingLocation'])->name('settings.map-locations.set-location');
-        Route::post('/settings/map-locations/buildings/{mapLocation}/rename', [MapLocationController::class, 'renameBuilding'])->name('settings.map-locations.rename');
-        Route::post('/settings/map-locations/buildings/{mapLocation}/move', [MapLocationController::class, 'moveBuilding'])->name('settings.map-locations.buildings.move');
-        Route::post('/settings/map-locations/merge', [MapLocationController::class, 'mergeBuildings'])->name('settings.map-locations.merge');
-        Route::delete('/settings/map-locations/buildings/{mapLocation}', [MapLocationController::class, 'destroyBuilding'])->name('settings.map-locations.buildings.destroy');
-        Route::post('/settings/map-locations/generate-all', [MapLocationController::class, 'generateAll'])->name('settings.map-locations.generate-all');
-        Route::post('/settings/map-locations/communities', [MapLocationController::class, 'storeCommunity'])->name('settings.map-locations.communities.store');
-        Route::post('/settings/map-locations/communities/merge', [MapLocationController::class, 'mergeCommunities'])->name('settings.map-locations.communities.merge');
-        Route::put('/settings/map-locations/communities/{community}', [MapLocationController::class, 'updateCommunity'])->name('settings.map-locations.communities.update');
-        Route::delete('/settings/map-locations/communities/{community}', [MapLocationController::class, 'destroyCommunity'])->name('settings.map-locations.communities.destroy');
+        Route::get('/settings/locations', [MapLocationController::class, 'index'])->name('settings.map-locations.index');
+        Route::post('/settings/locations', [MapLocationController::class, 'storeLocation'])->name('settings.map-locations.locations.store');
+        Route::post('/settings/locations/buildings/{mapLocation}/location', [MapLocationController::class, 'setBuildingLocation'])->name('settings.map-locations.set-location');
+        Route::post('/settings/locations/buildings/{mapLocation}/rename', [MapLocationController::class, 'renameBuilding'])->name('settings.map-locations.rename');
+        Route::post('/settings/locations/buildings/{mapLocation}/move', [MapLocationController::class, 'moveBuilding'])->name('settings.map-locations.buildings.move');
+        Route::post('/settings/locations/merge', [MapLocationController::class, 'mergeBuildings'])->name('settings.map-locations.merge');
+        Route::delete('/settings/locations/buildings/{mapLocation}', [MapLocationController::class, 'destroyBuilding'])->name('settings.map-locations.buildings.destroy');
+        Route::post('/settings/locations/generate-all', [MapLocationController::class, 'generateAll'])->name('settings.map-locations.generate-all');
+        Route::post('/settings/locations/communities', [MapLocationController::class, 'storeCommunity'])->name('settings.map-locations.communities.store');
+        Route::post('/settings/locations/communities/merge', [MapLocationController::class, 'mergeCommunities'])->name('settings.map-locations.communities.merge');
+        Route::put('/settings/locations/communities/{community}', [MapLocationController::class, 'updateCommunity'])->name('settings.map-locations.communities.update');
+        Route::delete('/settings/locations/communities/{community}', [MapLocationController::class, 'destroyCommunity'])->name('settings.map-locations.communities.destroy');
 
         // Document Templates (admin manages templates)
         Route::get('/document-templates', [DocumentTemplateController::class, 'index'])->name('document-templates.index');

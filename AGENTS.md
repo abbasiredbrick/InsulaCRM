@@ -187,7 +187,7 @@ on `properties` stay as snapshots.
   then its communities; the unassigned bucket is last), so "city is main".
   There is **one "Add Location" form** for the whole chain, opened by the header
   "Add Location" button and by each community row's **＋ Building**, both on
-  `/settings/map-locations` (no navigation to the create page, no separate
+  `/settings/locations` (no navigation to the create page, no separate
   "Add Community" modal). It posts to `settings.map-locations.locations.store`
   (`MapLocationController::storeLocation`) and walks City → Community → Building:
   the **City** is a dropdown from `citiesForTenant()` with an **＋ Add a new city**

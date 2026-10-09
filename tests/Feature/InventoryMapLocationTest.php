@@ -1122,7 +1122,7 @@ class InventoryMapLocationTest extends TestCase
         $this->get(route('inventory.locations-create', [
             'city' => 'Abu Dhabi',
             'community' => 'Al Reem Island',
-            'return' => '/settings/map-locations',
+            'return' => '/settings/locations',
         ]))
             ->assertOk()
             ->assertSee('value="Al Reem Island"', false)
