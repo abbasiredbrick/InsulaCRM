@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Stored once per building rather than per unit: every unit under a
  * sub_community points at the same place. Entries are created on availability
  * import (first-write-wins, normalized exact de-dup) and corrected from
- * Settings → Map Locations.
+ * Settings → Locations.
  *
  * There is intentionally no TenantScope — like PortalIntegration, tenancy is
  * always an explicit `where('tenant_id', …)`.

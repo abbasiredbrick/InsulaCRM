@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', __('Map Locations'))
-@section('page-title', __('Map Locations'))
+@section('title', __('Locations'))
+@section('page-title', __('Locations'))
 
 @section('breadcrumbs')
 <li class="breadcrumb-item"><a href="{{ route('settings.index') }}">{{ __('Settings') }}</a></li>
-<li class="breadcrumb-item active" aria-current="page">{{ __('Map Locations') }}</li>
+<li class="breadcrumb-item active" aria-current="page">{{ __('Locations') }}</li>
 @endsection
 
 @section('content')
@@ -34,8 +34,8 @@
             {{ __('Generate for all missing') }}
         </button>
         @endif
-        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addBuildingModal">{{ __('Add Building') }}</button>
         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addCommunityModal">{{ __('Add Community') }}</button>
+        <a href="{{ route('inventory.locations-create', ['return' => route('settings.map-locations.index', [], false)]) }}" class="btn btn-outline-secondary">{{ __('Add Location') }}</a>
         <a href="{{ route('settings.index') }}" class="btn btn-link text-decoration-none text-muted">← {{ __('Back to settings') }}</a>
     </div>
 </div>
@@ -313,51 +313,17 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ __('City') }}</label>
-                        <input type="text" name="city" class="form-control" placeholder="{{ __('Abu Dhabi') }}">
+                        <select name="city" class="form-select">
+                            <option value="">{{ __('—') }}</option>
+                            @foreach($cities as $city)
+                                <option value="{{ $city }}">{{ $city }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button type="submit" class="btn btn-primary">{{ __('Add community') }}</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- Add Building modal --}}
-<div class="modal fade" id="addBuildingModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="POST" action="{{ route('settings.map-locations.buildings.store') }}">
-            @csrf
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">{{ __('Add building') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label required">{{ __('Building / tower') }}</label>
-                        <input type="text" name="sub_community" class="form-control" placeholder="{{ __('e.g. Marina Heights Tower 2') }}" required>
-                        <small class="form-hint">{{ __('If a building with this name (or a similar spelling) already exists, it is reused — nothing is duplicated.') }}</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ __('Community') }}</label>
-                        <select name="community_id" class="form-select">
-                            <option value="">{{ __('None') }}</option>
-                            @foreach($communities as $community)
-                                <option value="{{ $community->id }}" @selected($selectedCommunity === (int) $community->id)>{{ $community->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ __('City') }}</label>
-                        <input type="text" name="city" class="form-control" placeholder="{{ __('Abu Dhabi') }}">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="submit" class="btn btn-primary">{{ __('Add building') }}</button>
                 </div>
             </div>
         </form>

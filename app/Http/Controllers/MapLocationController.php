@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
- * Settings → Map Locations: the communities → sub-communities (buildings)
+ * Settings → Locations: the communities → sub-communities (buildings)
  * master. Buildings are the map_locations rows that inventory imports already
  * maintained; this screen adds the community grouping, normalized de-dup,
  * renames (cascading to every unit) and merges.
@@ -90,6 +90,7 @@ class MapLocationController extends Controller
             'missing' => $missing,
             'maps' => $maps,
             'byCommunity' => $byCommunity,
+            'cities' => $maps->citiesForTenant($tenantId, auth()->user()->tenant?->country),
         ]);
     }
 

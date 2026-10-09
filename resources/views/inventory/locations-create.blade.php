@@ -13,7 +13,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted">
-                    {{ __('A building sits under a community, and a community sits under a city. Create the chain below — the building is then selected on your unit.') }}
+                    {{ __('A building sits under a community, and a community sits under a city. Create the chain below — the building is then available to pick.') }}
                 </p>
 
                 <form method="POST" action="{{ route('inventory.locations-store') }}">

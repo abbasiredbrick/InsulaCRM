@@ -842,7 +842,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/portal-integrations/{portal}/sync-locations', [PortalIntegrationController::class, 'syncLocations'])->name('portal-integrations.sync-locations');
         Route::get('/settings/portal-integrations/bayut/search-locations', [PortalIntegrationController::class, 'searchLocations'])->name('portal-integrations.search-locations');
 
-        // Map Locations (communities → buildings master)
+        // Locations (communities → buildings master)
         Route::get('/settings/map-locations', [MapLocationController::class, 'index'])->name('settings.map-locations.index');
         Route::post('/settings/map-locations/buildings', [MapLocationController::class, 'storeBuilding'])->name('settings.map-locations.buildings.store');
         Route::post('/settings/map-locations/buildings/{mapLocation}/location', [MapLocationController::class, 'setBuildingLocation'])->name('settings.map-locations.set-location');

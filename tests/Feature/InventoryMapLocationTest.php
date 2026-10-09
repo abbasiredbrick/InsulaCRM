@@ -347,6 +347,16 @@ class InventoryMapLocationTest extends TestCase
             ->assertSee('Al+Ghadeer', false);
     }
 
+    public function test_the_locations_screen_uses_the_shared_add_location_form(): void
+    {
+        $this->get(route('settings.map-locations.index'))
+            ->assertOk()
+            ->assertSee('Locations')
+            ->assertSee('Add Location')
+            ->assertSee(route('inventory.locations-create'), false)
+            ->assertDontSee('Add Building');
+    }
+
     public function test_the_public_share_page_embeds_the_map_and_links_each_unit(): void
     {
         $this->unit('Bey View Tower', '1301', 'Abu Dhabi Mall');

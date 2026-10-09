@@ -128,9 +128,9 @@ owner accounts. Don't try to add an owner special case to `inviteAgent`: the
 role cannot be posted there. It is a default, not a lockout — an owner can still
 opt in from the edit modal, and `isInLeadRotation()` honours that.
 
-## Map Locations — the communities ⇢ buildings master
+## Locations (formerly "Map Locations") — the communities ⇢ buildings master
 
-Settings → Map Locations is admin-only and independent of inventory sources
+Settings → Locations is admin-only and independent of inventory sources
 (which once owned this screen itself). `map_locations` rows are the
 building/tower master, `properties` rows are units. New FKs —
 `properties.map_location_id → map_locations` and
@@ -182,6 +182,13 @@ on `properties` stay as snapshots.
   `applyPickedBuilding` still resolves through `ensureMapLocation()`. Only the
   New Unit building picker sets `creatable`; the Bayut/lead pickers must not
   (their ids are external and cannot be invented).
+- **One page creates a location, everywhere.** Settings → Locations' "Add
+  Location" button and the New Unit picker both open
+  `inventory.locations-create` (city dropdown → community → building); the
+  screen's old "Add Building" modal is gone. Both pass a `return` path
+  (`settings.map-locations.index` / the unit form) and the create page redirects
+  back there. Only the community-only "Add Community" modal remains on the
+  Locations screen (its city is the same preloaded dropdown).
 
 ## Search / Filter UI — the live-filter convention
 

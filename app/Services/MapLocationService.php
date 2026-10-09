@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  * city, so every unit still has somewhere to point the visitor. The same query
  * drives the keyless embedded map and the "View on map" link on the public
  * share page. Entries live in map_locations (one row per building) and are
- * corrected from Settings → Map Locations.
+ * corrected from Settings → Locations.
  */
 class MapLocationService
 {

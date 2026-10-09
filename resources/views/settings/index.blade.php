@@ -82,7 +82,7 @@
                             <a href="{{ route('availability-sources.index') }}" class="nav-link">{{ __('Inventory Sources') }}</a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ route('settings.map-locations.index') }}" class="nav-link">{{ __('Map Locations') }}</a>
+                            <a href="{{ route('settings.map-locations.index') }}" class="nav-link">{{ __('Locations') }}</a>
                         </li>
                         @endif
                         <li class="nav-item">

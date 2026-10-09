@@ -99,7 +99,7 @@
             </button>
             <a href="{{ route('inventory.portal') }}" class="btn btn-sm btn-outline-secondary">{{ __('Portals') }}</a>
             @if(auth()->user()->hasRole('admin'))
-            <a href="{{ route('settings.map-locations.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Map Locations') }}</a>
+            <a href="{{ route('settings.map-locations.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('Locations') }}</a>
             @endif
             <a href="{{ route('inventory.create') }}" class="btn btn-sm btn-primary">{{ __('New Unit') }}</a>
         </div>

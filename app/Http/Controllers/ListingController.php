@@ -450,7 +450,7 @@ class ListingController extends Controller
 
         return redirect($this->safeInventoryReturn($data['return'] ?? null))
             ->withInput(['map_location_id' => (int) $location->id])
-            ->with('success', __('Building ":name" created. Pick it below to continue.', ['name' => $location->sub_community]));
+            ->with('success', __('Building ":name" created.', ['name' => $location->sub_community]));
     }
 
     /**
@@ -624,7 +624,7 @@ class ListingController extends Controller
                 $property->update(['map_location_id' => $location->id]);
             }
             if ($location->wasRecentlyCreated) {
-                $redirect->with('warning', __('Map location for ":building" was generated from its name. Review or correct it in Settings → Map Locations.', ['building' => $sub]));
+                $redirect->with('warning', __('Map location for ":building" was generated from its name. Review or correct it in Settings → Locations.', ['building' => $sub]));
             }
         }
 
