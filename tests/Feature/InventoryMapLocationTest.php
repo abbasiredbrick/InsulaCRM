@@ -708,6 +708,41 @@ class InventoryMapLocationTest extends TestCase
         $this->assertNotNull($community->fresh());
     }
 
+    public function test_communities_can_be_merged(): void
+    {
+        $keep = Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Al Reem Island', 'city' => 'Abu Dhabi']);
+        $discard = Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Reem Island', 'city' => null]);
+
+        $keepUnit = $this->unit('Shams Tower', '101', 'Al Reem Island');
+        $discardUnit = $this->unit('Gate Tower', '202', 'Reem Island');
+        $legacy = $this->unit('Park Tower', '303', 'Reem Island');
+
+        $keepBuilding = $this->location('Shams Tower', null, 'Shams Tower, Al Reem Island', 'Al Reem Island', 'Abu Dhabi');
+        $keepBuilding->update(['community_id' => $keep->id]);
+        $discardBuilding = $this->location('Gate Tower', null, 'Gate Tower, Reem Island', 'Reem Island', 'Abu Dhabi');
+        $discardBuilding->update(['community_id' => $discard->id]);
+
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Shams Tower', $keepBuilding);
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Gate Tower', $discardBuilding);
+
+        // Park Tower stays legacy (no FK) so the name-based fallback is exercised.
+        $legacy->update(['map_location_id' => null, 'community' => 'Reem Island']);
+
+        $this->post(route('settings.map-locations.communities.merge'), [
+            'keep_id' => $keep->id,
+            'discard_id' => $discard->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNull($discard->fresh());
+        $this->assertSame($keep->id, $keepBuilding->refresh()->community_id);
+        $this->assertSame('Al Reem Island', $keepBuilding->refresh()->community);
+        $this->assertSame($keep->id, $discardBuilding->refresh()->community_id);
+        $this->assertSame('Al Reem Island', $discardBuilding->refresh()->community);
+        $this->assertSame('Al Reem Island', $discardUnit->refresh()->community);
+        $this->assertSame('Al Reem Island', $keepUnit->refresh()->community);
+        $this->assertSame('Al Reem Island', $legacy->refresh()->community);
+    }
+
     public function test_manually_creating_a_unit_links_it_to_its_building(): void
     {
         $this->post(route('inventory.store'), [

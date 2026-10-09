@@ -335,6 +335,32 @@ class MapLocationController extends Controller
         return back()->with('success', __('Community renamed — its buildings and units were updated.', ['name' => $name]));
     }
 
+    public function mergeCommunities(Request $request): RedirectResponse
+    {
+        $tenantId = auth()->user()->tenant_id;
+
+        $data = $request->validate([
+            'keep_id' => 'required|integer',
+            'discard_id' => 'required|integer|different:keep_id',
+        ]);
+
+        $keep = Community::where('tenant_id', $tenantId)->find((int) $data['keep_id']);
+        $discard = Community::where('tenant_id', $tenantId)->find((int) $data['discard_id']);
+        abort_unless($keep && $discard, 403);
+
+        $result = app(MapLocationService::class)->mergeCommunities($tenantId, (int) $data['keep_id'], (int) $data['discard_id']);
+
+        if (isset($result['error'])) {
+            return back()->with('error', $result['error']);
+        }
+
+        return back()->with('success', __('Merged ":discard" into ":keep" — :count building(s) rehomed.', [
+            'discard' => $result['discarded_name'],
+            'keep' => $result['kept']->name,
+            'count' => $result['buildings'] ?? 0,
+        ]));
+    }
+
     public function destroyCommunity(Community $community): RedirectResponse
     {
         $community = $this->ownedCommunity($community);

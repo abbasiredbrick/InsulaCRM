@@ -12,7 +12,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <p class="text-muted mb-1">
-            {{ __('Communities group the buildings (sub-communities) your units live in. Each building has one Google Maps location shared by all of its units — set or correct it here, rename a building and every one of its units follows, or merge two spellings of the same building into one. Re-importing a sheet never duplicates a building.') }}
+            {{ __('Communities group the buildings (sub-communities) your units live in. Each building has one Google Maps location shared by all of its units — set or correct it here, rename a building and every one of its units follows, or merge two spellings of the same building into one. Communities can be renamed or merged too (e.g. "Al Reem Island" and "Reem Island" become one). Re-importing a sheet never duplicates a building.') }}
         </p>
         @php
             $totalMissing = $buildings->whereNull('map_url')->count();
@@ -86,6 +86,9 @@
                                     </td>
                                     <td class="text-nowrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCommunityModal{{ $community->id }}">{{ __('Edit') }}</button>
+                                        @if($communities->count() > 1)
+                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#mergeCommunityModal{{ $community->id }}">{{ __('Merge') }}</button>
+                                        @endif
                                         @if($community->map_locations_count > 0)
                                         <button type="button" class="btn btn-sm btn-outline-danger" disabled title="{{ __('Remove its buildings first') }}">{{ __('Delete') }}</button>
                                         @else
@@ -127,6 +130,41 @@
                                         </form>
                                     </div>
                                 </div>
+
+                                @if($communities->count() > 1)
+                                <div class="modal fade" id="mergeCommunityModal{{ $community->id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <form method="POST" action="{{ route('settings.map-locations.communities.merge') }}" onsubmit="return confirm('{{ __('Merge the selected community into \':name\'? Its buildings and units move here and the other community is removed.', ['name' => $community->name]) }}')">
+                                            @csrf
+                                            <input type="hidden" name="keep_id" value="{{ $community->id }}">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">{{ __('Merge into ":name"', ['name' => $community->name]) }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label required">{{ __('Community to merge in') }}</label>
+                                                        <select name="discard_id" class="form-select" required>
+                                                            <option value="">{{ __('Choose a community...') }}</option>
+                                                            @foreach($communities as $other)
+                                                                @if($other->id !== $community->id)
+                                                                    <option value="{{ $other->id }}">{{ $other->name }} ({{ $other->map_locations_count }})</option>
+                                                                @endif
+                                                            @endforeach
+                                                        </select>
+                                                        <small class="form-hint">{{ __('Its buildings and units are re-grouped under ":name", then the other community is deleted.', ['name' => $community->name]) }}</small>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                                                    <button type="submit" class="btn btn-warning">{{ __('Merge') }}</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                @endif
                             @empty
                                 <tr>
                                     <td colspan="3" class="text-muted text-center py-4">{{ __('No communities yet. Add one, or let a sheet import create buildings and their communities for you.') }}</td>

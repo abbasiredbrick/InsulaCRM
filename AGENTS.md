@@ -150,7 +150,11 @@ on `properties` stay as snapshots.
 - Rename cascades to every unit, FK-linked *and* legacy string-linked.
   `rename()` answers `['conflict' => true, 'target' => …]` when the new name
   already belongs to another building (blocked — merge instead). Community
-  rename cascades to the locations' `community` and to legacy unit strings.
+  rename cascades to the locations' `community` and to legacy unit strings;
+  communities can be **merged** too (`mergeCommunities()`) so two spellings of
+  the same place ("Al Reem Island" / "Reem Island") collapse into one — its
+  buildings are re-pointed at the kept community, name snapshots and units
+  follow, then the discarded row is deleted.
 - Merge re-points `map_location_id`, rewrites linked + legacy unit strings to
   the kept row, then deletes the discard. Deleting a building is blocked while
   it still has units (FK *or* legacy count).

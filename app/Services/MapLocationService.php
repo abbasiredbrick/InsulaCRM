@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Community;
 use App\Models\MapLocation;
 use App\Models\Property;
 use Illuminate\Support\Facades\Cache;
@@ -449,6 +450,73 @@ class MapLocationService
         $discard->delete();
 
         return ['kept' => $keep, 'moved' => $moved + $legacy, 'legacy' => $legacy];
+    }
+
+    /**
+     * Fold one community into another: its buildings are re-pointed at the
+     * kept community, the kept name is stamped onto every building and unit
+     * snapshot of the discarded community, then the discarded community row is
+     * deleted. "Al Reem Island" and "Reem Island" become one.
+     *
+     * @return array{kept?: Community, discarded_name?: string, buildings?: int, units?: int, error?: string}
+     */
+    public function mergeCommunities(int $tenantId, int $keepId, int $discardId): array
+    {
+        $keep = Community::where('tenant_id', $tenantId)->find($keepId);
+        $discard = Community::where('tenant_id', $tenantId)->find($discardId);
+
+        if (! $keep || ! $discard || $keep->id === $discard->id) {
+            return ['error' => __('Pick two different communities to merge.')];
+        }
+
+        if (($keep->city === null || $keep->city === '') && $discard->city !== null && $discard->city !== '') {
+            $keep->updateQuietly(['city' => $discard->city]);
+        }
+
+        $oldName = (string) $discard->name;
+
+        // Buildings explicitly grouped under the discarded community.
+        $buildings = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('community_id', $discard->id)
+            ->update(['community_id' => $keep->id, 'community' => $keep->name]);
+
+        // Buildings whose community text still names the discarded community
+        // but were never linked to it (post-backfill this is a no-op).
+        $buildings += MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('community_id')
+            ->whereRaw('LOWER(community) = ?', [mb_strtolower(trim($oldName))])
+            ->update(['community_id' => $keep->id, 'community' => $keep->name]);
+
+        $buildingIds = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('community_id', $keep->id)
+            ->pluck('id');
+
+        // Unit snapshots of those buildings that still carry the old name.
+        $units = Property::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('map_location_id', $buildingIds)
+            ->whereRaw('LOWER(community) = ?', [mb_strtolower(trim($oldName))])
+            ->update(['community' => $keep->name]);
+
+        // Legacy fallback: units never linked to a building row.
+        $legacy = Property::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->whereNull('map_location_id')
+            ->whereRaw('LOWER(community) = ?', [mb_strtolower(trim($oldName))])
+            ->update(['community' => $keep->name]);
+
+        $discard->delete();
+
+        return [
+            'kept' => $keep,
+            'discarded_name' => $oldName,
+            'buildings' => $buildings,
+            'units' => $units + $legacy,
+            'legacy' => $legacy,
+        ];
     }
 
     /**

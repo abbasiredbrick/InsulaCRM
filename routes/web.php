@@ -849,6 +849,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::delete('/settings/map-locations/buildings/{mapLocation}', [MapLocationController::class, 'destroyBuilding'])->name('settings.map-locations.buildings.destroy');
         Route::post('/settings/map-locations/generate-all', [MapLocationController::class, 'generateAll'])->name('settings.map-locations.generate-all');
         Route::post('/settings/map-locations/communities', [MapLocationController::class, 'storeCommunity'])->name('settings.map-locations.communities.store');
+        Route::post('/settings/map-locations/communities/merge', [MapLocationController::class, 'mergeCommunities'])->name('settings.map-locations.communities.merge');
         Route::put('/settings/map-locations/communities/{community}', [MapLocationController::class, 'updateCommunity'])->name('settings.map-locations.communities.update');
         Route::delete('/settings/map-locations/communities/{community}', [MapLocationController::class, 'destroyCommunity'])->name('settings.map-locations.communities.destroy');
 
