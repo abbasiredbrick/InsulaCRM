@@ -442,6 +442,36 @@ class MapLocationService
     }
 
     /**
+     * Re-parent a building into a different community, keeping the
+     * City → Community → Sub-community chain consistent: the building's own
+     * snapshot, every unit that points at it (FK-linked or legacy-name), and
+     * the city when the new community carries one. Returns the units updated.
+     */
+    public function moveToCommunity(MapLocation $location, Community $community): int
+    {
+        $city = $community->city !== null && $community->city !== '' ? $community->city : $location->city;
+
+        $location->update([
+            'community_id' => $community->id,
+            'community' => $community->name,
+            'city' => $city,
+        ]);
+
+        $linked = Property::withoutGlobalScopes()
+            ->where('tenant_id', $location->tenant_id)
+            ->where('map_location_id', $location->id)
+            ->update(['community' => $community->name, 'city' => $city]);
+
+        $legacy = Property::withoutGlobalScopes()
+            ->where('tenant_id', $location->tenant_id)
+            ->whereNull('map_location_id')
+            ->whereRaw('LOWER(sub_community) = ?', [mb_strtolower(trim((string) $location->sub_community))])
+            ->update(['community' => $community->name, 'city' => $city]);
+
+        return $linked + $legacy;
+    }
+
+    /**
      * Rename a building, cascading to every unit carrying the old name. When
      * the new name already belongs to another building the call returns
      * ['conflict' => true, 'target' => ...] and changes nothing — collapsing the

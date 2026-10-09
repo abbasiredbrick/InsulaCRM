@@ -12,7 +12,7 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
         <p class="text-muted mb-1">
-            {{ __('Communities group the buildings (sub-communities) your units live in. Each building has one Google Maps location shared by all of its units — set or correct it here, rename a building and every one of its units follows, or merge two spellings of the same building into one. Communities can be renamed or merged too (e.g. "Al Reem Island" and "Reem Island" become one). Re-importing a sheet never duplicates a building.') }}
+            {{ __('City → Community → Sub-community (building). Each building has one Google Maps location shared by all of its units — set or correct it here, rename a building and every one of its units follows, or move a building to another community. Communities can be renamed, re-homed to another city, merged, or removed; a sub-community can be renamed, moved to another community, merged, or removed. Re-importing a sheet never duplicates a building.') }}
         </p>
         @php
             $totalMissing = $buildings->whereNull('map_url')->count();
@@ -73,24 +73,34 @@
                 <div class="table-responsive">
                     <table class="table table-vcenter card-table">
                         <tbody>
-                            @forelse($communities as $community)
+                            @forelse($communitiesByCity as $city => $group)
+                                <tr class="table-active">
+                                    <td colspan="3" class="fw-bold">
+                                        {{ $city !== '' ? $city : __('No city') }}
+                                        <span class="text-muted small fw-normal ms-1">
+                                            {{ trans_choice(':count community|:count communities', $group->count()) }}
+                                            · {{ trans_choice(':count building|:count buildings', (int) $group->sum('map_locations_count')) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                @foreach($group as $community)
                                 <tr>
                                     <td class="w-100">
                                         <a href="{{ route('settings.map-locations.index', ['community' => $community->id, 'q' => $search ?: null]) }}" class="text-decoration-none {{ $selectedCommunity === (int) $community->id ? 'fw-bold' : '' }}">
                                             {{ $community->name }}
                                         </a>
-                                        <div class="text-muted small">{{ $community->city ?: __('—') }}</div>
                                     </td>
                                     <td class="text-center">
                                         <span class="badge bg-azure-lt">{{ $community->map_locations_count }}</span>
                                     </td>
                                     <td class="text-nowrap">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCommunityModal{{ $community->id }}">{{ __('Edit') }}</button>
+                                        <a href="{{ route('inventory.locations-create', ['city' => $community->city, 'community' => $community->name, 'return' => route('settings.map-locations.index', ['community' => $community->id], false)]) }}" class="btn btn-sm btn-outline-primary" title="{{ __('Add a building under :name', ['name' => $community->name]) }}">＋ {{ __('Building') }}</a>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editCommunityModal{{ $community->id }}">{{ __('Edit') }}</button>
                                         @if($communities->count() > 1)
                                         <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#mergeCommunityModal{{ $community->id }}">{{ __('Merge') }}</button>
                                         @endif
                                         @if($community->map_locations_count > 0)
-                                        <button type="button" class="btn btn-sm btn-outline-danger" disabled title="{{ __('Remove its buildings first') }}">{{ __('Delete') }}</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" disabled title="{{ __('Remove or move its buildings first') }}">{{ __('Delete') }}</button>
                                         @else
                                         <form method="POST" action="{{ route('settings.map-locations.communities.destroy', $community) }}" class="d-inline" onsubmit="return confirm('{{ __('Delete community \':name\'?', ['name' => $community->name]) }}')">
                                             @csrf
@@ -113,12 +123,17 @@
                                                 </div>
                                                 <div class="modal-body">
                                                     <div class="mb-3">
-                                                        <label class="form-label required">{{ __('Name') }}</label>
-                                                        <input type="text" name="name" class="form-control" value="{{ $community->name }}" required>
+                                                        <label class="form-label required">{{ __('City') }}</label>
+                                                        <select name="city" class="form-select">
+                                                            <option value="">{{ __('—') }}</option>
+                                                            @foreach(collect($cities)->merge($community->city ? [$community->city] : [])->unique()->sort() as $cityOption)
+                                                                <option value="{{ $cityOption }}" @selected($community->city === $cityOption)>{{ $cityOption }}</option>
+                                                            @endforeach
+                                                        </select>
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label">{{ __('City') }}</label>
-                                                        <input type="text" name="city" class="form-control" value="{{ $community->city }}">
+                                                        <label class="form-label required">{{ __('Community name') }}</label>
+                                                        <input type="text" name="name" class="form-control" value="{{ $community->name }}" required>
                                                     </div>
                                                     <small class="form-hint">{{ __('Renaming cascades to every building and unit of this community.') }}</small>
                                                 </div>
@@ -165,6 +180,7 @@
                                     </div>
                                 </div>
                                 @endif
+                                @endforeach
                             @empty
                                 <tr>
                                     <td colspan="3" class="text-muted text-center py-4">{{ __('No communities yet. Add one, or let a sheet import create buildings and their communities for you.') }}</td>
@@ -211,9 +227,22 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <a href="{{ route('settings.map-locations.index', ['community' => $b->community_id ?: '', 'q' => $search ?: null]) }}" class="text-decoration-none {{ $b->community_id ? '' : 'text-muted' }}">
-                                            {{ $b->community ?: '—' }}
-                                        </a>
+                                        @if($communities->isNotEmpty())
+                                        <form action="{{ route('settings.map-locations.buildings.move', $b) }}" method="POST" class="d-flex gap-1">
+                                            @csrf
+                                            <select name="community_id" class="form-select form-select-sm" title="{{ __('Move to another community') }}">
+                                                @if(!$b->community_id)
+                                                    <option value="" selected disabled>{{ __('— unassigned —') }}</option>
+                                                @endif
+                                                @foreach($communities as $community)
+                                                    <option value="{{ $community->id }}" @selected((int) $b->community_id === $community->id)>{{ $community->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">{{ __('Move') }}</button>
+                                        </form>
+                                        @else
+                                            <span class="text-muted">{{ $b->community ?: '—' }}</span>
+                                        @endif
                                     </td>
                                     <td>{{ $b->city ?: '—' }}</td>
                                     <td class="text-center">
@@ -296,7 +325,7 @@
     </div>
 </div>
 
-{{-- Add Community modal --}}
+{{-- Add Community modal: a community always sits under a city --}}
 <div class="modal fade" id="addCommunityModal" tabindex="-1">
     <div class="modal-dialog">
         <form method="POST" action="{{ route('settings.map-locations.communities.store') }}">
@@ -308,17 +337,18 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label required">{{ __('Name') }}</label>
-                        <input type="text" name="name" class="form-control" placeholder="{{ __('e.g. Al Ryada, Marjan Island') }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">{{ __('City') }}</label>
-                        <select name="city" class="form-select">
-                            <option value="">{{ __('—') }}</option>
+                        <label class="form-label required">{{ __('City') }}</label>
+                        <select name="city" class="form-select" required>
+                            <option value="">{{ __('Select a city...') }}</option>
                             @foreach($cities as $city)
                                 <option value="{{ $city }}">{{ $city }}</option>
                             @endforeach
                         </select>
+                        <div class="form-hint">{{ __('Cities come from your units and country. Missing one? Add a location — the city is created with it.') }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">{{ __('Community') }}</label>
+                        <input type="text" name="name" class="form-control" placeholder="{{ __('e.g. Al Reem Island') }}" required>
                     </div>
                 </div>
                 <div class="modal-footer">

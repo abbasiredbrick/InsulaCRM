@@ -354,7 +354,67 @@ class InventoryMapLocationTest extends TestCase
             ->assertSee('Locations')
             ->assertSee('Add Location')
             ->assertSee(route('inventory.locations-create'), false)
+            ->assertSee('Add Community')
             ->assertDontSee('Add Building');
+    }
+
+    public function test_the_locations_screen_groups_communities_under_their_city(): void
+    {
+        Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Al Reem Island', 'city' => 'Abu Dhabi']);
+        Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Dubai Marina', 'city' => 'Dubai']);
+
+        $this->get(route('settings.map-locations.index'))
+            ->assertOk()
+            ->assertSee('Abu Dhabi')
+            ->assertSee('Dubai')
+            ->assertSee('Al Reem Island')
+            ->assertSee('Dubai Marina');
+    }
+
+    public function test_a_community_created_from_the_screen_keeps_its_city(): void
+    {
+        $this->post(route('settings.map-locations.communities.store'), [
+            'city' => 'Abu Dhabi',
+            'name' => 'Al Reem Island',
+        ])->assertSessionHasNoErrors();
+
+        $community = Community::where('tenant_id', $this->tenant->id)->where('name', 'Al Reem Island')->first();
+        $this->assertNotNull($community);
+        $this->assertSame('Abu Dhabi', $community->city);
+    }
+
+    public function test_a_building_can_be_moved_to_another_community(): void
+    {
+        $abuDhabi = Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Al Reem Island', 'city' => 'Abu Dhabi']);
+        $dubai = Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Dubai Marina', 'city' => 'Dubai']);
+
+        $unit = $this->unit('Bey View Tower', '1301', 'Al Reem Island');
+        $location = $this->location('Bey View Tower', null, 'Bey View Tower, Al Reem Island', 'Al Reem Island', 'Abu Dhabi');
+        $location->update(['community_id' => $abuDhabi->id]);
+        app(MapLocationService::class)->linkBuildingUnits($this->tenant->id, 'Bey View Tower', $location);
+
+        $this->post(route('settings.map-locations.buildings.move', $location), [
+            'community_id' => $dubai->id,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame($dubai->id, $location->refresh()->community_id);
+        $this->assertSame('Dubai Marina', $location->community);
+        $this->assertSame('Dubai', $location->city);
+        $this->assertSame('Dubai Marina', $unit->refresh()->community);
+        $this->assertSame('Dubai', $unit->refresh()->city);
+    }
+
+    public function test_a_building_cannot_be_moved_to_a_foreign_tenants_community(): void
+    {
+        $location = $this->location('Bey View Tower', null, 'Bey View Tower, Abu Dhabi', 'Abu Dhabi Mall', 'Abu Dhabi');
+
+        $other = Community::create(['tenant_id' => 99999, 'name' => 'Someone Elses', 'city' => 'Dubai']);
+
+        $this->post(route('settings.map-locations.buildings.move', $location), [
+            'community_id' => $other->id,
+        ])->assertStatus(422);
+
+        $this->assertNull($location->refresh()->community_id);
     }
 
     public function test_the_public_share_page_embeds_the_map_and_links_each_unit(): void
@@ -952,6 +1012,20 @@ class InventoryMapLocationTest extends TestCase
             ->assertSee('name="city"', false)
             ->assertSee('Abu Dhabi')
             ->assertSee('value="Sky Tower"', false);
+    }
+
+    public function test_the_create_page_prefills_the_community_it_was_opened_from(): void
+    {
+        Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Al Reem Island', 'city' => 'Abu Dhabi']);
+
+        $this->get(route('inventory.locations-create', [
+            'city' => 'Abu Dhabi',
+            'community' => 'Al Reem Island',
+            'return' => '/settings/map-locations',
+        ]))
+            ->assertOk()
+            ->assertSee('value="Al Reem Island"', false)
+            ->assertSee('Abu Dhabi');
     }
 
     public function test_creating_a_location_from_the_picker_page_makes_the_community_and_building(): void

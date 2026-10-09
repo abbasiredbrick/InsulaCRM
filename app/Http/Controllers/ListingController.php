@@ -416,6 +416,8 @@ class ListingController extends Controller
         return view('inventory.locations-create', [
             'cities' => $maps->citiesForTenant($user->tenant_id, $user->tenant?->country),
             'name' => trim((string) $request->query('name')),
+            'prefillCity' => trim((string) $request->query('city')),
+            'prefillCommunity' => trim((string) $request->query('community')),
             'return' => $this->safeInventoryReturn($request->query('return')),
         ]);
     }

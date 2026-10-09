@@ -182,13 +182,21 @@ on `properties` stay as snapshots.
   `applyPickedBuilding` still resolves through `ensureMapLocation()`. Only the
   New Unit building picker sets `creatable`; the Bayut/lead pickers must not
   (their ids are external and cannot be invented).
-- **One page creates a location, everywhere.** Settings → Locations' "Add
-  Location" button and the New Unit picker both open
-  `inventory.locations-create` (city dropdown → community → building); the
-  screen's old "Add Building" modal is gone. Both pass a `return` path
-  (`settings.map-locations.index` / the unit form) and the create page redirects
-  back there. Only the community-only "Add Community" modal remains on the
-  Locations screen (its city is the same preloaded dropdown).
+- **The hierarchy is City → Community → Sub-community, and the screen says so.**
+  Settings → Locations' Communities panel is **grouped by city** (city header,
+  then its communities; the unassigned bucket is last), so "city is main".
+  A community always sits under a city: the "Add Community" modal takes a
+  **required city dropdown** (same `citiesForTenant()` list) plus the name.
+  Each community row has **＋ Building**, which opens `inventory.locations-create`
+  with `?city=&community=` prefilled (the create page's `prefillCity`/
+  `prefillCommunity`), and returns to that community's filtered view. A
+  building's Community cell is a **move control** (`settings.map-locations.buildings.move`
+  → `MapLocationService::moveToCommunity()`), which re-parents the building and
+  cascades the new community **and its city** to every FK-linked unit and any
+  legacy unlinked unit of that building name. Creating the full chain is still
+  the one shared page (New Unit picker and "Add Location" both use it); the page
+  is the only place a *new* city enters the system, so the Add-Community city
+  dropdown can honestly say "add a location" to create one.
 
 ## Search / Filter UI — the live-filter convention
 

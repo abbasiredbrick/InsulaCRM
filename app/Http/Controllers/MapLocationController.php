@@ -82,8 +82,17 @@ class MapLocationController extends Controller
             ->map(fn ($group) => $group->map(fn ($b) => ['value' => (string) $b->id, 'label' => $b->sub_community])->values())
             ->toArray();
 
+        // The hierarchy is City → Community → Sub-community, so the panel is
+        // grouped by city ("City is main"); the empty string is the unassigned
+        // bucket, kept last.
+        $communitiesByCity = $communities
+            ->groupBy(fn ($c) => trim((string) $c->city))
+            ->sortKeys()
+            ->sortBy(fn ($group, $city) => $city === '' ? 1 : 0);
+
         return view('settings.map-locations', [
             'communities' => $communities,
+            'communitiesByCity' => $communitiesByCity,
             'buildings' => $buildings,
             'selectedCommunity' => $selectedCommunity,
             'search' => $search,
@@ -92,6 +101,30 @@ class MapLocationController extends Controller
             'byCommunity' => $byCommunity,
             'cities' => $maps->citiesForTenant($tenantId, auth()->user()->tenant?->country),
         ]);
+    }
+
+    /**
+     * Re-parent a building into another community (the "edit" of the
+     * sub-community level), cascading the new community/city to its units.
+     */
+    public function moveBuilding(Request $request, MapLocation $mapLocation): RedirectResponse
+    {
+        $location = $this->ownedLocation($mapLocation);
+
+        $data = $request->validate([
+            'community_id' => 'required|integer',
+        ]);
+
+        $community = Community::where('tenant_id', $location->tenant_id)->find((int) $data['community_id']);
+        abort_unless($community, 422);
+
+        $moved = app(MapLocationService::class)->moveToCommunity($location, $community);
+
+        return back()->with('success', __('":building" moved to :community — :count unit(s) updated.', [
+            'building' => $location->sub_community,
+            'community' => $community->name,
+            'count' => $moved,
+        ]));
     }
 
     public function storeBuilding(Request $request): RedirectResponse

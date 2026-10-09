@@ -847,6 +847,7 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/map-locations/buildings', [MapLocationController::class, 'storeBuilding'])->name('settings.map-locations.buildings.store');
         Route::post('/settings/map-locations/buildings/{mapLocation}/location', [MapLocationController::class, 'setBuildingLocation'])->name('settings.map-locations.set-location');
         Route::post('/settings/map-locations/buildings/{mapLocation}/rename', [MapLocationController::class, 'renameBuilding'])->name('settings.map-locations.rename');
+        Route::post('/settings/map-locations/buildings/{mapLocation}/move', [MapLocationController::class, 'moveBuilding'])->name('settings.map-locations.buildings.move');
         Route::post('/settings/map-locations/merge', [MapLocationController::class, 'mergeBuildings'])->name('settings.map-locations.merge');
         Route::delete('/settings/map-locations/buildings/{mapLocation}', [MapLocationController::class, 'destroyBuilding'])->name('settings.map-locations.buildings.destroy');
         Route::post('/settings/map-locations/generate-all', [MapLocationController::class, 'generateAll'])->name('settings.map-locations.generate-all');

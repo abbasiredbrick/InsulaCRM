@@ -25,7 +25,7 @@
                         <select name="city" class="form-select @error('city') is-invalid @enderror" required>
                             <option value="">{{ __('Select a city...') }}</option>
                             @foreach($cities as $city)
-                                <option value="{{ $city }}" {{ old('city') === $city ? 'selected' : '' }}>{{ $city }}</option>
+                                <option value="{{ $city }}" {{ old('city', $prefillCity) === $city ? 'selected' : '' }}>{{ $city }}</option>
                             @endforeach
                         </select>
                         @error('city') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -34,7 +34,7 @@
                     <div class="mb-3">
                         <label class="form-label required">{{ __('Community') }}</label>
                         <input type="text" name="community" class="form-control @error('community') is-invalid @enderror"
-                            value="{{ old('community') }}" placeholder="{{ __('e.g. Al Reem Island') }}" required>
+                            value="{{ old('community', $prefillCommunity) }}" placeholder="{{ __('e.g. Al Reem Island') }}" required>
                         @error('community') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         <div class="form-hint">{{ __('If the community already exists under this city, it is reused.') }}</div>
                     </div>
