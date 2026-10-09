@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
 {
@@ -393,13 +394,77 @@ class ListingController extends Controller
     public function create(Request $request)
     {
         $property = new Property(['availability' => 'draft']);
+        $selectedBuildingId = old('map_location_id') ? (int) old('map_location_id') : null;
 
         return view('inventory.create', [
             'property' => $property,
             'agents' => $this->agents(),
-            'building_options' => $this->buildingOptions($property),
+            'building_options' => $this->buildingOptions($property, $selectedBuildingId),
             'building_search_url' => route('inventory.locations-search'),
         ]);
+    }
+
+    /**
+     * The "Create <building>" destination from the New Unit picker: a building
+     * is created under a community, and the community under a city.
+     */
+    public function locationCreate(Request $request)
+    {
+        $maps = app(MapLocationService::class);
+        $user = auth()->user();
+
+        return view('inventory.locations-create', [
+            'cities' => $maps->citiesForTenant($user->tenant_id, $user->tenant?->country),
+            'name' => trim((string) $request->query('name')),
+            'return' => $this->safeInventoryReturn($request->query('return')),
+        ]);
+    }
+
+    /**
+     * Persist a community + building created from the inventory picker, then
+     * send the user back to the unit form with the new building preselected.
+     */
+    public function locationStore(Request $request)
+    {
+        $maps = app(MapLocationService::class);
+        $user = auth()->user();
+        $tenantId = $user->tenant_id;
+
+        $data = $request->validate([
+            'city' => ['required', 'string', Rule::in($maps->citiesForTenant($tenantId, $user->tenant?->country))],
+            'community' => 'required|string|max:255',
+            'sub_community' => 'required|string|max:120',
+            'return' => 'nullable|string|max:2048',
+        ]);
+
+        $community = $maps->ensureCommunity($tenantId, $data['community'], $data['city']);
+        $location = $maps->ensureMapLocation($tenantId, $data['sub_community'], $community->name, $data['city'], null);
+
+        if (! $location) {
+            return back()->withInput()->with('error', __('Could not create the building.'));
+        }
+
+        if (! $location->community_id) {
+            $location->update(['community_id' => $community->id]);
+        }
+
+        return redirect($this->safeInventoryReturn($data['return'] ?? null))
+            ->withInput(['map_location_id' => (int) $location->id])
+            ->with('success', __('Building ":name" created. Pick it below to continue.', ['name' => $location->sub_community]));
+    }
+
+    /**
+     * Only allow returning to a path on this app (never an absolute/off-site URL).
+     */
+    protected function safeInventoryReturn(?string $url): string
+    {
+        $url = trim((string) $url);
+
+        if ($url === '' || ! str_starts_with($url, '/') || str_starts_with($url, '//')) {
+            return route('inventory.create');
+        }
+
+        return $url;
     }
 
     public function store(Request $request)
@@ -479,10 +544,12 @@ class ListingController extends Controller
     {
         $property->load('leads');
 
+        $selectedBuildingId = old('map_location_id') ? (int) old('map_location_id') : null;
+
         return view('inventory.edit', [
             'property' => $property,
             'agents' => $this->agents(),
-            'building_options' => $this->buildingOptions($property),
+            'building_options' => $this->buildingOptions($property, $selectedBuildingId),
             'building_search_url' => route('inventory.locations-search'),
         ]);
     }
@@ -626,17 +693,21 @@ class ListingController extends Controller
     }
 
     /**
-     * Preselected option for the building picker when editing an existing unit.
+     * Preselected option for the building picker. Uses the id just created from
+     * the picker's "Create" page (flashed as old input) when present, otherwise
+     * the unit's current building.
      */
-    protected function buildingOptions(Property $property): array
+    protected function buildingOptions(Property $property, ?int $selectedId = null): array
     {
-        if (! $property->map_location_id) {
+        $id = $selectedId ?: $property->map_location_id;
+
+        if (! $id) {
             return [];
         }
 
         $location = MapLocation::withoutGlobalScopes()
             ->where('tenant_id', auth()->user()->tenant_id)
-            ->find($property->map_location_id);
+            ->find($id);
 
         if (! $location) {
             return [];

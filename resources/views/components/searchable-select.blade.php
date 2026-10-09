@@ -10,6 +10,7 @@
     'labelName' => '',
     'creatable' => false,
     'createLabel' => __('Create'),
+    'createUrl' => '',
 ])
 
 <div class="searchable-select" data-ss
@@ -19,6 +20,7 @@
     data-remote="{{ $remote }}"
     data-creatable="{{ $creatable ? '1' : '' }}"
     data-create-label="{{ $createLabel }}"
+    data-create-url="{{ $createUrl }}"
     data-options="{{ json_encode($options) }}">
     <button type="button" class="form-select searchable-select-field text-start {{ $invalid ? 'is-invalid' : '' }}" data-ss-field
         aria-haspopup="listbox" aria-expanded="false">
@@ -76,6 +78,7 @@
         const remoteUrl = (root.dataset.remote || '').trim();
         const creatable = root.dataset.creatable === '1';
         const createLabel = (root.dataset.createLabel || '').trim() || 'Create';
+        const createUrl = (root.dataset.createUrl || '').trim();
 
         let options = [];
         try { options = JSON.parse(root.dataset.options || '[]'); } catch (e) { options = []; }
@@ -163,6 +166,16 @@
         function setCreated(name) {
             name = String(name).trim();
             if (!name) { return; }
+
+            // When a creation page is configured, hand the typed name off to it
+            // (city → community → building) instead of inventing a record here.
+            if (createUrl) {
+                const back = window.location.pathname + window.location.search;
+                const sep = createUrl.indexOf('?') >= 0 ? '&' : '?';
+                window.location.href = createUrl + sep + 'name=' + encodeURIComponent(name) + '&return=' + encodeURIComponent(back);
+                return;
+            }
+
             const value = 'new:' + name;
             ensureOption(value, name);
             select.value = value;

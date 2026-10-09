@@ -145,14 +145,15 @@
                             <x-searchable-select
                                 name="map_location_id"
                                 :options="$buildingOptions ?? []"
-                                :selected="(string) ($property->map_location_id ?? '')"
+                                :selected="(string) old('map_location_id', $property->map_location_id ?? '')"
                                 :remote="$buildingSearchUrl ?? route('inventory.locations-search')"
                                 :placeholder="__('Choose / search a building...')"
                                 :search-placeholder="__('Type building, community or city...')"
                                 :creatable="true"
                                 :create-label="__('Create')"
+                                :create-url="route('inventory.locations-create')"
                             />
-                            <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community automatically, and drives the map pin and portal listing location. If the building is not listed, type its name and choose Create; it is added on save.') }}</div>
+                            <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community automatically, and drives the map pin and portal listing location. If the building is not listed, choose Create to add it under a city and community first.') }}</div>
                         </div>
                         <div class="col-md-7">
                             <label class="form-label">{{ __('Address') }}</label>

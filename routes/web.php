@@ -350,6 +350,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/inventory/{property}/portal-location', [ListingController::class, 'updatePortalLocation'])->name('inventory.portal-location');
         Route::get('/inventory/bayut/locations/search', [PortalIntegrationController::class, 'searchLocations'])->name('inventory.bayut-locations-search');
         Route::get('/inventory/locations/search', [MapLocationController::class, 'searchBuildings'])->name('inventory.locations-search');
+        Route::get('/inventory/locations/create', [ListingController::class, 'locationCreate'])->name('inventory.locations-create');
+        Route::post('/inventory/locations', [ListingController::class, 'locationStore'])->name('inventory.locations-store');
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
             ->name('inventory.push');

@@ -932,4 +932,84 @@ class InventoryMapLocationTest extends TestCase
         $this->assertSame('Al Ryada', $property->community);
         $this->assertSame('Abu Dhabi', $property->city);
     }
+
+    public function test_the_picker_create_page_lists_cities_and_prefills_the_building_name(): void
+    {
+        $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
+
+        $this->get(route('inventory.locations-create', ['name' => 'Sky Tower']))
+            ->assertOk()
+            ->assertSee('name="city"', false)
+            ->assertSee('Abu Dhabi')
+            ->assertSee('value="Sky Tower"', false);
+    }
+
+    public function test_creating_a_location_from_the_picker_page_makes_the_community_and_building(): void
+    {
+        $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
+
+        $this->post(route('inventory.locations-store'), [
+            'city' => 'Abu Dhabi',
+            'community' => 'Al Reem Island',
+            'sub_community' => 'Sky Tower',
+            'return' => '/inventory/create',
+        ])->assertRedirect('/inventory/create')
+            ->assertSessionHas('success');
+
+        $community = Community::where('tenant_id', $this->tenant->id)
+            ->where('name', 'Al Reem Island')
+            ->firstOrFail();
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Sky Tower')
+            ->firstOrFail();
+
+        $this->assertSame('Abu Dhabi', $location->city);
+        $this->assertSame($community->id, $location->community_id);
+
+        // The unit form now preselects the freshly created building.
+        $this->get(route('inventory.create'))
+            ->assertOk()
+            ->assertSee('data-selected="'.$location->id.'"', false);
+    }
+
+    public function test_creating_a_location_reuses_an_existing_community_case_insensitively(): void
+    {
+        $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
+
+        $existing = Community::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Al Reem Island',
+            'city' => 'Abu Dhabi',
+        ]);
+
+        $this->post(route('inventory.locations-store'), [
+            'city' => 'Abu Dhabi',
+            'community' => 'AL REEM ISLAND',
+            'sub_community' => 'Sky Tower',
+        ])->assertRedirect();
+
+        $this->assertSame(1, Community::where('tenant_id', $this->tenant->id)
+            ->where('name', 'Al Reem Island')
+            ->count());
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Sky Tower')
+            ->firstOrFail();
+
+        $this->assertSame($existing->id, $location->community_id);
+    }
+
+    public function test_creating_a_location_rejects_a_city_that_is_not_known(): void
+    {
+        $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
+
+        $this->post(route('inventory.locations-store'), [
+            'city' => 'Atlantis',
+            'community' => 'Lost City',
+            'sub_community' => 'Poseidon Tower',
+        ])->assertSessionHasErrors('city');
+    }
 }

@@ -167,12 +167,21 @@ on `properties` stay as snapshots.
   (`applyPickedBuilding`); the picker contract is what we will reuse to map
   units onto Bayut/PF portal locations.
 - The picker is **creatable** (`:creatable="true"`): when a search matches no
-  building it offers `Create "<typed>"`, which submits `map_location_id =
-  "new:<name>"` instead of an id. `applyPickedBuilding` turns that into
-  `ensureMapLocation()` (so a case/spacing variant folds onto the existing
-  building — never a duplicate) + `linkBuildingUnits()`, then treats it exactly
-  like a picked one. Only the New Unit building picker sets `creatable`; the
-  Bayut/lead pickers must not (their ids are external and cannot be invented).
+  building it offers `Create "<typed>"`. With `:create-url` (the New Unit
+  picker) it navigates to `inventory.locations-create` — a page where the user
+  picks a **city from a dropdown** (preloaded via
+  `MapLocationService::citiesForTenant()`: cities already used by the tenant
+  unioned with `COUNTRY_CITIES[tenant->country]`), types the community, and
+  confirms the building/sub-community (prefilled from the typed name).
+  `locationStore` then runs `ensureCommunity()` (normalized-exact, reuses an
+  existing community case-insensitively) + `ensureMapLocation()`, stamps
+  `community_id`, and redirects back to the unit form (`return` param, path-only
+  — see `safeInventoryReturn()`) with `map_location_id` flashed as old input so
+  the picker preselects it. Without `:create-url` (e.g. an API/legacy caller) the
+  component falls back to submitting `map_location_id = "new:<name>"`, which
+  `applyPickedBuilding` still resolves through `ensureMapLocation()`. Only the
+  New Unit building picker sets `creatable`; the Bayut/lead pickers must not
+  (their ids are external and cannot be invented).
 
 ## Search / Filter UI — the live-filter convention
 

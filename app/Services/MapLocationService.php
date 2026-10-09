@@ -39,6 +39,19 @@ class MapLocationService
     // proper User-Agent and at most ~1 request/sec when backfilling.
     const GEOCODE_BASE = 'https://nominatim.openstreetmap.org/search';
 
+    // Every city is created *under a country*: the tenant already carries its
+    // country, so a fresh tenant of that country gets a sensible starting list
+    // even before any building exists. Cities actually used in the tenant's data
+    // are always merged in, so this is a floor, never a ceiling.
+    const COUNTRY_CITIES = [
+        'AE' => ['Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain', 'Al Ain'],
+        'SA' => ['Riyadh', 'Jeddah', 'Dammam', 'Mecca', 'Medina', 'Khobar'],
+        'QA' => ['Doha', 'Al Rayyan', 'Al Wakrah', 'Al Khor'],
+        'KW' => ['Kuwait City', 'Hawalli', 'Salmiya', 'Farwaniya'],
+        'BH' => ['Manama', 'Riffa', 'Muharraq', 'Hamad Town'],
+        'OM' => ['Muscat', 'Salalah', 'Sohar', 'Nizwa'],
+    ];
+
     /**
      * Strip surrounding whitespace and return the value only when it is a
      * real http(s) link. A bare host ("maps.google.com/...") is promoted to
@@ -331,6 +344,61 @@ class MapLocationService
         }
 
         return null;
+    }
+
+    /**
+     * Cities offered when a unit's building is created from the inventory
+     * picker: everything the tenant already uses, unioned with the starting
+     * list for the tenant's country so a new tenant still has choices.
+     */
+    public function citiesForTenant(int $tenantId, ?string $country = null): array
+    {
+        $cities = collect()
+            ->merge(Community::where('tenant_id', $tenantId)->whereNotNull('city')->pluck('city'))
+            ->merge(MapLocation::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNotNull('city')->pluck('city'))
+            ->merge(Property::withoutGlobalScopes()->where('tenant_id', $tenantId)->whereNotNull('city')->pluck('city'))
+            ->map(fn ($c) => trim((string) $c))
+            ->filter();
+
+        $key = strtoupper((string) $country);
+        foreach (self::COUNTRY_CITIES[$key] ?? [] as $city) {
+            $cities->push($city);
+        }
+
+        return $cities
+            ->unique(fn ($c) => mb_strtolower($c))
+            ->sortBy(fn ($c) => mb_strtolower($c))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The tenant's community for a name (normalized-exact), created when the
+     * first building under it is added. An existing community keeps its name;
+     * a missing city is filled in from the new context.
+     */
+    public function ensureCommunity(int $tenantId, string $name, ?string $city = null): Community
+    {
+        $name = trim($name);
+        $normalized = $this->normalizeName($name);
+
+        $existing = Community::where('tenant_id', $tenantId)
+            ->get(['id', 'name', 'city'])
+            ->first(fn ($c) => $this->normalizeName((string) $c->name) === $normalized);
+
+        if ($existing) {
+            if (! $existing->city && $city !== null && $city !== '') {
+                $existing->update(['city' => $city]);
+            }
+
+            return $existing;
+        }
+
+        return Community::create([
+            'tenant_id' => $tenantId,
+            'name' => $name,
+            'city' => $city !== null && $city !== '' ? $city : null,
+        ]);
     }
 
     /**
