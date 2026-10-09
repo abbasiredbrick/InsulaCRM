@@ -814,4 +814,71 @@ class InventoryMapLocationTest extends TestCase
             ->assertJsonPath('results.0.value', (string) MapLocation::withoutGlobalScopes()->firstOrFail()->id)
             ->assertJsonPath('results.0.label', 'Bey View Tower · Al Ryada · Abu Dhabi');
     }
+
+    public function test_creating_a_new_building_from_the_picker_creates_the_location_and_links_the_unit(): void
+    {
+        $this->post(route('inventory.store'), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'availability' => 'draft',
+            'map_location_id' => 'new:Zaya Tower',
+            'community' => 'Al Reem Island',
+            'city' => 'Abu Dhabi',
+            'unit_no' => 'B0801',
+            'bedrooms' => 2,
+            'rent_price' => 175000,
+        ])->assertRedirect();
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Zaya Tower')
+            ->first();
+
+        $this->assertNotNull($location);
+
+        $property = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('unit_no', 'B0801')
+            ->firstOrFail();
+
+        $this->assertSame($location->id, $property->map_location_id);
+        $this->assertSame('Zaya Tower', $property->sub_community);
+        $this->assertSame('Al Reem Island', $property->community);
+    }
+
+    public function test_creating_a_building_from_the_picker_folds_onto_a_case_insensitive_match(): void
+    {
+        $existing = $this->location('Zaya Tower', null, 'Zaya Tower', 'Al Reem Island', 'Abu Dhabi');
+
+        $this->post(route('inventory.store'), [
+            'intent' => 'rent',
+            'market_class' => 'ready',
+            'property_category' => 'apartment',
+            'availability' => 'draft',
+            'map_location_id' => 'new:zaya tower',
+            'unit_no' => 'B0802',
+            'bedrooms' => 1,
+            'rent_price' => 120000,
+        ])->assertRedirect();
+
+        $this->assertSame(1, MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Zaya Tower')
+            ->count());
+
+        $property = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('unit_no', 'B0802')
+            ->firstOrFail();
+
+        $this->assertSame($existing->id, $property->map_location_id);
+    }
+
+    public function test_the_building_picker_is_marked_creatable(): void
+    {
+        $this->get(route('inventory.create'))
+            ->assertOk()
+            ->assertSee('data-creatable="1"', false);
+    }
 }

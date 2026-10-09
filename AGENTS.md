@@ -166,6 +166,13 @@ on `properties` stay as snapshots.
   the typed city/community/sub-community server-side
   (`applyPickedBuilding`); the picker contract is what we will reuse to map
   units onto Bayut/PF portal locations.
+- The picker is **creatable** (`:creatable="true"`): when a search matches no
+  building it offers `Create "<typed>"`, which submits `map_location_id =
+  "new:<name>"` instead of an id. `applyPickedBuilding` turns that into
+  `ensureMapLocation()` (so a case/spacing variant folds onto the existing
+  building — never a duplicate) + `linkBuildingUnits()`, then treats it exactly
+  like a picked one. Only the New Unit building picker sets `creatable`; the
+  Bayut/lead pickers must not (their ids are external and cannot be invented).
 
 ## Search / Filter UI — the live-filter convention
 

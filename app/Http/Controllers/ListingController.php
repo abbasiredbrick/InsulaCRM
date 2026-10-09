@@ -574,9 +574,44 @@ class ListingController extends Controller
      */
     protected function applyPickedBuilding(Request $request, array $data): ?array
     {
+        $tenantId = auth()->user()->tenant_id;
+        $picked = (string) $request->input('map_location_id');
+
+        // The picker's "Create" row submits "new:<name>": a building the tenant
+        // has not mapped yet. Create (or de-dup onto) the location, then treat
+        // it exactly like a picked one.
+        if (str_starts_with($picked, 'new:')) {
+            $name = trim(substr($picked, 4));
+            if ($name === '') {
+                return null;
+            }
+
+            $maps = app(MapLocationService::class);
+            $location = $maps->ensureMapLocation(
+                $tenantId,
+                $name,
+                $data['community'] ?? null,
+                $data['city'] ?? null,
+                null
+            );
+
+            if (! $location) {
+                return null;
+            }
+
+            $maps->linkBuildingUnits($tenantId, $location->sub_community, $location);
+
+            $data['map_location_id'] = (int) $location->id;
+            $data['sub_community'] = $location->sub_community;
+            $data['community'] = $location->community ?: ($data['community'] ?? null);
+            $data['city'] = $location->city ?: ($data['city'] ?? null);
+
+            return $data;
+        }
+
         $location = MapLocation::withoutGlobalScopes()
-            ->where('tenant_id', auth()->user()->tenant_id)
-            ->find((int) $request->input('map_location_id'));
+            ->where('tenant_id', $tenantId)
+            ->find((int) $picked);
 
         if (! $location) {
             return null;

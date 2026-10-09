@@ -149,8 +149,10 @@
                                 :remote="$buildingSearchUrl ?? route('inventory.locations-search')"
                                 :placeholder="__('Choose / search a building...')"
                                 :search-placeholder="__('Type building, community or city...')"
+                                :creatable="true"
+                                :create-label="__('Create')"
                             />
-                            <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community below, and drives the map pin and portal listing location. A new name typed in Sub-community is created on save.') }}</div>
+                            <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community below, and drives the map pin and portal listing location. If the building is not listed, type its name and choose Create; it is added on save.') }}</div>
                         </div>
                         <div class="col-md-7">
                             <label class="form-label">{{ __('Address') }}</label>

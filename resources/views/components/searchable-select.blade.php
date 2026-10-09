@@ -8,6 +8,8 @@
     'invalid' => false,
     'remote' => '',
     'labelName' => '',
+    'creatable' => false,
+    'createLabel' => __('Create'),
 ])
 
 <div class="searchable-select" data-ss
@@ -15,6 +17,8 @@
     data-search-placeholder="{{ $searchPlaceholder }}"
     data-selected="{{ $selected }}"
     data-remote="{{ $remote }}"
+    data-creatable="{{ $creatable ? '1' : '' }}"
+    data-create-label="{{ $createLabel }}"
     data-options="{{ json_encode($options) }}">
     <button type="button" class="form-select searchable-select-field text-start {{ $invalid ? 'is-invalid' : '' }}" data-ss-field
         aria-haspopup="listbox" aria-expanded="false">
@@ -49,6 +53,7 @@
     }
     .searchable-select .ss-item:hover { background-color: var(--tblr-primary, #0054a6); color: #fff; }
     .searchable-select .ss-item.ss-item-selected { font-weight: 600; background-color: rgba(0, 0, 0, .05); }
+    .searchable-select .ss-item.ss-item-create { color: var(--tblr-primary, #0054a6); font-weight: 600; }
     .searchable-select .ss-empty { padding: .45rem .6rem; font-size: .875rem; }
 </style>
 
@@ -69,6 +74,8 @@
         const select = root.querySelector('[data-ss-select]');
         const labelInput = root.querySelector('[data-ss-label]');
         const remoteUrl = (root.dataset.remote || '').trim();
+        const creatable = root.dataset.creatable === '1';
+        const createLabel = (root.dataset.createLabel || '').trim() || 'Create';
 
         let options = [];
         try { options = JSON.parse(root.dataset.options || '[]'); } catch (e) { options = []; }
@@ -114,8 +121,10 @@
         }
 
         function render() {
-            const q = (filter.value || '').trim().toLowerCase();
+            const raw = (filter.value || '').trim();
+            const q = raw.toLowerCase();
             let html = '';
+            let visible = 0;
             let emptyText = '{{ __('No matches found.') }}';
             let rows = currentList();
             if (remoteUrl && q && isRemoteLoading) { html = '<div class="ss-empty text-muted">{{ __('Searching...') }}</div>'; emptyText = ''; }
@@ -124,9 +133,15 @@
                     let t;
                     try { t = String(o.label || ''); } catch (e) { t = ''; }
                     if (q && t.toLowerCase().indexOf(q) === -1) { return; }
+                    visible++;
                     const selected = String(o.value) === String(select.value);
                     html += '<div class="ss-item' + (selected ? ' ss-item-selected' : '') + '" data-value="' + escapeHtml(o.value) + '">' + escapeHtml(t) + '</div>';
                 });
+                if (creatable && q && visible === 0) {
+                    const label = escapeHtml(createLabel + ' "' + raw + '"');
+                    html += '<div class="ss-item ss-item-create" data-create="1" data-value="new:' + escapeHtml(raw) + '" data-label="' + escapeHtml(raw) + '">' + label + '</div>';
+                    emptyText = '';
+                }
             }
             list.innerHTML = html || (emptyText ? '<div class="ss-empty text-muted">' + emptyText + '</div>' : '');
         }
@@ -143,6 +158,25 @@
             refreshValueText();
             close();
             root.dispatchEvent(new CustomEvent('ss-change', { detail: value }));
+        }
+
+        function setCreated(name) {
+            name = String(name).trim();
+            if (!name) { return; }
+            const value = 'new:' + name;
+            ensureOption(value, name);
+            select.value = value;
+            if (labelInput) { labelInput.value = name; }
+            valueEl.textContent = name;
+            valueEl.classList.remove('text-muted');
+            close();
+            root.dispatchEvent(new CustomEvent('ss-change', { detail: value }));
+        }
+
+        function activateItem(item) {
+            if (!item) { return; }
+            if (item.dataset.create === '1') { setCreated(item.dataset.label); return; }
+            setValue(item.dataset.value);
         }
 
         function open() {
@@ -208,19 +242,22 @@
             if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); }
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (activeIndex >= 0 && items[activeIndex]) { setValue(items[activeIndex].dataset.value); }
-                else if (items.length) { setValue(items[0].dataset.value); }
+                if (activeIndex >= 0 && items[activeIndex]) { activateItem(items[activeIndex]); }
+                else if (items.length) { activateItem(items[0]); }
                 return;
             }
             if (activeIndex >= 0 && items[activeIndex]) {
-                items.forEach(function (el, i) { el.classList.toggle('ss-item-selected', String(el.dataset.value) === String(select.value) ? i === activeIndex : false); });
+                items.forEach(function (el, i) {
+                    const isSel = String(el.dataset.value) === String(select.value);
+                    el.classList.toggle('ss-item-selected', i === activeIndex || (activeIndex < 0 && isSel));
+                });
                 try { items[activeIndex].scrollIntoView({ block: 'nearest' }); } catch (e) {}
             }
         });
 
         list.addEventListener('click', function (e) {
             const item = e.target.closest ? e.target.closest('.ss-item') : null;
-            if (item) { setValue(item.dataset.value); }
+            if (item) { activateItem(item); }
         });
 
         document.addEventListener('click', function (e) {
