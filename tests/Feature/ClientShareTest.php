@@ -451,7 +451,7 @@ class ClientShareTest extends TestCase
             ->get('/s/test-company');
 
         $inventory->assertOk()
-            ->assertSee("\u{20C3}75,000")
+            ->assertSee('AED 75,000')
             ->assertDontSee('$75,000')
             ->assertSee('Max Rent (AED)');
     }

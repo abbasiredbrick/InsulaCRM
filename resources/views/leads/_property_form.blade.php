@@ -227,10 +227,10 @@ function calculateMAO() {
 
     if (arv && repair) {
         const mao = (arv * 0.70) - repair;
-        maoEl.textContent = '{{ Fmt::currencySymbol() }}' + mao.toLocaleString('{{ Fmt::jsLocale() }}', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        maoEl.textContent = '{{ Fmt::currencyPrefix() }}' + mao.toLocaleString('{{ Fmt::jsLocale() }}', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         maoEl.className = mao >= 0 ? 'h4 text-green' : 'h4 text-red';
     } else {
-        maoEl.textContent = '{{ Fmt::currencySymbol() }}0.00';
+        maoEl.textContent = '{{ Fmt::currencyPrefix() }}0.00';
         maoEl.className = 'h4';
     }
 }
@@ -244,10 +244,10 @@ function calculateAssignmentFee() {
         const mao = (arv * 0.70) - repair;
         const fee = mao - ourOffer;
         const feeEl = document.getElementById('assignment-fee');
-        feeEl.textContent = '{{ Fmt::currencySymbol() }}' + fee.toLocaleString('{{ Fmt::jsLocale() }}', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        feeEl.textContent = '{{ Fmt::currencyPrefix() }}' + fee.toLocaleString('{{ Fmt::jsLocale() }}', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         feeEl.className = fee >= 0 ? 'h4 text-green' : 'h4 text-red';
     } else {
-        document.getElementById('assignment-fee').textContent = '{{ Fmt::currencySymbol() }}0.00';
+        document.getElementById('assignment-fee').textContent = '{{ Fmt::currencyPrefix() }}0.00';
         document.getElementById('assignment-fee').className = 'h4';
     }
 }

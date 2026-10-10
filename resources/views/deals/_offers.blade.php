@@ -48,14 +48,14 @@
                             <div class="col-md-4">
                                 <label class="form-label required">{{ __('Offer Price') }}</label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text">$</span>
+                                    <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                                     <input type="number" name="offer_price" class="form-control" step="0.01" min="0" required>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">{{ __('Earnest Money') }}</label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text">$</span>
+                                    <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                                     <input type="number" name="earnest_money" class="form-control" step="0.01" min="0">
                                 </div>
                             </div>
@@ -199,7 +199,7 @@
                     </button>
                     <div class="offer-counter-input d-none align-items-center gap-2" id="offer-counter-{{ $offer->id }}">
                         <div class="input-group input-group-sm" style="width: 160px;">
-                            <span class="input-group-text">$</span>
+                            <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                             <input type="number" class="form-control offer-counter-price" data-offer-id="{{ $offer->id }}" step="0.01" min="0" placeholder="{{ __('Counter price') }}">
                         </div>
                         <button type="button" class="btn btn-sm btn-warning offer-counter-submit" data-offer-id="{{ $offer->id }}">{{ __('Send') }}</button>

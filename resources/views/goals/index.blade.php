@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         var label = metricLabels[goal.metric] || goal.metric;
                         var period = periodLabels[goal.period] || goal.period;
                         var targetDisplay = goal.metric === 'revenue_earned'
-                            ? '$' + parseFloat(goal.target_value).toLocaleString()
+                            ? '{{ Fmt::currencyPrefix() }}' + parseFloat(goal.target_value).toLocaleString()
                             : parseFloat(goal.target_value).toLocaleString();
                         html += '<label class="d-flex align-items-start gap-2 p-2 border rounded mb-2" style="cursor: pointer;">';
                         html += '<input type="checkbox" class="form-check-input mt-1 ai-goal-check" data-index="' + i + '" checked>';

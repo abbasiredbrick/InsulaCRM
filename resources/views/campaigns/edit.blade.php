@@ -49,7 +49,7 @@
                 <div class="col-md-4">
                     <label class="form-label">{{ __('Budget') }}</label>
                     <div class="input-group">
-                        <span class="input-group-text">$</span>
+                        <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                         <input type="number" name="budget" class="form-control @error('budget') is-invalid @enderror" value="{{ old('budget', $campaign->budget) }}" step="0.01" min="0" placeholder="0.00">
                     </div>
                     @error('budget') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -57,7 +57,7 @@
                 <div class="col-md-4">
                     <label class="form-label">{{ __('Actual Spend') }}</label>
                     <div class="input-group">
-                        <span class="input-group-text">$</span>
+                        <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                         <input type="number" name="actual_spend" class="form-control @error('actual_spend') is-invalid @enderror" value="{{ old('actual_spend', $campaign->actual_spend) }}" step="0.01" min="0" placeholder="0.00">
                     </div>
                     @error('actual_spend') <div class="invalid-feedback">{{ $message }}</div> @enderror

@@ -555,13 +555,11 @@
     const baseUrl = '{{ url("/pipeline") }}';
     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
     const stageProbs = @json($stageProbs);
+    const currencyPrefix = '{{ Fmt::currencyPrefix() }}';
     const currencyFmt = () => (typeof Intl !== 'undefined')
-        ? new Intl.NumberFormat(undefined, { style: 'currency', currency: '{{ Fmt::currencyCode() }}', maximumFractionDigits: 0 })
-        : null;
-    const fmt = (v) => {
-        const f = currencyFmt();
-        return f ? f.format(v || 0) : '$' + Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
-    };
+        ? new Intl.NumberFormat('{{ Fmt::jsLocale() }}', { maximumFractionDigits: 0 })
+        : { format: (v) => Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 0 }) };
+    const fmt = (v) => currencyPrefix + currencyFmt().format(v || 0);
 
     let dragDealId = null;
     let dragSourceStage = null;
@@ -1065,14 +1063,14 @@
                     var newPriceEl = card.querySelector('[data-field="contract_price"]');
                     if (newPriceEl && contractPrice) {
                         newPriceEl.dataset.rawValue = contractPrice;
-                        newPriceEl.textContent = '$' + Number(contractPrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                        newPriceEl.textContent = fmt(contractPrice);
                     }
 
                     // Update fee display (assignment_fee or total_commission based on mode)
                     var newFeeEl = card.querySelector('[data-field="' + feeName + '"]');
                     if (newFeeEl && feeValue) {
                         newFeeEl.dataset.rawValue = feeValue;
-                        newFeeEl.textContent = '$' + Number(feeValue).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                        newFeeEl.textContent = fmt(feeValue);
                     }
 
                     // Reflect the change in the card's stat datums + column totals

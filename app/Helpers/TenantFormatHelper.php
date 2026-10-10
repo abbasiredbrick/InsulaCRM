@@ -32,8 +32,8 @@ class TenantFormatHelper
         'CZK' => 'Kč',
         'HUF' => 'Ft',
         'RON' => 'lei',
-        'AED' => "\u{20C3}",
-        'SAR' => '﷼',
+        'AED' => 'AED',
+        'SAR' => 'SAR',
         'PHP' => '₱',
         'THB' => '฿',
         'IDR' => 'Rp',
@@ -114,13 +114,12 @@ class TenantFormatHelper
     {
         $tenant = static::tenant();
         $code = $tenant->currency ?? 'USD';
-        $symbol = static::$currencySymbols[$code] ?? $code;
 
         if (in_array($code, static::$zeroDecimalCurrencies)) {
             $decimals = 0;
         }
 
-        return $symbol.number_format($amount ?? 0, $decimals);
+        return static::currencyPrefix().number_format($amount ?? 0, $decimals);
     }
 
     /**
@@ -132,6 +131,19 @@ class TenantFormatHelper
         $code = $tenant->currency ?? 'USD';
 
         return static::$currencySymbols[$code] ?? $code;
+    }
+
+    /**
+     * The symbol followed by a space when it is a word/code rather than a
+     * glyph, so "AED" reads as "AED 1,200" while "$" stays "$1,200". Every
+     * currency renderer (PHP and the inline JS) must use this, not the bare
+     * symbol, or amounts drift between screens.
+     */
+    public static function currencyPrefix(): string
+    {
+        $symbol = static::currencySymbol();
+
+        return preg_match('/[A-Za-z0-9]$/', $symbol) ? $symbol.' ' : $symbol;
     }
 
     /**
@@ -381,8 +393,8 @@ class TenantFormatHelper
             'CZK' => 'CZK (Kč)',
             'HUF' => 'HUF (Ft)',
             'RON' => 'RON (lei)',
-            'AED' => 'AED ('."\u{20C3}".')',
-            'SAR' => 'SAR (﷼)',
+            'AED' => 'AED',
+            'SAR' => 'SAR',
             'PHP' => 'PHP (₱)',
             'THB' => 'THB (฿)',
             'IDR' => 'IDR (Rp)',

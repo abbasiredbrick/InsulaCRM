@@ -377,7 +377,7 @@ loadWidget('pipeline', document.getElementById('pipeline-value'), function(data,
                             <span class="legend-dot ${info.color} me-2"></span>
                             <span>${info.label}</span>
                         </span>
-                        <span class="fw-bold">{{ Fmt::currencySymbol() }}${val.toLocaleString('{{ Fmt::jsLocale() }}')}</span>
+                        <span class="fw-bold">{{ Fmt::currencyPrefix() }}${val.toLocaleString('{{ Fmt::jsLocale() }}')}</span>
                     </div>
                     <div class="progress progress-sm">
                         <div class="progress-bar ${info.color}" style="width: ${pct}%" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -478,16 +478,16 @@ loadWidget('pipeline', document.getElementById('pipeline-value'), function(data,
 loadWidget('lead_source_roi', document.getElementById('lead-source-roi-container'), function(data, el) {
     if (data.leadSourceROI && data.leadSourceROI.length) {
         let html = '<div class="table-responsive"><table class="table table-vcenter card-table table-sm">';
-        html += '<thead><tr><th>{{ __('Source') }}</th><th>{{ __('Leads') }}</th><th>{{ __('Closed') }}</th><th>{{ __('Budget') }}</th><th>{{ __('$/Lead') }}</th><th>{{ __('$/Deal') }}</th></tr></thead><tbody>';
+        html += '<thead><tr><th>{{ __('Source') }}</th><th>{{ __('Leads') }}</th><th>{{ __('Closed') }}</th><th>{{ __('Budget') }}</th><th>{{ Fmt::currencySymbol() }}/{{ __('Lead') }}</th><th>{{ Fmt::currencySymbol() }}/{{ __('Deal') }}</th></tr></thead><tbody>';
         data.leadSourceROI.forEach(row => {
             const sourceName = row.source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             html += '<tr>' +
                 '<td>' + sourceName + '</td>' +
                 '<td>' + row.leads + '</td>' +
                 '<td>' + row.closed + '</td>' +
-                '<td>$' + Number(row.budget).toLocaleString('{{ Fmt::jsLocale() }}') + '</td>' +
-                '<td>' + (row.cost_per_lead > 0 ? '{{ Fmt::currencySymbol() }}' + row.cost_per_lead.toFixed(2) : '-') + '</td>' +
-                '<td>' + (row.cost_per_deal > 0 ? '{{ Fmt::currencySymbol() }}' + row.cost_per_deal.toFixed(2) : '-') + '</td>' +
+                '<td>{{ Fmt::currencyPrefix() }}' + Number(row.budget).toLocaleString('{{ Fmt::jsLocale() }}') + '</td>' +
+                '<td>' + (row.cost_per_lead > 0 ? '{{ Fmt::currencyPrefix() }}' + row.cost_per_lead.toFixed(2) : '-') + '</td>' +
+                '<td>' + (row.cost_per_deal > 0 ? '{{ Fmt::currencyPrefix() }}' + row.cost_per_deal.toFixed(2) : '-') + '</td>' +
                 '</tr>';
         });
         html += '</tbody></table></div>';

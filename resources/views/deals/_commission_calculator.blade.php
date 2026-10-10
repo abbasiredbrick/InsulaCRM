@@ -95,13 +95,14 @@ document.addEventListener('DOMContentLoaded', function() {
     var calcSaveBtn = document.getElementById('calc-save-btn');
 
     var jsLocale = '{{ Fmt::jsLocale() }}';
-    var currencyCode = '{{ Fmt::currencyCode() }}';
+    var currencySymbol = '{{ Fmt::currencyPrefix() }}';
 
     function formatCurrency(value) {
+        var n = Number(value) || 0;
         try {
-            return new Intl.NumberFormat(jsLocale, { style: 'currency', currency: currencyCode, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+            return currencySymbol + n.toLocaleString(jsLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         } catch (e) {
-            return '$' + value.toFixed(2);
+            return currencySymbol + n.toFixed(2);
         }
     }
 

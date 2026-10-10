@@ -20,6 +20,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        \App\Helpers\TenantFormatHelper::forgetTenant();
+
         if (! file_exists(storage_path('installed.lock'))) {
             file_put_contents(storage_path('installed.lock'), now()->toIso8601String());
             $this->installedLockCreated = true;

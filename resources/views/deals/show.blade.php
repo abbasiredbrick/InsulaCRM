@@ -669,7 +669,7 @@ if (window.trackRecentlyViewed) {
     var briefingLinks = document.getElementById('deal-briefing-links');
     if (!briefingText) return;
     var csrfTkn = document.querySelector('meta[name="csrf-token"]').content;
-    var fmtCur = function(v) { return v ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v) : ''; };
+    var fmtCur = function(v) { return v ? '{{ Fmt::currencyPrefix() }}' + Number(v).toLocaleString('{{ Fmt::jsLocale() }}', { maximumFractionDigits: 0 }) : ''; };
 
     var typeLabels = { deal: '{{ ($businessMode ?? "wholesale") === "realestate" ? __("Transaction") : __("Deal") }}', lead: '{{ __("Lead") }}', buyer: '{{ ($businessMode ?? "wholesale") === "realestate" ? __("Client") : __("Buyer") }}', property: '{{ __("Property") }}' };
     var typeColors = { deal: 'bg-blue-lt', lead: 'bg-green-lt', buyer: 'bg-orange-lt', property: 'bg-cyan-lt' };

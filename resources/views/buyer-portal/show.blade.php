@@ -348,7 +348,7 @@
                         <div class="col-md-6">
                             <label class="form-label">{{ __('Max Purchase Price') }}</label>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text">{{ Fmt::currencySymbol() }}</span>
                                 <input type="number" name="max_purchase_price" class="form-control @error('max_purchase_price') is-invalid @enderror" value="{{ old('max_purchase_price') }}" min="0" step="1000">
                             </div>
                             @error('max_purchase_price')

@@ -24,6 +24,8 @@ class BuyerPortalController extends Controller
             abort(404);
         }
 
+        \App\Helpers\TenantFormatHelper::setTenant($tenant);
+
         $properties = $this->getAvailableProperties($tenant);
 
         return view('buyer-portal.show', [
@@ -47,10 +49,10 @@ class BuyerPortalController extends Controller
 
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
-            'last_name'  => 'required|string|max:255',
-            'email'      => 'required|email|max:255',
-            'phone'      => 'nullable|string|max:20',
-            'company'    => 'nullable|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'phone' => 'nullable|string|max:20',
+            'company' => 'nullable|string|max:255',
             'max_purchase_price' => 'nullable|numeric|min:0',
             'preferred_property_types' => 'nullable|array',
             'preferred_property_types.*' => 'string|max:50',
@@ -80,16 +82,16 @@ class BuyerPortalController extends Controller
         }
 
         $buyer = Buyer::withoutGlobalScopes()->create([
-            'tenant_id'               => $tenant->id,
-            'first_name'              => $validated['first_name'],
-            'last_name'               => $validated['last_name'],
-            'email'                   => $validated['email'],
-            'phone'                   => $validated['phone'] ?? null,
-            'company'                 => $validated['company'] ?? null,
-            'max_purchase_price'      => $validated['max_purchase_price'] ?? null,
+            'tenant_id' => $tenant->id,
+            'first_name' => $validated['first_name'],
+            'last_name' => $validated['last_name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+            'company' => $validated['company'] ?? null,
+            'max_purchase_price' => $validated['max_purchase_price'] ?? null,
             'preferred_property_types' => $validated['preferred_property_types'] ?? [],
-            'preferred_zip_codes'     => $zipCodes,
-            'notes'                   => $validated['notes'] ?? null,
+            'preferred_zip_codes' => $zipCodes,
+            'notes' => $validated['notes'] ?? null,
         ]);
 
         // Notify tenant admin(s) about the new buyer registration
@@ -136,18 +138,18 @@ class BuyerPortalController extends Controller
         return response()->json([
             'properties' => $properties->map(function ($property) {
                 return [
-                    'id'            => $property->id,
-                    'address'       => $property->address,
-                    'city'          => $property->city,
-                    'state'         => $property->state,
-                    'zip_code'      => $property->zip_code,
+                    'id' => $property->id,
+                    'address' => $property->address,
+                    'city' => $property->city,
+                    'state' => $property->state,
+                    'zip_code' => $property->zip_code,
                     'property_type' => $property->property_type,
-                    'bedrooms'      => $property->bedrooms,
-                    'bathrooms'     => $property->bathrooms,
+                    'bedrooms' => $property->bedrooms,
+                    'bathrooms' => $property->bathrooms,
                     'square_footage' => $property->square_footage,
-                    'year_built'    => $property->year_built,
+                    'year_built' => $property->year_built,
                     'estimated_value' => $property->estimated_value,
-                    'condition'     => $property->condition,
+                    'condition' => $property->condition,
                 ];
             }),
         ]);

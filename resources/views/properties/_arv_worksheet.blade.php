@@ -312,7 +312,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     var csrf = document.querySelector('meta[name="csrf-token"]').content;
     var propertyId = {{ $property->id }};
-    var currencySymbol = '{{ Fmt::currencySymbol() }}';
+    var currencySymbol = '{{ Fmt::currencyPrefix() }}';
     var jsLocale = '{{ Fmt::jsLocale() }}';
 
     // Initialize tooltips
