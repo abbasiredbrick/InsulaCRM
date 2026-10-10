@@ -191,10 +191,12 @@
         if (building) { setTimeout(function () { building.focus(); }, 150); }
     });
 
-    // Opened by the inventory building picker's "Create" row.
+    // Opened by the inventory building picker's "Create" row. Only react to the
+    // picker wired to THIS modal (a page may host more than one create-modal).
     document.addEventListener('ss-create', function (e) {
         var name = e.detail && e.detail.name;
         if (!name) { return; }
+        if (e.detail && e.detail.modal && e.detail.modal !== '#' + modalEl.id) { return; }
         window.__ssCreateName = name;
         if (window.bootstrap && window.bootstrap.Modal) {
             window.bootstrap.Modal.getOrCreateInstance(modalEl).show();

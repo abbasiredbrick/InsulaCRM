@@ -84,6 +84,9 @@
                         <li class="nav-item">
                             <a href="{{ route('settings.map-locations.index') }}" class="nav-link">{{ __('Locations') }}</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="{{ route('settings.owners.index') }}" class="nav-link">{{ __('Owners') }}</a>
+                        </li>
                         @endif
                         <li class="nav-item">
                             <a href="#tab-storage" class="nav-link" data-bs-toggle="tab">{{ __('Storage') }}</a>

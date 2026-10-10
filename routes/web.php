@@ -49,6 +49,7 @@ use App\Http\Controllers\OfferSignatureController;
 use App\Http\Controllers\OfferVerificationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OpenHouseController;
+use App\Http\Controllers\OwnerController;
 use App\Http\Controllers\PdfExportController;
 use App\Http\Controllers\PluginController;
 use App\Http\Controllers\PortalIntegrationController;
@@ -352,6 +353,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/inventory/locations/search', [MapLocationController::class, 'searchBuildings'])->name('inventory.locations-search');
         Route::get('/inventory/locations/create', [ListingController::class, 'locationCreate'])->name('inventory.locations-create');
         Route::post('/inventory/locations', [ListingController::class, 'locationStore'])->name('inventory.locations-store');
+        Route::get('/inventory/owners/search', [OwnerController::class, 'search'])->name('inventory.owners-search');
+        Route::post('/inventory/owners', [ListingController::class, 'ownerStore'])->name('inventory.owners-store');
         Route::post('/inventory/{property}/push/{portal}', [ListingController::class, 'pushToPortal'])
             ->whereIn('portal', ['bayut', 'propertyfinder'])
             ->name('inventory.push');
@@ -855,6 +858,12 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::post('/settings/locations/communities/merge', [MapLocationController::class, 'mergeCommunities'])->name('settings.map-locations.communities.merge');
         Route::put('/settings/locations/communities/{community}', [MapLocationController::class, 'updateCommunity'])->name('settings.map-locations.communities.update');
         Route::delete('/settings/locations/communities/{community}', [MapLocationController::class, 'destroyCommunity'])->name('settings.map-locations.communities.destroy');
+
+        // Owners (landlords master)
+        Route::get('/settings/owners', [OwnerController::class, 'index'])->name('settings.owners.index');
+        Route::post('/settings/owners', [OwnerController::class, 'store'])->name('settings.owners.store');
+        Route::put('/settings/owners/{owner}', [OwnerController::class, 'update'])->name('settings.owners.update');
+        Route::delete('/settings/owners/{owner}', [OwnerController::class, 'destroy'])->name('settings.owners.destroy');
 
         // Document Templates (admin manages templates)
         Route::get('/document-templates', [DocumentTemplateController::class, 'index'])->name('document-templates.index');

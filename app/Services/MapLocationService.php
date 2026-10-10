@@ -156,11 +156,25 @@ class MapLocationService
      */
     public function wazeUrl(MapLocation $location): ?string
     {
-        if ($location->latitude !== null && $location->longitude !== null) {
-            return self::WAZE_BASE.'?ll='.rtrim(rtrim(sprintf('%.7f', $location->latitude), '0'), '.').','.rtrim(rtrim(sprintf('%.7f', $location->longitude), '0'), '.').'&navigate=yes';
+        return $this->wazeUrlFor(
+            $location->latitude,
+            $location->longitude,
+            $location->map_query ?: $this->queryForLocation($location)
+        );
+    }
+
+    /**
+     * Driving link built from a pinned coordinate pair or a query text — the
+     * shared primitive behind MapLocation and Owner. Waze starts navigating
+     * from wherever the visitor is.
+     */
+    public function wazeUrlFor(?float $latitude, ?float $longitude, ?string $query): ?string
+    {
+        if ($latitude !== null && $longitude !== null) {
+            return self::WAZE_BASE.'?ll='.rtrim(rtrim(sprintf('%.7f', $latitude), '0'), '.').','.rtrim(rtrim(sprintf('%.7f', $longitude), '0'), '.').'&navigate=yes';
         }
 
-        $query = trim((string) ($location->map_query ?: $this->queryForLocation($location)));
+        $query = trim((string) $query);
 
         return $query === '' ? null : self::WAZE_BASE.'?q='.rawurlencode($query).'&navigate=yes';
     }

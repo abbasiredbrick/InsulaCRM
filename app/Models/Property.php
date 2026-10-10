@@ -133,6 +133,7 @@ class Property extends Model
         'availability',
         'assigned_agent_id',
         'assign_leads_to_owner',
+        'owner_id',
         'owner_name',
         'owner_phone',
         'owner_email',
@@ -230,6 +231,15 @@ class Property extends Model
     public function mapLocation()
     {
         return $this->belongsTo(MapLocation::class, 'map_location_id');
+    }
+
+    /**
+     * The unit's owner/landlord (the owners master). owner_name/phone/email on
+     * this row stay snapshots so existing search and offer letters keep working.
+     */
+    public function owner()
+    {
+        return $this->belongsTo(Owner::class, 'owner_id');
     }
 
     public function media()

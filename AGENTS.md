@@ -219,6 +219,56 @@ on `properties` stay as snapshots.
   API/legacy path (its `city` is pinned to `citiesForTenant()`); the in-app
   picker now uses the modal instead.
 
+## Owners (landlords) — the unit-form picker + Settings → Owners master
+
+Owners mirror Locations' shape: a per-tenant master so the same landlord is
+entered once instead of being retyped (and drifting) on every unit.
+
+- Schema: `owners` (tenant_id, name, phone, email, office_address, `map_url`
+  TEXT, map_query, latitude, longitude) and `properties.owner_id` FK
+  (`nullOnDelete`). The `owner_name`/`owner_phone`/`owner_email` strings on a
+  unit stay **snapshots** — they are what inventory search, offer letters and
+  exports read; the FK is the source of truth for management. As with
+  `MapLocation`/`Community`, `Owner` has **no `TenantScope`** — tenancy is an
+  explicit `where('tenant_id', …)` everywhere (`OwnerService`,
+  `OwnerController::owned()`), and route-bound owners are never trusted
+  tenant-scoped.
+- `UnitLeadAssignmentService::unitOwner()`/`assign_leads_to_owner` is a
+  **different concept** (which agent handles the unit's leads). The new
+  `Property::owner()` relation is the landlord record. Do not conflate them.
+- De-dup is **normalized-exact on name** (`OwnerService::normalizeName()` —
+  case/whitespace-insensitive) with the canonical phone as the secondary key
+  (`findByPhone` via `ContactNormalizer::phone()`), matching Locations. There
+  is deliberately **no DB unique** on the name: two different people can share
+  a name, so the merge is a UI/human choice, not a constraint. **Richer data
+  wins, weaker never overwrites** — `findOrCreate()` tops up only fields the
+  existing row is missing (name/phone/email/office_address).
+- **Adopting legacy units:** the migration `…_add_owner_id_to_properties`
+  backfills owners from the existing free-text `owner_name` (normalized group,
+  first non-empty phone/email wins), and `OwnerService::linkUnitsByName()`
+  adopts any still-unlinked unit whose `owner_name` matches when an owner is
+  created/imported — so an existing inventory folds onto the master without a
+  re-import. `OwnerService::cascadeToUnits()` copies an edited owner back onto
+  every linked unit's snapshot columns.
+- Office location reuses the Locations machinery: `setOfficeLocation()` accepts
+  a pasted Google Maps URL or a typed address, runs it through
+  `MapLocationService::cleanUrl()`/`searchUrl()`/`coordsFromUrl()`/`geocode()`
+  and stores the pin, so `Owner::mapsSearchUrl()`/`mapsDirectionsUrl()`/
+  `wazeUrl()` all resolve. `MapLocationService::wazeUrlFor()` is the shared
+  helper (both `MapLocation` and `Owner` delegate to it).
+- **UI:** Settings → Owners (`settings.owners.*`, admin-only) is the CRUD list
+  with the header **Add Owner** and per-row edit modals. The shared
+  `x-add-owner-modal` is also embedded on the inventory **New Unit**/**Edit**
+  forms, opened by the owner picker's **Create "<name>"** row via
+  `x-searchable-select`'s `:create-modal` (the `ss-create` event + the stashed
+  `window.__ssCreateName`); the `ss-create` listener guards on
+  `e.detail.modal === '#'+modalEl.id` so multiple create-modals don't all open.
+  The picker is `owner_id` (`inventory.owners-search` → `{results:[{value,label}]}`)
+  with name/phone/email snapshot fields that go readonly once an owner is
+  picked (`#ownerFormData` JSON + an `ss-change` sync). The agent-accessible
+  `inventory.owners-store` creates from the modal and redirects to `return`
+  flashing `owner_id` so the picker preselects the new owner.
+
 ## Search / Filter UI — the live-filter convention
 
 All list/board screens (leads table & kanban, inventory, Scheduling Hub) use the
@@ -382,7 +432,7 @@ Product name is **Keystone** (never the legacy name). Driven by server-env
 ## Test conventions
 
 Portals/wholesale use `business_mode` (=`realestate`), roles fixtures live in
-the base `TestCase`. Full suite is green: **1059 tests / 3414 assertions**,
+the base `TestCase`. Full suite is green: **1419 tests / 4976 assertions**,
 with the exceptions listed below.
 Keep it green; a few tests fail occasionally mid-suite (a different one each
 run) — `FollowupFeedbackTest::test_quick_log_posts_the_selected_card_type`,

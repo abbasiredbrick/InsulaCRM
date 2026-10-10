@@ -228,18 +228,39 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <label class="form-label">{{ __('Owner name') }}</label>
-                            <input type="text" name="owner_name" class="form-control" value="{{ old('owner_name', $property->owner_name) }}">
+                            <label class="form-label">{{ __('Owner') }}</label>
+                            <x-searchable-select
+                                name="owner_id"
+                                :options="$ownerOptions ?? []"
+                                :selected="(string) old('owner_id', $property->owner_id ?? '')"
+                                :remote="route('inventory.owners-search')"
+                                :placeholder="__('Choose / search an owner...')"
+                                :search-placeholder="__('Type owner name, phone or email...')"
+                                :creatable="true"
+                                :create-label="__('Create')"
+                                :create-modal="'#addOwnerModal'"
+                            />
+                            <div class="form-hint">{{ __('Pick an existing owner — their details fill in below. If they are not listed, choose Create to add them first.') }}</div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">{{ __('Owner phone') }}</label>
-                            <input type="text" name="owner_phone" class="form-control" value="{{ old('owner_phone', $property->owner_phone) }}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">{{ __('Owner email') }}</label>
-                            <input type="email" name="owner_email" class="form-control" value="{{ old('owner_email', $property->owner_email) }}">
+                        <div class="col-md-8">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('Owner name') }}</label>
+                                    <input type="text" name="owner_name" data-owner-name class="form-control" value="{{ old('owner_name', $property->owner_name) }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('Owner phone') }}</label>
+                                    <input type="text" name="owner_phone" data-owner-phone class="form-control" value="{{ old('owner_phone', $property->owner_phone) }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ __('Owner email') }}</label>
+                                    <input type="email" name="owner_email" data-owner-email class="form-control" value="{{ old('owner_email', $property->owner_email) }}">
+                                </div>
+                            </div>
+                            <div class="form-hint mt-1">{{ __('These are kept in step with the owner you pick. Manage office address and map location in Settings → Owners.') }}</div>
                         </div>
                     </div>
+                    <script type="application/json" id="ownerFormData">@json($ownerData ?? [])</script>
                 </div>
             </div>
 
@@ -327,7 +348,76 @@
     :return-path="request()->getRequestUri()"
 />
 
+<x-add-owner-modal
+    :action="route('inventory.owners-store')"
+    :return-path="request()->getRequestUri()"
+/>
+
 @push('scripts')
+<script>
+(function () {
+    var dataEl = document.getElementById('ownerFormData');
+    var ownerData = {};
+    try { ownerData = JSON.parse(dataEl ? dataEl.textContent : '{}'); } catch (e) { ownerData = {}; }
+    if (dataEl) { dataEl.remove(); }
+
+    function fields() {
+        return {
+            name: document.querySelector('[data-owner-name]'),
+            phone: document.querySelector('[data-owner-phone]'),
+            email: document.querySelector('[data-owner-email]'),
+        };
+    }
+
+    function setReadonly(on) {
+        var f = fields();
+        if (f.name) { f.name.readOnly = on; }
+        if (f.phone) { f.phone.readOnly = on; }
+        if (f.email) { f.email.readOnly = on; }
+    }
+
+    function fill(owner) {
+        var f = fields();
+        if (f.name) { f.name.value = owner.name || ''; }
+        if (f.phone) { f.phone.value = owner.phone || ''; }
+        if (f.email) { f.email.value = owner.email || ''; }
+    }
+
+    function onChange(e) {
+        var value = e && e.detail != null ? String(e.detail) : '';
+        var owner = ownerData[value];
+        if (owner) {
+            fill(owner);
+            setReadonly(true);
+        } else {
+            // "" (cleared) or "new:<name>" (create flow) — keep fields editable.
+            setReadonly(false);
+        }
+    }
+
+    function rootEl() {
+        var sel = document.querySelector('[data-ss] select[name="owner_id"]');
+        return sel ? sel.closest('[data-ss]') : null;
+    }
+
+    function boot() {
+        var root = rootEl();
+        if (!root || root.dataset.ownerBound === '1') { return; }
+        root.dataset.ownerBound = '1';
+        root.addEventListener('ss-change', onChange);
+        var sel = root.querySelector('select[name="owner_id"]');
+        if (sel && sel.value && ownerData[String(sel.value)]) { setReadonly(true); }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+    document.addEventListener('insulacrm:live-updated', boot);
+    setTimeout(boot, 400);
+})();
+</script>
 <script>
     // Studio is a size, not a category: it is stored as bedrooms = 0 and the
     // unit stays an apartment. Ticking Studio writes 0; unticking clears the

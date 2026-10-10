@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Community;
 use App\Models\MapLocation;
+use App\Models\Owner;
 use App\Models\Property;
 use App\Models\PropertyMedia;
 use App\Services\MapLocationService;
+use App\Services\OwnerService;
 use App\Support\InventorySearchParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -404,6 +406,8 @@ class ListingController extends Controller
             'building_search_url' => route('inventory.locations-search'),
             'cities' => $this->citiesForLocationForm(),
             'communities' => $this->communitiesForLocationForm(),
+            'owner_options' => $this->ownerOptions(),
+            'owner_data' => $this->ownerFormData(),
         ]);
     }
 
@@ -462,6 +466,45 @@ class ListingController extends Controller
     }
 
     /**
+     * Persist an owner created from the inventory unit form's "Add Owner" modal,
+     * then send the user back to the unit form with that owner preselected.
+     * Same de-dup as Settings → Owners (normalized-exact on name/phone).
+     */
+    public function ownerStore(Request $request)
+    {
+        $tenantId = auth()->user()->tenant_id;
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:50',
+            'email' => 'nullable|email|max:190',
+            'office_address' => 'nullable|string|max:255',
+            'office_location' => 'nullable|string|max:1000',
+        ]);
+
+        $owners = app(OwnerService::class);
+        $result = $owners->findOrCreate($tenantId, $data);
+        $owner = $result['owner'];
+
+        app(OwnerService::class)->setOfficeLocation($owner, $request->input('office_location'));
+
+        if (! $result['reused']) {
+            $owners->linkUnitsByName($owner);
+        }
+
+        return redirect($this->safeInventoryReturn($request->input('return')))
+            ->withInput([
+                'owner_id' => (int) $owner->id,
+                'owner_name' => $owner->name,
+                'owner_phone' => $owner->phone,
+                'owner_email' => $owner->email,
+            ])
+            ->with('success', $result['reused']
+                ? __('":name" already exists — it was reused, not duplicated.', ['name' => $owner->name])
+                : __('Owner ":name" created.', ['name' => $owner->name]));
+    }
+
+    /**
      * Only allow returning to a path on this app (never an absolute/off-site URL).
      */
     protected function safeInventoryReturn(?string $url): string
@@ -483,6 +526,13 @@ class ListingController extends Controller
             $data = $this->applyPickedBuilding($request, $data);
             if ($data === null) {
                 return back()->withErrors(['map_location_id' => __('Pick a building from the list.')])->withInput();
+            }
+        }
+
+        if ($request->filled('owner_id')) {
+            $data = $this->applyPickedOwner($request, $data);
+            if ($data === null) {
+                return back()->withErrors(['owner_id' => __('Pick an owner from the list.')])->withInput();
             }
         }
 
@@ -561,6 +611,8 @@ class ListingController extends Controller
             'building_search_url' => route('inventory.locations-search'),
             'cities' => $this->citiesForLocationForm(),
             'communities' => $this->communitiesForLocationForm(),
+            'owner_options' => $this->ownerOptions(),
+            'owner_data' => $this->ownerFormData(),
         ]);
     }
 
@@ -572,6 +624,13 @@ class ListingController extends Controller
             $data = $this->applyPickedBuilding($request, $data);
             if ($data === null) {
                 return back()->withErrors(['map_location_id' => __('Pick a building from the list.')])->withInput();
+            }
+        }
+
+        if ($request->filled('owner_id')) {
+            $data = $this->applyPickedOwner($request, $data);
+            if ($data === null) {
+                return back()->withErrors(['owner_id' => __('Pick an owner from the list.')])->withInput();
             }
         }
 
@@ -749,6 +808,86 @@ class ListingController extends Controller
         return Community::where('tenant_id', auth()->user()->tenant_id)
             ->orderBy('name')
             ->get(['name', 'city']);
+    }
+
+    /**
+     * Existing owners offered by the unit form's owner picker as initial
+     * options (remote search still runs while typing).
+     */
+    protected function ownerOptions(): array
+    {
+        return Owner::where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone'])
+            ->map(function (Owner $owner) {
+                $label = $owner->name;
+                if ($owner->phone) {
+                    $label .= ' · '.$owner->phone;
+                }
+
+                return ['value' => (string) $owner->id, 'label' => $label];
+            })
+            ->all();
+    }
+
+    /**
+     * Owner details keyed by id, embedded for the unit form so selecting an
+     * owner fills the name/phone/email fields without a round-trip.
+     */
+    protected function ownerFormData(): array
+    {
+        return Owner::where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone', 'email'])
+            ->mapWithKeys(fn (Owner $owner) => [
+                (string) $owner->id => [
+                    'name' => (string) $owner->name,
+                    'phone' => (string) $owner->phone,
+                    'email' => (string) $owner->email,
+                ],
+            ])
+            ->all();
+    }
+
+    /**
+     * Resolve the picked owner (or the picker's "new:<name>" row) onto the unit:
+     * the owner's details are authoritative and overwrite the snapshot columns.
+     * An empty picker value keeps the legacy free-text owner.
+     */
+    protected function applyPickedOwner(Request $request, array $data): ?array
+    {
+        $tenantId = auth()->user()->tenant_id;
+        $picked = (string) ($request->input('owner_id') ?? '');
+
+        if ($picked === '') {
+            $data['owner_id'] = null;
+
+            return $data;
+        }
+
+        $owners = app(OwnerService::class);
+
+        if (str_starts_with($picked, 'new:')) {
+            $name = trim(substr($picked, 4));
+            if ($name === '') {
+                return null;
+            }
+            $result = $owners->findOrCreate($tenantId, ['name' => $name]);
+            $owner = $result['owner'];
+        } else {
+            $owner = Owner::where('tenant_id', $tenantId)->find((int) $picked);
+        }
+
+        if (! $owner) {
+            return null;
+        }
+
+        $data['owner_id'] = (int) $owner->id;
+        $data['owner_name'] = $owner->name;
+        $data['owner_phone'] = $owner->phone;
+        $data['owner_email'] = $owner->email;
+
+        return $data;
     }
 
     public function destroy(Request $request, Property $property)
@@ -1215,6 +1354,7 @@ class ListingController extends Controller
             'availability' => 'required|in:draft,ready_to_list,upcoming,listed,reserved,leased,sold,unlisted',
             'assigned_agent_id' => 'nullable|exists:users,id',
             'assign_leads_to_owner' => 'nullable|boolean',
+            'owner_id' => 'nullable|integer',
             'owner_name' => 'nullable|string|max:150',
             'owner_phone' => 'nullable|string|max:30',
             'owner_email' => 'nullable|email|max:190',
