@@ -11,6 +11,7 @@
     'creatable' => false,
     'createLabel' => __('Create'),
     'createUrl' => '',
+    'createModal' => '',
 ])
 
 <div class="searchable-select" data-ss
@@ -21,6 +22,7 @@
     data-creatable="{{ $creatable ? '1' : '' }}"
     data-create-label="{{ $createLabel }}"
     data-create-url="{{ $createUrl }}"
+    data-create-modal="{{ $createModal }}"
     data-options="{{ json_encode($options) }}">
     <button type="button" class="form-select searchable-select-field text-start {{ $invalid ? 'is-invalid' : '' }}" data-ss-field
         aria-haspopup="listbox" aria-expanded="false">
@@ -79,6 +81,7 @@
         const creatable = root.dataset.creatable === '1';
         const createLabel = (root.dataset.createLabel || '').trim() || 'Create';
         const createUrl = (root.dataset.createUrl || '').trim();
+        const createModal = (root.dataset.createModal || '').trim();
 
         let options = [];
         try { options = JSON.parse(root.dataset.options || '[]'); } catch (e) { options = []; }
@@ -166,6 +169,15 @@
         function setCreated(name) {
             name = String(name).trim();
             if (!name) { return; }
+
+            // When the page hosts an "Add Location" modal, hand the typed name
+            // over to it (city → community → building) instead of navigating.
+            if (createModal) {
+                window.__ssCreateName = name;
+                close();
+                root.dispatchEvent(new CustomEvent('ss-create', { bubbles: true, detail: { name: name, modal: createModal } }));
+                return;
+            }
 
             // When a creation page is configured, hand the typed name off to it
             // (city → community → building) instead of inventing a record here.

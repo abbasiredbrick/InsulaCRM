@@ -1159,6 +1159,65 @@ class InventoryMapLocationTest extends TestCase
             ->assertSee('data-selected="'.$location->id.'"', false);
     }
 
+    public function test_creating_a_location_accepts_a_brand_new_city_and_community(): void
+    {
+        $this->post(route('inventory.locations-store'), [
+            'city' => '__new__',
+            'new_city' => 'Al Ain',
+            'community' => '__new__',
+            'new_community' => 'Al Jimi',
+            'sub_community' => 'Jimi Tower',
+        ])->assertRedirect();
+
+        $community = Community::where('tenant_id', $this->tenant->id)
+            ->where('name', 'Al Jimi')
+            ->firstOrFail();
+        $this->assertSame('Al Ain', $community->city);
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Jimi Tower')
+            ->firstOrFail();
+
+        $this->assertSame('Al Ain', $location->city);
+        $this->assertSame($community->id, $location->community_id);
+    }
+
+    public function test_the_unit_form_hosts_the_add_location_modal(): void
+    {
+        Community::create(['tenant_id' => $this->tenant->id, 'name' => 'Al Reem Island', 'city' => 'Abu Dhabi']);
+
+        $this->get(route('inventory.create'))
+            ->assertOk()
+            ->assertSee('id="addLocationModal"', false)
+            ->assertSee(route('inventory.locations-store'), false)
+            ->assertSee('Add a new city', false)
+            ->assertSee('Add a new community', false)
+            ->assertSee('data-create-modal="#addLocationModal"', false)
+            ->assertSee('addLocationCommunityData', false)
+            ->assertSee('__ssCreateName', false);
+    }
+
+    public function test_creating_a_location_from_the_unit_form_flashes_the_new_building(): void
+    {
+        $response = $this->post(route('inventory.locations-store'), [
+            'city' => 'Abu Dhabi',
+            'community' => 'Al Reem Island',
+            'sub_community' => 'Sky Tower',
+            'return' => '/inventory/create',
+        ])->assertRedirect('/inventory/create')
+            ->assertSessionHas('success');
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', 'Sky Tower')
+            ->firstOrFail();
+
+        $response->assertSessionHasInput('map_location_id', $location->id);
+        $response->assertSessionHasInput('community', 'Al Reem Island');
+        $response->assertSessionHasInput('city', 'Abu Dhabi');
+    }
+
     public function test_creating_a_location_reuses_an_existing_community_case_insensitively(): void
     {
         $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
@@ -1187,14 +1246,12 @@ class InventoryMapLocationTest extends TestCase
         $this->assertSame($existing->id, $location->community_id);
     }
 
-    public function test_creating_a_location_rejects_a_city_that_is_not_known(): void
+    public function test_creating_a_location_from_the_unit_form_requires_city_community_and_building(): void
     {
-        $this->location('Bey View Tower', null, 'q', 'Al Ryada', 'Abu Dhabi');
-
         $this->post(route('inventory.locations-store'), [
-            'city' => 'Atlantis',
-            'community' => 'Lost City',
-            'sub_community' => 'Poseidon Tower',
-        ])->assertSessionHasErrors('city');
+            'city' => 'Abu Dhabi',
+            'community' => '',
+            'sub_community' => '',
+        ])->assertSessionHasErrors(['community', 'sub_community']);
     }
 }

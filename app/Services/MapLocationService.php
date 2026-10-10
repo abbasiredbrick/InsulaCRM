@@ -402,6 +402,69 @@ class MapLocationService
     }
 
     /**
+     * The single "Add Location" form's raw input, resolved: "city" / "community"
+     * may be the "__new__" sentinel, in which case the adjacent typed field
+     * (new_city / new_community) supplies the value.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{city: string, community: string, sub_community: string}
+     */
+    public function normalizeAddLocationInput(array $input): array
+    {
+        $city = trim((string) ($input['city'] ?? ''));
+        if ($city === '__new__') {
+            $city = trim((string) ($input['new_city'] ?? ''));
+        }
+
+        $community = trim((string) ($input['community'] ?? ''));
+        if ($community === '__new__') {
+            $community = trim((string) ($input['new_community'] ?? ''));
+        }
+
+        return [
+            'city' => $city,
+            'community' => $community,
+            'sub_community' => trim((string) ($input['sub_community'] ?? '')),
+        ];
+    }
+
+    /**
+     * Create (or reuse) the City → Community → Building chain from the single
+     * Add Location form, shared by Settings → Locations and the inventory unit
+     * forms. The building name is de-duplicated normalized-exact, so a
+     * corrected spelling folds onto the existing row instead of duplicating.
+     *
+     * @return array{community: Community, location: MapLocation, reused: bool, city: string}|null
+     */
+    public function createLocationFromForm(int $tenantId, string $city, string $community, string $subCommunity): ?array
+    {
+        $community = $this->ensureCommunity($tenantId, $community, $city);
+
+        // Check before writing so the caller can report a reuse rather than a
+        // duplicate creation.
+        $existing = $this->findByName($tenantId, $subCommunity);
+
+        $location = $this->ensureMapLocation($tenantId, $subCommunity, $community->name, $city, null);
+
+        if (! $location) {
+            return null;
+        }
+
+        if (! $location->community_id) {
+            $location->update(['community_id' => $community->id]);
+        }
+
+        $this->linkBuildingUnits($tenantId, $location->sub_community, $location);
+
+        return [
+            'community' => $community,
+            'location' => $location,
+            'reused' => (bool) $existing,
+            'city' => $city,
+        ];
+    }
+
+    /**
      * Create the location entry for a building the first time it is seen.
      * Re-imports never duplicate: the normalized name is matched first, so a
      * corrected spelling in a newer sheet is folded back onto the existing

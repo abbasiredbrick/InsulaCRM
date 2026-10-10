@@ -151,7 +151,7 @@
                                 :search-placeholder="__('Type building, community or city...')"
                                 :creatable="true"
                                 :create-label="__('Create')"
-                                :create-url="route('inventory.locations-create')"
+                                :create-modal="'#addLocationModal'"
                             />
                             <div class="form-hint">{{ __('Pick an existing building — it fills the community, city and sub-community automatically, and drives the map pin and portal listing location. If the building is not listed, choose Create to add it under a city and community first.') }}</div>
                         </div>
@@ -317,6 +317,15 @@
         </form>
     </div>
 </div>
+
+{{-- The same "Add Location" form used on Settings → Locations, so a building
+     missing from the picker is added right here without leaving the unit. --}}
+<x-add-location-modal
+    :action="route('inventory.locations-store')"
+    :cities="$cities ?? []"
+    :communities="$communities ?? []"
+    :return-path="request()->getRequestUri()"
+/>
 
 @push('scripts')
 <script>

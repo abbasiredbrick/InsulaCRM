@@ -140,60 +140,27 @@ class MapLocationController extends Controller
         $tenantId = auth()->user()->tenant_id;
         $maps = app(MapLocationService::class);
 
-        // "city" is the dropdown value; "__new__" defers to the typed field.
-        $city = trim((string) $request->input('city'));
-        if ($city === '__new__') {
-            $city = trim((string) $request->input('new_city'));
-        }
-
-        $communityName = trim((string) $request->input('community'));
-        if ($communityName === '__new__') {
-            $communityName = trim((string) $request->input('new_community'));
-        }
-
-        $data = Validator::make([
-            'city' => $city,
-            'community' => $communityName,
-            'sub_community' => trim((string) $request->input('sub_community')),
-        ], [
+        $data = Validator::make($maps->normalizeAddLocationInput($request->all()), [
             'city' => 'required|string|max:255',
             'community' => 'required|string|max:255',
             'sub_community' => 'required|string|max:255',
         ])->validate();
 
-        $community = $maps->ensureCommunity($tenantId, $data['community'], $data['city']);
+        $result = $maps->createLocationFromForm($tenantId, $data['city'], $data['community'], $data['sub_community']);
 
-        // Check for a similar building before writing, so the flash can say the
-        // existing one was reused instead of implying a second row was created.
-        $existing = $maps->findByName($tenantId, $data['sub_community']);
-
-        $location = $maps->ensureMapLocation(
-            $tenantId,
-            $data['sub_community'],
-            $community->name,
-            $data['city'],
-            null
-        );
-
-        if (! $location) {
+        if (! $result) {
             return back()->withInput()->with('error', __('Could not create the building.'));
         }
 
-        if (! $location->community_id) {
-            $location->update(['community_id' => $community->id]);
-        }
-
-        $maps->linkBuildingUnits($tenantId, $location->sub_community, $location);
-
-        if ($existing) {
+        if ($result['reused']) {
             return back()->with('warning', __('":name" already exists — it was reused, not duplicated.', [
-                'name' => $location->sub_community,
+                'name' => $result['location']->sub_community,
             ]));
         }
 
         return back()->with('success', __('Building ":name" added under :community, :city.', [
-            'name' => $location->sub_community,
-            'community' => $community->name,
+            'name' => $result['location']->sub_community,
+            'community' => $result['community']->name,
             'city' => $data['city'],
         ]));
     }

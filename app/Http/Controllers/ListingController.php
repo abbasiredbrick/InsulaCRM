@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\Community;
 use App\Models\MapLocation;
 use App\Models\Property;
 use App\Models\PropertyMedia;
@@ -12,8 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class ListingController extends Controller
 {
@@ -401,6 +402,8 @@ class ListingController extends Controller
             'agents' => $this->agents(),
             'building_options' => $this->buildingOptions($property, $selectedBuildingId),
             'building_search_url' => route('inventory.locations-search'),
+            'cities' => $this->citiesForLocationForm(),
+            'communities' => $this->communitiesForLocationForm(),
         ]);
     }
 
@@ -423,36 +426,39 @@ class ListingController extends Controller
     }
 
     /**
-     * Persist a community + building created from the inventory picker, then
-     * send the user back to the unit form with the new building preselected.
+     * Persist a community + building created from the inventory unit form's
+     * "Add Location" modal, then send the user back to the unit form with the
+     * new building preselected. Same chain and de-dup as Settings → Locations.
      */
     public function locationStore(Request $request)
     {
         $maps = app(MapLocationService::class);
-        $user = auth()->user();
-        $tenantId = $user->tenant_id;
+        $tenantId = auth()->user()->tenant_id;
 
-        $data = $request->validate([
-            'city' => ['required', 'string', Rule::in($maps->citiesForTenant($tenantId, $user->tenant?->country))],
+        $data = Validator::make($maps->normalizeAddLocationInput($request->all()), [
+            'city' => 'required|string|max:255',
             'community' => 'required|string|max:255',
             'sub_community' => 'required|string|max:120',
-            'return' => 'nullable|string|max:2048',
-        ]);
+        ])->validate();
 
-        $community = $maps->ensureCommunity($tenantId, $data['community'], $data['city']);
-        $location = $maps->ensureMapLocation($tenantId, $data['sub_community'], $community->name, $data['city'], null);
+        $result = $maps->createLocationFromForm($tenantId, $data['city'], $data['community'], $data['sub_community']);
 
-        if (! $location) {
+        if (! $result) {
             return back()->withInput()->with('error', __('Could not create the building.'));
         }
 
-        if (! $location->community_id) {
-            $location->update(['community_id' => $community->id]);
-        }
+        $location = $result['location'];
 
-        return redirect($this->safeInventoryReturn($data['return'] ?? null))
-            ->withInput(['map_location_id' => (int) $location->id])
-            ->with('success', __('Building ":name" created.', ['name' => $location->sub_community]));
+        return redirect($this->safeInventoryReturn($request->input('return')))
+            ->withInput([
+                'map_location_id' => (int) $location->id,
+                'sub_community' => $location->sub_community,
+                'community' => $location->community ?: $result['community']->name,
+                'city' => $location->city ?: $result['city'],
+            ])
+            ->with('success', $result['reused']
+                ? __('":name" already exists — it was reused, not duplicated.', ['name' => $location->sub_community])
+                : __('Building ":name" created.', ['name' => $location->sub_community]));
     }
 
     /**
@@ -553,6 +559,8 @@ class ListingController extends Controller
             'agents' => $this->agents(),
             'building_options' => $this->buildingOptions($property, $selectedBuildingId),
             'building_search_url' => route('inventory.locations-search'),
+            'cities' => $this->citiesForLocationForm(),
+            'communities' => $this->communitiesForLocationForm(),
         ]);
     }
 
@@ -719,6 +727,28 @@ class ListingController extends Controller
         $label = $location->sub_community.($place !== '' ? ' · '.$place : '');
 
         return [['value' => (string) $location->id, 'label' => $label]];
+    }
+
+    /**
+     * Cities offered by the unit form's "Add Location" modal (the tenant's own
+     * cities unioned with the country starter list).
+     */
+    protected function citiesForLocationForm(): array
+    {
+        $user = auth()->user();
+
+        return app(MapLocationService::class)->citiesForTenant($user->tenant_id, $user->tenant?->country);
+    }
+
+    /**
+     * Communities offered by the unit form's "Add Location" modal, so its
+     * community dropdown can be filtered to the chosen city client-side.
+     */
+    protected function communitiesForLocationForm()
+    {
+        return Community::where('tenant_id', auth()->user()->tenant_id)
+            ->orderBy('name')
+            ->get(['name', 'city']);
     }
 
     public function destroy(Request $request, Property $property)

@@ -187,26 +187,37 @@ on `properties` stay as snapshots.
   then its communities; the unassigned bucket is last), so "city is main".
   There is **one "Add Location" form** for the whole chain, opened by the header
   "Add Location" button and by each community row's **＋ Building**, both on
-  `/settings/locations` (no navigation to the create page, no separate
-  "Add Community" modal). It posts to `settings.map-locations.locations.store`
-  (`MapLocationController::storeLocation`) and walks City → Community → Building:
-  the **City** is a dropdown from `citiesForTenant()` with an **＋ Add a new city**
+  `/settings/locations` (route names stay `settings.map-locations.*`). It is the
+  shared component `resources/views/components/add-location-modal.blade.php`, so
+  the SAME form is embedded on the inventory **New Unit** and **Edit** screens:
+  the building picker's **Create "<name>"** row no longer navigates to
+  `inventory.locations-create`; `x-searchable-select` takes `:create-modal` (the
+  picker dispatches a bubbling `ss-create` event + stashes `window.__ssCreateName`,
+  and the modal opens prefilled). The form walks City → Community → Building: the
+  **City** is a dropdown from `citiesForTenant()` with an **＋ Add a new city**
   option that reveals a text field; choosing a city enables the **Community**
-  dropdown, filtered client-side to that city's communities (`data-city`) and
-  carrying its own **＋ Add a new community** option; then the **Building** name
-  is typed. A brand-new city therefore forces a new community (an existing city
-  may still add one). The controller normalizes `__new__` + the typed field,
-  validates all three, then `ensureCommunity()` + `ensureMapLocation()`
-  (normalized-exact, first-write-wins). A building whose normalized name already
-  exists is **reused and reported** (`warning`), never silently duplicated. A
-  building's Community cell is a **move control**
+  dropdown, filtered to that city's communities and carrying its own
+  **＋ Add a new community** option; then the **Building** name is typed. A
+  brand-new city therefore forces a new community (an existing city may still add
+  one). **The community list is rebuilt in JS, not hidden with `<option hidden>`**
+  — Safari/WebKit ignores `hidden` on options, which left every community visible
+  for every city. The modal embeds the communities as JSON
+  (`#addLocationCommunityData`) and re-creates the `<option>`s on city change.
+  Both save paths share `MapLocationService::normalizeAddLocationInput()`
+  (`__new__` + typed field) and `createLocationFromForm()` (ensureCommunity +
+  ensureMapLocation, normalized-exact). A building whose name already exists is
+  **reused and reported** (`warning`), never duplicated. `MapLocationController::storeLocation`
+  (`settings.map-locations.locations.store`) redirects `back()`; the
+  agent-accessible `inventory.locations-store` (`ListingController::locationStore`)
+  accepts the same `__new__` input and redirects to `return` flashing
+  `map_location_id` (plus community/city/sub_community) so the picker preselects
+  the new building. A building's Community cell is a **move control**
   (`settings.map-locations.buildings.move` → `MapLocationService::moveToCommunity()`),
   which re-parents the building and cascades the new community **and its city**
   to every FK-linked unit and any legacy unlinked unit of that building name.
-  The New Unit picker's **Create "<name>"** still opens `inventory.locations-create`
-  (that page's `prefillCity`/`prefillCommunity` are fed by the same builder
-  fields); its `city` is pinned to `citiesForTenant()` so that public path cannot
-  invent a city — only this Settings form may.
+  The legacy standalone `inventory.locations-create` page still exists for the
+  API/legacy path (its `city` is pinned to `citiesForTenant()`); the in-app
+  picker now uses the modal instead.
 
 ## Search / Filter UI — the live-filter convention
 
