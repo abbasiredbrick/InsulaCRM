@@ -454,6 +454,12 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="col-md-3">
+                        <input type="text" name="phone" class="form-control" placeholder="{{ __('Phone (optional)') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" name="whatsapp_number" class="form-control" placeholder="{{ __('WhatsApp number (optional)') }}">
+                    </div>
                     <div class="col-md-12">
                         <label class="form-label">{{ __('Additional roles (optional)') }}</label>
                         <select name="additional_roles[]" class="form-select" multiple>
@@ -468,6 +474,13 @@
                             <span class="form-check-label">{{ __('Receives new leads') }}</span>
                         </label>
                         <small class="form-hint">{{ __('Leave on to put them in the round-robin and AI distribution pool. Turn it off to stop new leads being assigned; leads already on their book are kept.') }}</small>
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="whatsapp_opt_in" value="1" id="invite-whatsapp-opt-in">
+                            <span class="form-check-label">{{ __('Receive WhatsApp notifications') }}</span>
+                        </label>
+                        <small class="form-hint">{{ __('Requires a WhatsApp number above. Sends a message when a new lead is assigned to them.') }}</small>
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">{{ __('Add') }}</button>
@@ -548,6 +561,15 @@
                                                             <small class="form-hint">{{ __('This is the email they use to sign in.') }}</small>
                                                         </div>
                                                         <div class="mb-3">
+                                                            <label class="form-label">{{ __('Phone') }}</label>
+                                                            <input type="text" name="phone" class="form-control" value="{{ $agent->phone }}" placeholder="+971501234567">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label">{{ __('WhatsApp number') }}</label>
+                                                            <input type="text" name="whatsapp_number" class="form-control" value="{{ $agent->whatsapp_number }}" placeholder="+971501234567">
+                                                            <small class="form-hint">{{ __('International format. Used for WhatsApp notifications.') }}</small>
+                                                        </div>
+                                                        <div class="mb-3">
                                                             <label class="form-label required">{{ __('Role') }}</label>
                                                             <select name="role_id" class="form-select" required>
                                                                 @foreach($assignableRoles as $role)
@@ -580,6 +602,13 @@
                                                                     {{ __('Portal leads for their listings will be routed to whoever is next in the distribution pool, or left unassigned for the team to claim.') }}
                                                                 </small>
                                                             @endunless
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-check form-switch mb-0">
+                                                                <input class="form-check-input" type="checkbox" name="whatsapp_opt_in" value="1" @checked($agent->whatsapp_opt_in)>
+                                                                <span class="form-check-label">{{ __('Receive WhatsApp notifications') }}</span>
+                                                            </label>
+                                                            <small class="form-hint">{{ __('Requires a WhatsApp number above. Sends a message when a new lead is assigned to them.') }}</small>
                                                         </div>
                                                         <div>
                                                             <label class="form-label">{{ __('Manager') }}</label>
@@ -2801,6 +2830,122 @@ Content-Type: application/json</code></pre>
                     </div>
                 </div>
 
+                <!-- WhatsApp Provider -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ __('WhatsApp (Cloud API)') }}</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-secondary mb-3">{{ __('Connect the official Meta WhatsApp Cloud API so assigned agents get a WhatsApp message about their new lead. Each agent needs a WhatsApp number and an opt-in on their profile.') }}</p>
+
+                        @php
+                            $whatsAppDrivers = $integrationManager->getAvailableDrivers('whatsapp');
+                            $whatsAppIntegrations = \App\Models\Integration::withoutGlobalScopes()
+                                ->where('tenant_id', $tenant->id)
+                                ->where('category', 'whatsapp')
+                                ->get()
+                                ->keyBy('driver');
+                            // Exclude 'log' from the configurable list — it's always the fallback
+                            $configurableWhatsAppDrivers = collect($whatsAppDrivers)->filter(fn($d) => $d['requires_config']);
+                        @endphp
+
+                        <div class="alert alert-info mb-3">
+                            <div class="d-flex">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></svg>
+                                </div>
+                                <div>
+                                    @if($whatsAppIntegrations->filter(fn($i) => $i->is_active)->isEmpty())
+                                        {{ __('No WhatsApp provider is active. Agents will not receive WhatsApp notifications.') }}
+                                    @else
+                                        {{ __('A WhatsApp provider is active. Assigned agents who are opted in will be messaged.') }}
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        @foreach($configurableWhatsAppDrivers as $driverKey => $driverInfo)
+                        @php $existing = $whatsAppIntegrations->get($driverKey); @endphp
+                        <div class="card mb-3 {{ $existing && $existing->is_active ? 'border-success' : '' }}">
+                            <div class="card-header">
+                                <div class="d-flex align-items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>
+                                    <h3 class="card-title mb-0">{{ __($driverInfo['name']) }}</h3>
+                                </div>
+                                <div class="card-actions">
+                                    @if($existing)
+                                        @if($existing->is_active)
+                                            <span class="badge bg-green-lt me-2">{{ __('Active') }}</span>
+                                        @else
+                                            <span class="badge bg-secondary-lt me-2">{{ __('Inactive') }}</span>
+                                        @endif
+                                        <form action="{{ route('integrations.toggle', $existing) }}" method="POST" class="d-inline">
+                                            @csrf @method('PATCH')
+                                            <button type="submit" class="btn btn-sm {{ $existing->is_active ? 'btn-outline-warning' : 'btn-outline-success' }}">
+                                                {{ $existing->is_active ? __('Disable') : __('Enable') }}
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="badge bg-secondary-lt">{{ __('Not Configured') }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <form action="{{ route('integrations.store') }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="category" value="whatsapp">
+                                    <input type="hidden" name="driver" value="{{ $driverKey }}">
+                                    <div class="row mb-3">
+                                        @foreach($driverInfo['config_fields'] as $field)
+                                        <div class="col-md-6 mb-2">
+                                            <label class="form-label">{{ __($field['label']) }}@if($field['required'] ?? false) <span class="text-danger">*</span>@endif</label>
+                                            <input
+                                                type="{{ $field['type'] }}"
+                                                name="config[{{ $field['name'] }}]"
+                                                class="form-control"
+                                                placeholder="{{ $field['placeholder'] ?? '' }}"
+                                                value="{{ $existing && $field['type'] !== 'password' ? ($existing->config[$field['name']] ?? '') : '' }}"
+                                            >
+                                            @if(!empty($field['hint']))
+                                            <small class="text-secondary">{{ __($field['hint']) }}</small>
+                                            @endif
+                                        </div>
+                                        @endforeach
+                                        <div class="col-12">
+                                            <small class="text-secondary">{{ __('Leave a password field blank to keep the stored token.') }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-info mb-3">
+                                        <h4 class="alert-heading">{{ __('Setup Instructions') }}</h4>
+                                        <ol class="mb-0 small">
+                                            <li>{{ __('Create a Meta app of type Business and add the WhatsApp product, then open WhatsApp > API Setup.') }}</li>
+                                            <li>{{ __('Copy the Phone Number ID (not the phone number itself) and the WhatsApp Business Account ID.') }}</li>
+                                            <li>{{ __('Create a System User in Business Settings with whatsapp_business_messaging and whatsapp_business_management, and generate a token that never expires.') }}</li>
+                                            <li>{{ __('Paste the Phone Number ID and the permanent token above, then send a test.') }}</li>
+                                            <li>{{ __('Each agent must add their WhatsApp number and opt in from their profile.') }}</li>
+                                        </ol>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        {{ $existing ? __('Update Configuration') : __('Enable & Save') }}
+                                    </button>
+                                    @if($existing)
+                                    <button type="button" class="btn btn-outline-secondary ms-2" id="btn-test-whatsapp">
+                                        {{ __('Send Test WhatsApp') }}
+                                    </button>
+                                    @endif
+                                </form>
+                                @if($existing)
+                                <form action="{{ route('integrations.destroy', $existing) }}" method="POST" class="d-inline ms-2" onsubmit="return confirm('{{ __('Remove this WhatsApp configuration?') }}')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="btn btn-outline-danger mt-2">{{ __('Remove') }}</button>
+                                </form>
+                                @endif
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+
                 <!-- Integration Guide -->
                 <div class="card">
                     <div class="card-header">
@@ -3784,6 +3929,44 @@ if (testSmsBtn) {
             }
             testSmsBtn.disabled = false;
             testSmsBtn.textContent = '{{ __("Send Test SMS") }}';
+        });
+    });
+}
+
+// WhatsApp test
+var testWhatsAppBtn = document.getElementById('btn-test-whatsapp');
+if (testWhatsAppBtn) {
+    testWhatsAppBtn.addEventListener('click', function() {
+        var phone = prompt('{{ __("Enter a WhatsApp number to send a test message (E.164 format, e.g. +971501234567):") }}');
+        if (!phone) return;
+
+        testWhatsAppBtn.disabled = true;
+        testWhatsAppBtn.textContent = '{{ __("Sending...") }}';
+
+        fetch('{{ route("settings.testWhatsApp") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({ to: phone })
+        }).then(function(r) { return r.json(); }).then(function(data) {
+            if (typeof window.showToast === 'function') {
+                window.showToast(data.message, data.success ? 'success' : 'danger');
+            } else {
+                alert(data.message);
+            }
+            testWhatsAppBtn.disabled = false;
+            testWhatsAppBtn.textContent = '{{ __("Send Test WhatsApp") }}';
+        }).catch(function() {
+            if (typeof window.showToast === 'function') {
+                window.showToast('{{ __("Network error.") }}', 'danger');
+            } else {
+                alert('{{ __("Network error.") }}');
+            }
+            testWhatsAppBtn.disabled = false;
+            testWhatsAppBtn.textContent = '{{ __("Send Test WhatsApp") }}';
         });
     });
 }

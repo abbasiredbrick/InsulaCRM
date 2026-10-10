@@ -19,11 +19,14 @@ class ProfileController extends Controller
 
         $rules = [
             'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+            'email' => 'required|email|max:255|unique:users,email,'.$user->id,
             'email_mode' => 'nullable|in:shared,personal',
             'email_from_name' => 'nullable|string|max:100',
             'email_reply_to' => 'nullable|email|max:255',
             'notification_delivery' => 'nullable|in:instant,daily_digest',
+            'phone' => 'nullable|string|max:50',
+            'whatsapp_number' => 'nullable|string|max:50',
+            'whatsapp_opt_in' => 'nullable|boolean',
         ];
 
         if ($request->filled('current_password') || $request->filled('password')) {
@@ -39,6 +42,9 @@ class ProfileController extends Controller
         $user->email_from_name = $validated['email_from_name'] ?? null;
         $user->email_reply_to = $validated['email_reply_to'] ?? null;
         $user->notification_delivery = $validated['notification_delivery'] ?? 'instant';
+        $user->phone = $validated['phone'] ?? null;
+        $user->whatsapp_number = $validated['whatsapp_number'] ?? null;
+        $user->whatsapp_opt_in = $request->boolean('whatsapp_opt_in');
 
         if (isset($validated['password'])) {
             $user->password = Hash::make($validated['password']);

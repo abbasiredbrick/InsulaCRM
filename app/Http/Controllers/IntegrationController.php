@@ -31,7 +31,7 @@ class IntegrationController extends Controller
     public function store(Request $request, IntegrationManager $manager)
     {
         $request->validate([
-            'category' => 'required|string|in:2fa,sso',
+            'category' => 'required|string|in:2fa,sso,whatsapp',
             'driver' => 'required|string|max:100',
             'config' => 'nullable|array',
         ]);
@@ -39,7 +39,7 @@ class IntegrationController extends Controller
         $tenant = auth()->user()->tenant;
 
         // Verify the driver is registered
-        if (!$manager->hasDriver($request->category, $request->driver)) {
+        if (! $manager->hasDriver($request->category, $request->driver)) {
             return back()->with('error', __('Unknown integration driver.'));
         }
 
@@ -55,6 +55,7 @@ class IntegrationController extends Controller
                 'name' => $driverInstance->name(),
                 'config' => $request->config ?? [],
                 'is_active' => true,
+                'is_default' => true,
             ]
         );
 
@@ -68,7 +69,7 @@ class IntegrationController extends Controller
     {
         abort_unless($integration->tenant_id === auth()->user()->tenant_id, 403);
 
-        $integration->update(['is_active' => !$integration->is_active]);
+        $integration->update(['is_active' => ! $integration->is_active]);
 
         return back()->with('success', __('Integration :status.', [
             'status' => $integration->is_active ? __('enabled') : __('disabled'),

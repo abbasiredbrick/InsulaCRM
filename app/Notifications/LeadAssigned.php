@@ -4,6 +4,10 @@ namespace App\Notifications;
 
 use App\Models\Lead;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Notifications\Channels\WhatsAppChannel;
+use App\Notifications\Messages\WhatsAppMessage;
+use App\Services\WhatsAppService;
 use App\Traits\DigestAwareNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,6 +23,31 @@ class LeadAssigned extends Notification implements ShouldQueue
         protected Lead $lead,
         protected Tenant $tenant,
     ) {}
+
+    public function via(object $notifiable): array
+    {
+        $channels = $this->digestChannels($notifiable);
+
+        if ($notifiable instanceof User && app(WhatsAppService::class)->canSendTo($notifiable)) {
+            $channels[] = WhatsAppChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toWhatsApp(object $notifiable): WhatsAppMessage
+    {
+        $lead = $this->lead;
+
+        return WhatsAppMessage::template('new_lead_assigned')
+            ->body([
+                $notifiable->name,
+                trim("{$lead->first_name} {$lead->last_name}") ?: 'New lead',
+                $lead->phone ?: 'N/A',
+                ucwords(str_replace('_', ' ', $lead->lead_source ?? 'N/A')),
+            ])
+            ->button((string) $lead->id);
+    }
 
     public function toArray(object $notifiable): array
     {

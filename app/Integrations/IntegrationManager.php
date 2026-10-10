@@ -5,12 +5,15 @@ namespace App\Integrations;
 use App\Contracts\Integrations\SmsProviderInterface;
 use App\Contracts\Integrations\SsoProviderInterface;
 use App\Contracts\Integrations\TwoFactorProviderInterface;
+use App\Contracts\Integrations\WhatsAppProviderInterface;
 use App\Integrations\Sms\LogSmsProvider;
 use App\Integrations\Sms\TwilioSmsProvider;
 use App\Integrations\Sso\GoogleOAuthProvider;
 use App\Integrations\Sso\MicrosoftOAuthProvider;
 use App\Integrations\Sso\OktaOAuthProvider;
 use App\Integrations\TwoFactor\TotpProvider;
+use App\Integrations\WhatsApp\CloudApiWhatsAppProvider;
+use App\Integrations\WhatsApp\LogWhatsAppProvider;
 use App\Models\Integration;
 
 class IntegrationManager
@@ -31,6 +34,8 @@ class IntegrationManager
         $this->registerDriver('2fa', 'totp', TotpProvider::class);
         $this->registerDriver('sms', 'log', LogSmsProvider::class);
         $this->registerDriver('sms', 'twilio', TwilioSmsProvider::class);
+        $this->registerDriver('whatsapp', 'log', LogWhatsAppProvider::class);
+        $this->registerDriver('whatsapp', 'cloud-api', CloudApiWhatsAppProvider::class);
         $this->registerDriver('sso', 'google-oauth', GoogleOAuthProvider::class);
         $this->registerDriver('sso', 'microsoft-oauth', MicrosoftOAuthProvider::class);
         $this->registerDriver('sso', 'okta-oauth', OktaOAuthProvider::class);
@@ -59,6 +64,7 @@ class IntegrationManager
                 'config_fields' => $instance->configFields(),
             ];
         }
+
         return $drivers;
     }
 
@@ -80,12 +86,12 @@ class IntegrationManager
     {
         $key = "{$category}.{$driver}";
 
-        if (!isset($this->instances[$key])) {
+        if (! isset($this->instances[$key])) {
             $class = $this->drivers[$category][$driver] ?? null;
-            if (!$class || !class_exists($class)) {
+            if (! $class || ! class_exists($class)) {
                 throw new \InvalidArgumentException("Integration driver [{$driver}] not found for category [{$category}].");
             }
-            $this->instances[$key] = new $class();
+            $this->instances[$key] = new $class;
         }
 
         return $this->instances[$key];
@@ -100,7 +106,7 @@ class IntegrationManager
         $driver = $driver ?? 'totp';
 
         // Check if this driver is registered
-        if (!isset($this->drivers['2fa'][$driver])) {
+        if (! isset($this->drivers['2fa'][$driver])) {
             $driver = 'totp'; // fallback to default
         }
 
@@ -147,10 +153,11 @@ class IntegrationManager
             ->get()
             ->map(function ($integration) {
                 $driver = $this->drivers['sso'][$integration->driver] ?? null;
-                if (!$driver) {
+                if (! $driver) {
                     return null;
                 }
                 $instance = $this->resolveDriver('sso', $integration->driver);
+
                 return [
                     'driver' => $integration->driver,
                     'name' => $instance->name(),
@@ -162,8 +169,37 @@ class IntegrationManager
     }
 
     /**
-     * Get the SMS provider for a tenant.
-     * Falls back to the log provider if no custom provider is configured.
+     * Get the WhatsApp provider for a tenant.
+     * Falls back to a no-op logger when no provider is configured, so callers
+     * can tell "configured" from "not configured" via driver().
+     */
+    public function getWhatsAppProvider(?int $tenantId = null): WhatsAppProviderInterface
+    {
+        $driver = 'log';
+        $config = [];
+
+        if ($tenantId) {
+            $active = Integration::where('tenant_id', $tenantId)
+                ->where('category', 'whatsapp')
+                ->where('is_active', true)
+                ->where('is_default', true)
+                ->first();
+
+            if ($active && isset($this->drivers['whatsapp'][$active->driver])) {
+                $driver = $active->driver;
+                $config = $active->config;
+            }
+        }
+
+        $provider = $this->resolveDriver('whatsapp', $driver);
+        $provider->setConfig($config);
+
+        return $provider;
+    }
+
+    /**
+     * Get an SMS provider for a tenant.
+     * Falls back to the built-in log driver if no custom provider is configured.
      */
     public function getSmsProvider(?int $tenantId = null): SmsProviderInterface
     {

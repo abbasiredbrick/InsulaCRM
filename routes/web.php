@@ -907,6 +907,9 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         // SMS Test
         Route::post('/settings/sms/test', [SettingsController::class, 'testSms'])->name('settings.testSms');
 
+        // WhatsApp Test
+        Route::post('/settings/whatsapp/test', [SettingsController::class, 'testWhatsApp'])->name('settings.testWhatsApp');
+
         // Backups
         Route::get('/settings/backups/list', [SettingsController::class, 'backupList'])->name('settings.backupList');
         Route::post('/settings/backups/create', [SettingsController::class, 'backupCreate'])->name('settings.backupCreate');

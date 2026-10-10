@@ -360,6 +360,66 @@ class SettingsController extends Controller
     }
 
     /**
+     * Send a test WhatsApp message to verify the Cloud API configuration.
+     *
+     * Uses the default connectivity template (hello_world) unless the caller
+     * names another approved template; this only proves the token, Phone
+     * Number ID and template are wired up.
+     */
+    public function testWhatsApp(Request $request)
+    {
+        $request->validate([
+            'to' => 'required|string',
+            'template' => 'nullable|string|max:100',
+            'language' => 'nullable|string|max:20',
+        ]);
+
+        $tenant = auth()->user()->tenant;
+        $provider = app(\App\Integrations\IntegrationManager::class)->getWhatsAppProvider($tenant->id);
+
+        if ($provider->driver() === 'log') {
+            return response()->json([
+                'success' => false,
+                'message' => __('No WhatsApp provider is active. Configure and enable one first.'),
+            ], 422);
+        }
+
+        $to = app(\App\Services\ContactNormalizer::class)->phone($request->to, $tenant->country)
+            ?? preg_replace('/\D+/', '', $request->to);
+
+        try {
+            $result = $provider->sendTemplate(
+                $to,
+                $request->input('template', 'hello_world'),
+                [],
+                $request->input('language', 'en_US'),
+            );
+
+            if ($result) {
+                return response()->json([
+                    'success' => true,
+                    'message' => __('Test WhatsApp message sent to :to.', ['to' => $to]),
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => __('WhatsApp send failed. Check the access token, Phone Number ID and that the template is approved.'),
+            ], 422);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('WhatsApp test failed', [
+                'to' => $to,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('WhatsApp send failed. Check the access token, Phone Number ID and that the template is approved.'),
+            ], 422);
+        }
+    }
+
+    /**
      * Send a test SMS to verify Twilio configuration.
      */
     public function testSms(Request $request)
@@ -535,6 +595,9 @@ class SettingsController extends Controller
                 }
             }],
             'receives_leads' => 'nullable|boolean',
+            'phone' => 'nullable|string|max:50',
+            'whatsapp_number' => 'nullable|string|max:50',
+            'whatsapp_opt_in' => 'nullable|boolean',
         ]);
 
         $agent = User::create([
@@ -543,6 +606,9 @@ class SettingsController extends Controller
             'role_id' => $validated['role_id'],
             'name' => $request->name,
             'email' => $request->email,
+            'phone' => $request->filled('phone') ? $request->input('phone') : null,
+            'whatsapp_number' => $request->filled('whatsapp_number') ? $request->input('whatsapp_number') : null,
+            'whatsapp_opt_in' => $request->boolean('whatsapp_opt_in'),
             'password' => Hash::make($request->password),
             // An absent field means "left on" here (updateAgent reads the same
             // field as off, because an unchecked box sends nothing). The owner
@@ -587,6 +653,9 @@ class SettingsController extends Controller
                 }
             }],
             'receives_leads' => 'nullable|boolean',
+            'phone' => 'nullable|string|max:50',
+            'whatsapp_number' => 'nullable|string|max:50',
+            'whatsapp_opt_in' => 'nullable|boolean',
         ]);
 
         $newRole = Role::find($validated['role_id']);
@@ -613,6 +682,9 @@ class SettingsController extends Controller
         // raw request rather than $validated - otherwise the opt-out could never
         // be saved. Leads already on their book are left alone either way.
         $user->receives_leads = $request->boolean('receives_leads');
+        $user->phone = $request->filled('phone') ? $request->input('phone') : null;
+        $user->whatsapp_number = $request->filled('whatsapp_number') ? $request->input('whatsapp_number') : null;
+        $user->whatsapp_opt_in = $request->boolean('whatsapp_opt_in');
 
         if ($oldEmail !== $validated['email']) {
             $user->email_verified_at = null;

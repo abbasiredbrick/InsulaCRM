@@ -150,6 +150,37 @@
                 </div>
             </div>
 
+            <!-- WhatsApp Notifications -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">{{ __('WhatsApp Notifications') }}</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">{{ __('Add your WhatsApp number to get a message when a new lead is assigned to you. Your administrator must enable WhatsApp for the workspace first.') }}</p>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('Phone') }}</label>
+                            <input type="text" name="phone" class="form-control @error('phone') is-invalid @enderror" value="{{ old('phone', $user->phone) }}" placeholder="+971501234567">
+                            @error('phone')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">{{ __('WhatsApp number') }}</label>
+                            <input type="text" name="whatsapp_number" class="form-control @error('whatsapp_number') is-invalid @enderror" value="{{ old('whatsapp_number', $user->whatsapp_number) }}" placeholder="+971501234567">
+                            @error('whatsapp_number')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="form-hint">{{ __('International format, e.g. +971501234567.') }}</small>
+                        </div>
+                    </div>
+                    <label class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" name="whatsapp_opt_in" value="1" @checked(old('whatsapp_opt_in', $user->whatsapp_opt_in))>
+                        <span class="form-check-label">{{ __('Receive WhatsApp notifications') }}</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="d-flex justify-content-end">
                 <button type="submit" class="btn btn-primary">{{ __('Save Changes') }}</button>
             </div>

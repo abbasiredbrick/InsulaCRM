@@ -16,6 +16,9 @@ class User extends Authenticatable
         'reports_to',
         'name',
         'email',
+        'phone',
+        'whatsapp_number',
+        'whatsapp_opt_in',
         'password',
         'is_active',
         'receives_leads',
@@ -51,6 +54,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'receives_leads' => 'boolean',
+            'whatsapp_opt_in' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'onboarding_completed' => 'boolean',
             'dashboard_widgets' => 'array',
@@ -333,6 +337,15 @@ class User extends Authenticatable
     public function isInLeadRotation(): bool
     {
         return (bool) $this->is_active && (bool) $this->receives_leads;
+    }
+
+    /**
+     * Whether the member has a WhatsApp number and has opted in. Independent of
+     * whether the tenant has configured a WhatsApp provider.
+     */
+    public function whatsappReachable(): bool
+    {
+        return ! blank($this->whatsapp_number) && (bool) $this->whatsapp_opt_in;
     }
 
     /**
