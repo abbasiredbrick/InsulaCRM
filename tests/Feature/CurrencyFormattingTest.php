@@ -43,6 +43,29 @@ class CurrencyFormattingTest extends TestCase
         $this->assertStringNotContainsString("\u{20C3}", implode(' ', Fmt::currencies()));
     }
 
+    public function test_aed_uses_the_arabic_symbol_when_the_locale_is_arabic(): void
+    {
+        $this->actingAsAdmin(['currency' => 'AED', 'country' => 'AE', 'locale' => 'ar']);
+        Fmt::forgetTenant();
+
+        $this->assertTrue(Fmt::isRtl());
+        $this->assertSame('د.إ', Fmt::currencySymbol());
+        $this->assertSame('د.إ ', Fmt::currencyPrefix());
+        $this->assertSame('د.إ 1,200.50', Fmt::currency(1200.5));
+        $this->assertSame('AED (د.إ)', Fmt::currencies()['AED']);
+    }
+
+    public function test_aed_stays_latin_when_the_locale_is_english(): void
+    {
+        $this->actingAsAdmin(['currency' => 'AED', 'country' => 'AE', 'locale' => 'en']);
+        Fmt::forgetTenant();
+
+        $this->assertFalse(Fmt::isRtl());
+        $this->assertSame('AED', Fmt::currencySymbol());
+        $this->assertSame('AED ', Fmt::currencyPrefix());
+        $this->assertSame('AED', Fmt::currencies()['AED']);
+    }
+
     public function test_the_dashboard_shows_the_tenant_currency_symbol(): void
     {
         $this->actingAsAdmin(['currency' => 'AED', 'country' => 'AE', 'business_mode' => 'realestate']);

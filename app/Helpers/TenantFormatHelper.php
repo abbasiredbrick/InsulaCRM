@@ -123,27 +123,51 @@ class TenantFormatHelper
     }
 
     /**
-     * Get just the currency symbol.
+     * Native Arabic currency abbreviations, used when the tenant's UI locale
+     * is Arabic. Like the Latin code these are ordinary text ("د.إ"), so they
+     * render inside a <select> and under bold without the tofu / fake-bold
+     * synthesis that the single dirham glyph (U+20C3) suffered.
+     */
+    protected static array $arabicCurrencySymbols = [
+        'AED' => 'د.إ',
+        'SAR' => 'ر.س',
+    ];
+
+    /**
+     * Get just the currency symbol, in the tenant's own script: "AED" for an
+     * English UI, "د.إ" for an Arabic one.
      */
     public static function currencySymbol(): string
     {
         $tenant = static::tenant();
         $code = $tenant->currency ?? 'USD';
 
+        if (static::isRtl() && isset(static::$arabicCurrencySymbols[$code])) {
+            return static::$arabicCurrencySymbols[$code];
+        }
+
         return static::$currencySymbols[$code] ?? $code;
     }
 
     /**
+     * Whether the tenant's UI locale is right-to-left (currently Arabic).
+     */
+    public static function isRtl(): bool
+    {
+        return str_starts_with(strtolower(static::tenant()?->locale ?? ''), 'ar');
+    }
+
+    /**
      * The symbol followed by a space when it is a word/code rather than a
-     * glyph, so "AED" reads as "AED 1,200" while "$" stays "$1,200". Every
-     * currency renderer (PHP and the inline JS) must use this, not the bare
-     * symbol, or amounts drift between screens.
+     * glyph, so "AED" reads as "AED 1,200" and "د.إ" as "د.إ 1,200" while
+     * "$" stays "$1,200". Every currency renderer (PHP and the inline JS)
+     * must use this, not the bare symbol, or amounts drift between screens.
      */
     public static function currencyPrefix(): string
     {
         $symbol = static::currencySymbol();
 
-        return preg_match('/[A-Za-z0-9]$/', $symbol) ? $symbol.' ' : $symbol;
+        return preg_match('/[\p{L}\p{N}]$/u', $symbol) ? $symbol.' ' : $symbol;
     }
 
     /**
@@ -372,7 +396,7 @@ class TenantFormatHelper
      */
     public static function currencies(): array
     {
-        return [
+        $currencies = [
             'USD' => 'USD ($)',
             'CAD' => 'CAD (C$)',
             'EUR' => 'EUR (€)',
@@ -412,6 +436,16 @@ class TenantFormatHelper
             'ARS' => 'ARS (AR$)',
             'PEN' => 'PEN (S/)',
         ];
+
+        if (static::isRtl()) {
+            foreach (static::$arabicCurrencySymbols as $code => $symbol) {
+                if (isset($currencies[$code])) {
+                    $currencies[$code] = $code.' ('.$symbol.')';
+                }
+            }
+        }
+
+        return $currencies;
     }
 
     /**
