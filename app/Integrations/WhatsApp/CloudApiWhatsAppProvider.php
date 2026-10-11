@@ -109,7 +109,7 @@ class CloudApiWhatsAppProvider implements WhatsAppProviderInterface
         }
     }
 
-    public function sendText(string $to, string $text): bool
+    public function sendText(string $to, string $text): ?string
     {
         $phoneNumberId = (string) ($this->config['phone_number_id'] ?? '');
         $accessToken = (string) ($this->config['access_token'] ?? '');
@@ -118,7 +118,7 @@ class CloudApiWhatsAppProvider implements WhatsAppProviderInterface
         if ($phoneNumberId === '' || $accessToken === '') {
             Log::error('WhatsApp Cloud API: Missing configuration (phone_number_id or access_token).');
 
-            return false;
+            return null;
         }
 
         try {
@@ -132,7 +132,7 @@ class CloudApiWhatsAppProvider implements WhatsAppProviderInterface
                 ]);
 
             if ($response->successful()) {
-                return true;
+                return $response->json('messages.0.id');
             }
 
             Log::error('WhatsApp text failed', [
@@ -141,15 +141,35 @@ class CloudApiWhatsAppProvider implements WhatsAppProviderInterface
                 'error' => $response->json('error.message', 'Unknown error'),
             ]);
 
-            return false;
+            return null;
         } catch (\Throwable $e) {
             Log::error('WhatsApp text exception', [
                 'to' => $to,
                 'error' => $e->getMessage(),
             ]);
 
-            return false;
+            return null;
         }
+    }
+
+    /**
+     * The Meta webhook verify token configured for this tenant, if any.
+     */
+    public function getVerifyToken(): ?string
+    {
+        $token = trim((string) ($this->config['verify_token'] ?? ''));
+
+        return $token !== '' ? $token : null;
+    }
+
+    /**
+     * The Meta app secret used to validate the X-Hub-Signature-256 header.
+     */
+    public function getAppSecret(): ?string
+    {
+        $secret = trim((string) ($this->config['app_secret'] ?? ''));
+
+        return $secret !== '' ? $secret : null;
     }
 
     public function requiresConfig(): bool
@@ -183,6 +203,22 @@ class CloudApiWhatsAppProvider implements WhatsAppProviderInterface
                 'placeholder' => '123456789012345',
                 'required' => false,
                 'hint' => 'Optional. The WABA ID, for reference.',
+            ],
+            [
+                'name' => 'verify_token',
+                'label' => 'Webhook Verify Token',
+                'type' => 'text',
+                'placeholder' => 'a-random-string-you-choose',
+                'required' => false,
+                'hint' => 'Required for the inbound Inbox. Paste the same value you set in Meta → WhatsApp → Configuration → Webhook "Verify token".',
+            ],
+            [
+                'name' => 'app_secret',
+                'label' => 'App Secret',
+                'type' => 'password',
+                'placeholder' => '',
+                'required' => false,
+                'hint' => 'Required for the inbound Inbox. Meta → your app → Settings → Basic. Used to verify webhook signatures.',
             ],
             [
                 'name' => 'api_version',

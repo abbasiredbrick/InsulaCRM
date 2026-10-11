@@ -362,9 +362,10 @@ class SettingsController extends Controller
     /**
      * Send a test WhatsApp message to verify the Cloud API configuration.
      *
-     * Uses the default connectivity template (hello_world) unless the caller
-     * names another approved template; this only proves the token, Phone
-     * Number ID and template are wired up.
+     * Defaults to the real assignment template (new_lead_assigned) with sample
+     * parameters, so the test exercises the same template the notification
+     * uses — the connectivity-only hello_world template only exists on Meta's
+     * test number, not on a live WABA.
      */
     public function testWhatsApp(Request $request)
     {
@@ -387,12 +388,30 @@ class SettingsController extends Controller
         $to = app(\App\Services\ContactNormalizer::class)->phone($request->to, $tenant->country)
             ?? preg_replace('/\D+/', '', $request->to);
 
+        $template = $request->input('template', 'new_lead_assigned');
+
+        $bodyParameters = [];
+        $buttonParameter = null;
+
+        if ($template === 'new_lead_assigned') {
+            $bodyParameters = [
+                auth()->user()->name,
+                'Sample Lead',
+                '+971500000000',
+                'Bayut',
+                'Hi, I am interested in this property. Please call me.',
+                'https://wa.me/971500000000',
+            ];
+            $buttonParameter = '1';
+        }
+
         try {
             $result = $provider->sendTemplate(
                 $to,
-                $request->input('template', 'hello_world'),
-                [],
+                $template,
+                $bodyParameters,
                 $request->input('language', 'en_US'),
+                $buttonParameter,
             );
 
             if ($result) {
@@ -598,6 +617,7 @@ class SettingsController extends Controller
             'phone' => 'nullable|string|max:50',
             'whatsapp_number' => 'nullable|string|max:50',
             'whatsapp_opt_in' => 'nullable|boolean',
+            'whatsapp_inbox_enabled' => 'nullable|boolean',
         ]);
 
         $agent = User::create([
@@ -609,6 +629,7 @@ class SettingsController extends Controller
             'phone' => $request->filled('phone') ? $request->input('phone') : null,
             'whatsapp_number' => $request->filled('whatsapp_number') ? $request->input('whatsapp_number') : null,
             'whatsapp_opt_in' => $request->boolean('whatsapp_opt_in'),
+            'whatsapp_inbox_enabled' => $request->boolean('whatsapp_inbox_enabled'),
             'password' => Hash::make($request->password),
             // An absent field means "left on" here (updateAgent reads the same
             // field as off, because an unchecked box sends nothing). The owner
@@ -656,6 +677,7 @@ class SettingsController extends Controller
             'phone' => 'nullable|string|max:50',
             'whatsapp_number' => 'nullable|string|max:50',
             'whatsapp_opt_in' => 'nullable|boolean',
+            'whatsapp_inbox_enabled' => 'nullable|boolean',
         ]);
 
         $newRole = Role::find($validated['role_id']);
@@ -685,6 +707,7 @@ class SettingsController extends Controller
         $user->phone = $request->filled('phone') ? $request->input('phone') : null;
         $user->whatsapp_number = $request->filled('whatsapp_number') ? $request->input('whatsapp_number') : null;
         $user->whatsapp_opt_in = $request->boolean('whatsapp_opt_in');
+        $user->whatsapp_inbox_enabled = $request->boolean('whatsapp_inbox_enabled');
 
         if ($oldEmail !== $validated['email']) {
             $user->email_verified_at = null;

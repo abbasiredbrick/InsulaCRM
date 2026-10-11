@@ -37,16 +37,7 @@ class LeadAssigned extends Notification implements ShouldQueue
 
     public function toWhatsApp(object $notifiable): WhatsAppMessage
     {
-        $lead = $this->lead;
-
-        return WhatsAppMessage::template('new_lead_assigned')
-            ->body([
-                $notifiable->name,
-                trim("{$lead->first_name} {$lead->last_name}") ?: 'New lead',
-                $lead->phone ?: 'N/A',
-                ucwords(str_replace('_', ' ', $lead->lead_source ?? 'N/A')),
-            ])
-            ->button((string) $lead->id);
+        return app(WhatsAppService::class)->leadAssignedMessage($notifiable, $this->lead);
     }
 
     public function toArray(object $notifiable): array

@@ -4,6 +4,9 @@ namespace App\Notifications;
 
 use App\Models\Lead;
 use App\Models\User;
+use App\Notifications\Channels\WhatsAppChannel;
+use App\Notifications\Messages\WhatsAppMessage;
+use App\Services\WhatsAppService;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -29,11 +32,24 @@ class LeadReassigned extends Notification
     {
         $isNewAgent = $notifiable->id === $this->to->id;
 
+        $channels = ['database'];
+
         if ($isNewAgent && ($notifiable->notification_delivery ?? 'instant') !== 'daily_digest') {
-            return ['database', 'mail'];
+            $channels[] = 'mail';
         }
 
-        return ['database'];
+        // Only the newly assigned agent gets a WhatsApp message; the previous
+        // agent and managers get the database row only.
+        if ($isNewAgent && $notifiable instanceof User && app(WhatsAppService::class)->canSendTo($notifiable)) {
+            $channels[] = WhatsAppChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toWhatsApp(object $notifiable): WhatsAppMessage
+    {
+        return app(WhatsAppService::class)->leadAssignedMessage($notifiable, $this->lead);
     }
 
     public function toMail(object $notifiable): MailMessage

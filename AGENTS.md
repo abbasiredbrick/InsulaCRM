@@ -417,6 +417,41 @@ Also: `deals.show` renders the letter form inline (a collapse), and only for
 registered `deal.offers.create` route points at `offers.create`, a view that
 does not exist and 500s; do not build on it.
 
+## WhatsApp Inbox & webhook
+
+Outbound notifications (templates) and the inbound Inbox share the WhatsApp
+Cloud API integration. Rules that keep them from drifting:
+
+- **`sendText()` returns the wamid (`?string`), never `bool`.** The Inbox stores
+  outbound messages with that id; a `null` return is a failed send and the reply
+  endpoint surfaces it as 422 without persisting. `sendTemplate()` keeps its
+  `bool` contract.
+- **Resolve the provider through `IntegrationManager::getWhatsAppProvider($tenantId)`,**
+  never `new CloudApiWhatsAppProvider` / never inject it from the container — a
+  fresh instance has an empty config and every send fails silently. Same trap as
+  the Property Finder service.
+- **The webhook is tenant-less.** Meta posts without a session, so there is no
+  `auth()->user()->tenant_id` and no global `tenant()` helper (that function
+  does not exist — do not write code that calls it). The tenant is resolved from
+  the payload's `metadata.phone_number_id` against the active `cloud-api`
+  `Integration` rows, then stamped on the request attributes so the `HasTenant`
+  trait stamps model writes. The GET verify answer matches the configured
+  `verify_token` (env `WHATSAPP_VERIFY_TOKEN` or per-integration config).
+- **Webhook credentials live on the Integration config, not `.env` alone:** the
+  Cloud API provider exposes `verify_token` and `app_secret` config fields; the
+  signature (`X-Hub-Signature-256`) is checked with the integration's
+  `app_secret` when one is set. Routes are public, CSRF-exempt
+  (`webhooks/whatsapp/*`).
+- **Per-agent opt-in is explicit.** `whatsapp_inbox_enabled` (Settings → Team
+  invite + edit) gates who sees the inbox; admins/owners and
+  `whatsapp_inbox_admin` always see everything, other enabled agents only their
+  own + unassigned conversations. Default off (unchecked sends nothing).
+- **Phone identity for conversation matching:** inbound `wa_id` is stored as
+  digits; a conversation uniquifies on `[tenant_id, wa_id]`. Lead matching
+  tolerates a missing country code by comparing the last nine digits, and the
+  conversation picks up `lead_id`/`assigned_user_id`/`display_name` from the
+  lead when one is found.
+
 ## Commands
 
 - Run the whole suite: `php -d memory_limit=1G vendor/bin/phpunit`

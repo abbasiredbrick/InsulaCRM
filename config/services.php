@@ -41,4 +41,14 @@ return [
         'client_secret' => env('TRUERENTOR_CLIENT_SECRET'),
     ],
 
+    'whatsapp' => [
+        /*
+         * Fallback webhook credentials for a single-company install. Per-tenant
+         * values configured on the WhatsApp integration take precedence; see
+         * CloudApiWhatsAppProvider::configFields().
+         */
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+    ],
+
 ];

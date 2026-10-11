@@ -73,6 +73,8 @@ use App\Http\Controllers\ThemeController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\WebhookRecipeController;
+use App\Http\Controllers\WhatsappInboxController;
+use App\Http\Controllers\WhatsappWebhookController;
 use App\Http\Controllers\WorkflowController;
 use Illuminate\Support\Facades\Route;
 
@@ -956,4 +958,19 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
     // ── Knowledge Base (all roles) ──────────────────────────
     Route::get('/help', [KnowledgeBaseController::class, 'index'])->name('help.index');
     Route::get('/help/{slug}', [KnowledgeBaseController::class, 'show'])->name('help.show');
+});
+
+// WhatsApp Webhooks (public)
+Route::prefix('webhooks/whatsapp')->group(function () {
+    Route::get('/', [WhatsappWebhookController::class, 'verify'])->name('whatsapp.webhook.verify');
+    Route::post('/', [WhatsappWebhookController::class, 'handle'])->name('whatsapp.webhook.handle');
+});
+
+// WhatsApp Inbox
+Route::middleware(['auth', 'tenant', 'require2fa'])->prefix('whatsapp')->name('whatsapp.')->group(function () {
+    Route::get('/inbox', [WhatsappInboxController::class, 'index'])->name('inbox.index');
+    Route::get('/inbox/{conversation}', [WhatsappInboxController::class, 'show'])->name('inbox.show');
+    Route::post('/inbox/{conversation}/reply', [WhatsappInboxController::class, 'reply'])->name('inbox.reply');
+    Route::post('/inbox/{conversation}/assign', [WhatsappInboxController::class, 'assign'])->name('inbox.assign');
+    Route::post('/inbox/{conversation}/close', [WhatsappInboxController::class, 'close'])->name('inbox.close');
 });

@@ -25,8 +25,10 @@ interface WhatsAppProviderInterface
 
     /**
      * Send a free-form text message. Only valid inside a 24h customer service window.
+     *
+     * @return string|null the provider's message id (wamid) on success, null on failure
      */
-    public function sendText(string $to, string $text): bool;
+    public function sendText(string $to, string $text): ?string;
 
     public function requiresConfig(): bool;
 

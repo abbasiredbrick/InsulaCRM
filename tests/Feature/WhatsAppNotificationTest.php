@@ -79,7 +79,14 @@ class WhatsAppNotificationTest extends TestCase
         $this->configureWhatsApp();
         $agent = $this->optedInAgent();
 
-        $lead = $this->createLead(['first_name' => 'Sara', 'last_name' => 'Khan', 'phone' => '+971500000000', 'lead_source' => 'portal']);
+        $lead = $this->createLead([
+            'first_name' => 'Sara',
+            'last_name' => 'Khan',
+            'phone' => '+971500000000',
+            'lead_source' => 'portal',
+            'notes' => "Interested in\nMarina Tower",
+            'custom_fields' => ['contact_link' => 'https://www.propertyfinder.ae/leads/v1/lead/message/abc'],
+        ]);
         $notification = new LeadAssigned($lead, $this->tenant);
 
         Http::fake([
@@ -100,9 +107,37 @@ class WhatsAppNotificationTest extends TestCase
                 && $body['template']['components'][0]['type'] === 'body'
                 && $body['template']['components'][0]['parameters'][0]['text'] === $agent->name
                 && $body['template']['components'][0]['parameters'][1]['text'] === 'Sara Khan'
+                && $body['template']['components'][0]['parameters'][4]['text'] === 'Interested in Marina Tower'
+                && $body['template']['components'][0]['parameters'][5]['text'] === 'https://www.propertyfinder.ae/leads/v1/lead/message/abc'
                 && $body['template']['components'][1]['type'] === 'button'
                 && $body['template']['components'][1]['parameters'][0]['text'] === (string) $lead->id;
         });
+    }
+
+    public function test_reassignment_whatsapps_the_new_agent_only(): void
+    {
+        $this->actingAsAdmin();
+        $this->configureWhatsApp();
+
+        $this->adminUser->update(['whatsapp_number' => '+971501234567', 'whatsapp_opt_in' => true]);
+
+        $old = $this->createUserWithRole('agent', [
+            'whatsapp_number' => '+971509999999',
+            'whatsapp_opt_in' => true,
+        ]);
+
+        $lead = $this->createLead(['first_name' => 'Sara', 'last_name' => 'Khan', 'phone' => '+971500000000']);
+
+        Http::fake([
+            'graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.TEST']]], 200),
+        ]);
+
+        // New agent (admin) gets the channel; the previous agent does not.
+        $toNotification = new \App\Notifications\LeadReassigned($lead, $old, $this->adminUser, 'Reassigned');
+        $this->assertContains(WhatsAppChannel::class, $toNotification->via($this->adminUser));
+
+        $fromNotification = new \App\Notifications\LeadReassigned($lead, $old, $this->adminUser, 'Reassigned');
+        $this->assertNotContains(WhatsAppChannel::class, $fromNotification->via($old));
     }
 
     public function test_channel_does_not_send_when_agent_opted_out(): void
@@ -158,7 +193,7 @@ class WhatsAppNotificationTest extends TestCase
             ->assertJson(['success' => false]);
     }
 
-    public function test_test_whatsapp_endpoint_sends_the_connectivity_template(): void
+    public function test_test_whatsapp_endpoint_sends_the_lead_assigned_template(): void
     {
         $this->actingAsAdmin();
         $this->configureWhatsApp();
@@ -175,9 +210,37 @@ class WhatsAppNotificationTest extends TestCase
             $body = $request->data();
 
             return $body['to'] === '971501234567'
-                && $body['template']['name'] === 'hello_world'
-                && $body['template']['language']['code'] === 'en_US';
+                && $body['template']['name'] === 'new_lead_assigned'
+                && $body['template']['language']['code'] === 'en_US'
+                && $body['template']['components'][0]['type'] === 'body'
+                && $body['template']['components'][0]['parameters'][1]['text'] === 'Sample Lead'
+                && $body['template']['components'][1]['type'] === 'button'
+                && $body['template']['components'][1]['parameters'][0]['text'] === '1';
         });
+    }
+
+    public function test_resaving_the_whatsapp_config_keeps_the_stored_token(): void
+    {
+        $this->actingAsAdmin();
+        $this->configureWhatsApp(['access_token' => 'secret-token-value']);
+
+        $this->post(route('integrations.store'), [
+            'category' => 'whatsapp',
+            'driver' => 'cloud-api',
+            'config' => [
+                'phone_number_id' => '519394444600658',
+                'access_token' => '',
+                'business_account_id' => '574516909079551',
+            ],
+        ])->assertRedirect();
+
+        $integration = Integration::withoutGlobalScopes()
+            ->where('category', 'whatsapp')
+            ->where('driver', 'cloud-api')
+            ->firstOrFail();
+
+        $this->assertSame('secret-token-value', $integration->config['access_token']);
+        $this->assertSame('574516909079551', $integration->config['business_account_id']);
     }
 
     public function test_invite_agent_stores_whatsapp_fields(): void

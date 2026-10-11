@@ -482,6 +482,13 @@
                         </label>
                         <small class="form-hint">{{ __('Requires a WhatsApp number above. Sends a message when a new lead is assigned to them.') }}</small>
                     </div>
+                    <div class="col-md-12">
+                        <label class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="whatsapp_inbox_enabled" value="1" id="invite-whatsapp-inbox">
+                            <span class="form-check-label">{{ __('Use WhatsApp Inbox') }}</span>
+                        </label>
+                        <small class="form-hint">{{ __('Opt this agent into the shared company WhatsApp chat so they can message leads from Keystone. Admins always have access.') }}</small>
+                    </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100">{{ __('Add') }}</button>
                     </div>
@@ -609,6 +616,13 @@
                                                                 <span class="form-check-label">{{ __('Receive WhatsApp notifications') }}</span>
                                                             </label>
                                                             <small class="form-hint">{{ __('Requires a WhatsApp number above. Sends a message when a new lead is assigned to them.') }}</small>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-check form-switch mb-0">
+                                                                <input class="form-check-input" type="checkbox" name="whatsapp_inbox_enabled" value="1" @checked($agent->whatsapp_inbox_enabled)>
+                                                                <span class="form-check-label">{{ __('Use WhatsApp Inbox') }}</span>
+                                                            </label>
+                                                            <small class="form-hint">{{ __('Opt this agent into the shared company WhatsApp chat so they can message leads from Keystone. Admins always have access.') }}</small>
                                                         </div>
                                                         <div>
                                                             <label class="form-label">{{ __('Manager') }}</label>

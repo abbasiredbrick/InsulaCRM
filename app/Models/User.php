@@ -37,6 +37,8 @@ class User extends Authenticatable
         'notification_delivery',
         'agent_code',
         'photo_storage',
+        'whatsapp_inbox_enabled',
+        'whatsapp_inbox_admin',
     ];
 
     protected $hidden = [
@@ -55,6 +57,8 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'receives_leads' => 'boolean',
             'whatsapp_opt_in' => 'boolean',
+            'whatsapp_inbox_enabled' => 'boolean',
+            'whatsapp_inbox_admin' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'onboarding_completed' => 'boolean',
             'dashboard_widgets' => 'array',

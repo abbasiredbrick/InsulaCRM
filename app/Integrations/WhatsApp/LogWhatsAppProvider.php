@@ -37,11 +37,11 @@ class LogWhatsAppProvider implements WhatsAppProviderInterface
         return true;
     }
 
-    public function sendText(string $to, string $text): bool
+    public function sendText(string $to, string $text): ?string
     {
         Log::info('WhatsApp text (log driver)', ['to' => $to, 'text' => $text]);
 
-        return true;
+        return 'log-'.bin2hex(random_bytes(8));
     }
 
     public function requiresConfig(): bool

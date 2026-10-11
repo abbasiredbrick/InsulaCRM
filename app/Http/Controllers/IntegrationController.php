@@ -45,6 +45,30 @@ class IntegrationController extends Controller
 
         $driverInstance = $manager->resolveDriver($request->category, $request->driver);
 
+        $config = $request->config ?? [];
+
+        // A blank password field means "keep the stored secret". The form
+        // never re-renders secrets, so re-saving a config would otherwise wipe
+        // the token.
+        $existing = Integration::where('tenant_id', $tenant->id)
+            ->where('category', $request->category)
+            ->where('driver', $request->driver)
+            ->first();
+
+        if ($existing) {
+            $previous = is_array($existing->config) ? $existing->config : [];
+
+            $passwordFields = collect($driverInstance->configFields())
+                ->where('type', 'password')
+                ->pluck('name');
+
+            foreach ($passwordFields as $field) {
+                if (blank($config[$field] ?? null) && ! blank($previous[$field] ?? null)) {
+                    $config[$field] = $previous[$field];
+                }
+            }
+        }
+
         Integration::updateOrCreate(
             [
                 'tenant_id' => $tenant->id,
@@ -53,7 +77,7 @@ class IntegrationController extends Controller
             ],
             [
                 'name' => $driverInstance->name(),
-                'config' => $request->config ?? [],
+                'config' => $config,
                 'is_active' => true,
                 'is_default' => true,
             ]
