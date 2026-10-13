@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Meeting;
+use App\Models\Property;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -76,7 +77,21 @@ class CalendarSyncController extends Controller
             ->whereDate('scheduled_at', '<=', $endDate->toDateString())
             ->get();
 
-        $ical = $this->buildIcal($user, $tasks, $meetings);
+        // Listing-permit renewals a year ahead — the -30/+90 window suits
+        // viewings and meetings but hides an annual permit that needs planning.
+        $permits = Property::withoutGlobalScopes()
+            ->where('tenant_id', $user->tenant_id)
+            ->whereNotNull('rera_permit_no')
+            ->whereNotNull('permit_expires_at')
+            ->whereBetween('permit_expires_at', [$startDate->toDateString(), $now->copy()->addDays(365)->toDateString()]);
+
+        if (! $user->isAdmin() && $user->isAgent()) {
+            $permits->where(fn ($q) => $q->where('assigned_agent_id', $user->id)->orWhereNull('assigned_agent_id'));
+        }
+
+        $permits = $permits->get();
+
+        $ical = $this->buildIcal($user, $tasks, $meetings, $permits);
 
         return response($ical, 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
@@ -205,9 +220,9 @@ class CalendarSyncController extends Controller
     }
 
     /**
-     * Build iCal content string from tasks and meetings.
+     * Build iCal content string from tasks, meetings and permit renewals.
      */
-    protected function buildIcal(User $user, $tasks, $meetings): string
+    protected function buildIcal(User $user, $tasks, $meetings, $permits = []): string
     {
         $lines = [];
         $lines[] = 'BEGIN:VCALENDAR';
@@ -262,6 +277,17 @@ class CalendarSyncController extends Controller
             $lines[] = 'END:VEVENT';
         }
 
+        foreach ($permits as $property) {
+            $lines[] = 'BEGIN:VEVENT';
+            $lines[] = 'UID:permit-'.$property->id.'@keystone';
+            $lines[] = 'DTSTART;VALUE=DATE:'.$property->permit_expires_at->format('Ymd');
+            $lines[] = 'SUMMARY:'.$this->escapeIcalText($property->permit_label.' expires — '.$property->display_name);
+            $lines[] = 'DESCRIPTION:'.$this->escapeIcalText('Permit no: '.($property->rera_permit_no ?: '—').'. Renew it to keep the unit listed on the portals.');
+            $lines[] = 'STATUS:CONFIRMED';
+            $lines[] = 'DTSTAMP:'.now()->utc()->format('Ymd\THis\Z');
+            $lines[] = 'END:VEVENT';
+        }
+
         $lines[] = 'END:VCALENDAR';
 
         return implode("\r\n", $lines)."\r\n";
@@ -288,8 +314,8 @@ class CalendarSyncController extends Controller
             $line = trim($line);
 
             if ($line === 'BEGIN:VEVENT') {
-$inEvent = true;
-            $currentEvent = ['summary' => null, 'dtstart' => null, 'dtstart_time' => null];
+                $inEvent = true;
+                $currentEvent = ['summary' => null, 'dtstart' => null, 'dtstart_time' => null];
 
                 continue;
             }

@@ -16,6 +16,10 @@ class WhatsAppService
      * initial-assignment and reassignment notifications so both carry the same
      * lead name, phone, source, the client's enquiry message and the portal
      * conversation link.
+     *
+     * The approved template has no URL button (it was removed to keep it
+     * Utility-priced), so no button parameter is sent — a button component on
+     * a buttonless template is a Meta parameter-mismatch rejection.
      */
     public function leadAssignedMessage(User $notifiable, Lead $lead): WhatsAppMessage
     {
@@ -27,8 +31,7 @@ class WhatsAppService
                 ucwords(str_replace('_', ' ', $lead->lead_source ?? 'N/A')),
                 $this->conversationMessage($lead),
                 $this->conversationLink($lead),
-            ])
-            ->button((string) $lead->id);
+            ]);
     }
 
     /**

@@ -58,7 +58,7 @@
                     <div class="d-flex align-items-center gap-1">
                         <select name="status" class="form-select form-select-sm" style="width:auto;">
                             <option value="">{{ __('Set status...') }}</option>
-                            @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
+                            @foreach(\App\Services\LeadStatusGate::bulkStatusOptions() as $val => $label)
                                 <option value="{{ $val }}">{{ $label }}</option>
                             @endforeach
                         </select>
@@ -201,8 +201,12 @@
                     </td>
                     <td class="text-secondary">@if($lead->phone)<a href="tel:{{ $lead->phone }}" class="text-reset text-decoration-none">{{ $lead->phone }}</a>@else - @endif</td>
                     <td>
-                        <select class="form-select form-select-sm status-select" data-lead-id="{{ $lead->id }}" aria-label="{{ __('Status for') }} {{ $lead->full_name }}" style="width: auto; min-width: 120px;">
-                            @foreach(\App\Services\CustomFieldService::getOptions('lead_status') as $val => $label)
+                        @php $statusOptions = \App\Services\LeadStatusGate::statusOptionsFor($lead); @endphp
+                        <select class="form-select form-select-sm status-select" data-lead-id="{{ $lead->id }}" data-current="{{ $lead->status }}" aria-label="{{ __('Status for') }} {{ $lead->full_name }}" style="width: auto; min-width: 120px;">
+                            @if(! array_key_exists($lead->status, $statusOptions))
+                                <option value="{{ $lead->status }}" selected>{{ \App\Services\CustomFieldService::getOptions('lead_status')[$lead->status] ?? $lead->status }}</option>
+                            @endif
+                            @foreach($statusOptions as $val => $label)
                                 <option value="{{ $val }}" {{ $lead->status == $val ? 'selected' : '' }}>{{ $label }}</option>
                             @endforeach
                         </select>
@@ -379,13 +383,20 @@ document.addEventListener('change', function(e) {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({ status: status })
-        }).then(function(r) {
+        }).then(async function(r) {
             if (r.ok) {
                 showToast('{{ __("Status updated successfully.") }}', 'success');
             } else {
-                showToast('{{ __("Failed to update status.") }}', 'error');
+                var message = '{{ __("Failed to update status.") }}';
+                try {
+                    var data = await r.json();
+                    if (data && data.message) message = data.message;
+                } catch(e) {}
+                select.value = select.dataset.current;
+                showToast(message, 'error');
             }
         }).catch(function() {
+            select.value = select.dataset.current;
             showToast('{{ __("Network error. Please try again.") }}', 'error');
         });
 });

@@ -402,7 +402,6 @@ class SettingsController extends Controller
                 'Hi, I am interested in this property. Please call me.',
                 'https://wa.me/971500000000',
             ];
-            $buttonParameter = '1';
         }
 
         try {
@@ -1714,6 +1713,10 @@ class SettingsController extends Controller
     {
         $tenant = auth()->user()->tenant;
 
+        $request->validate([
+            'permit_expiry_reminder_days' => 'nullable|string|max:60',
+        ]);
+
         $notificationTypes = [
             'lead_assigned',
             'lead_reassigned',
@@ -1725,6 +1728,7 @@ class SettingsController extends Controller
             'team_member_invited',
             'sequence_email',
             'lease_expiry_reminder',
+            'permit_expiry_reminder',
             'calendar_reminders',
             'schedule_feedback',
         ];
@@ -1733,6 +1737,12 @@ class SettingsController extends Controller
         foreach ($notificationTypes as $type) {
             $preferences[$type] = $request->boolean($type);
         }
+
+        // The permit reminder offsets (days before expiry) are configurable; an
+        // empty value falls back to the default 7,3,1 in PermitExpiryService.
+        $preferences['permit_expiry_reminder_days'] = \App\Services\PermitExpiryService::parseReminderDays(
+            $request->input('permit_expiry_reminder_days')
+        );
 
         $tenant->update(['notification_preferences' => $preferences]);
 

@@ -76,7 +76,58 @@
                         <span class="badge bg-red badge-pill chat-unread" data-lead-chat-unread="{{ $leadChatUnread }}" style="position:absolute; top:-6px; right:-6px; font-size:10px;">{{ min($leadChatUnread, 99) }}</span>
                         @endif
                     </a>
-                    @if($canReassign)
+{{-- Mark as Lost modal: upload the WhatsApp proof and set the lost status in one step. --}}
+@if(! \App\Services\LostLeadNotifier::isLostStatus($lead->status) && \Illuminate\Support\Facades\Gate::allows('update', $lead))
+<div class="modal modal-blur fade" id="markLostModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <form method="POST" action="{{ route('leads.proof.store', $lead) }}" enctype="multipart/form-data">
+            @csrf
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 21a1 1 0 0 0 1 -1v-8a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1v8a1 1 0 0 0 1 1h3z"/><path d="M13 8a4 4 0 0 0 -4 -4h-1.5a1.5 1.5 0 0 0 -1.5 1.5v8.5"/><path d="M15.035 15.536a4 4 0 0 0 0 -5.656l-.707 -.707"/><path d="M19.071 19.071a9 9 0 0 0 0 -12.728l-.707 -.707"/></svg>
+                        {{ __('Mark :name as Lost', ['name' => $lead->full_name]) }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning border-0 small">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        {{ __('Attach a screenshot of your last WhatsApp conversation with this client as proof the lead has moved on. Uploading it here marks the lead in the same step.') }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('Status to set') }}</label>
+                        <select name="status" class="form-select" required>
+                            @foreach(\App\Services\LeadStatusGate::PROOF_REQUIRED_STATUSES as $lostStatus)
+                                <option value="{{ $lostStatus }}">{{ \App\Services\CustomFieldService::getOptions('lead_status')[$lostStatus] ?? $lostStatus }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-hint">{{ __('Closed lost is normally set by the deal process; Dead is the agent-set status.') }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">{{ __('WhatsApp proof screenshot') }}</label>
+                        <input type="file" name="proof" class="form-control" accept=".png,.jpg,.jpeg,.webp,.pdf,image/*" required>
+                        <div class="form-hint">{{ __('PNG, JPG, WebP or PDF, up to 10 MB.') }}</div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">{{ __('Note (optional)') }}</label>
+                        <textarea name="note" class="form-control" rows="2" maxlength="500" placeholder="{{ __('e.g. client rented elsewhere — declined our offers') }}"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="submit" class="btn btn-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>
+                        {{ __('Upload & Mark Lost') }}
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
+
+@if($canReassign)
                     <button type="button" class="btn btn-outline-warning btn-sm me-1" data-bs-toggle="modal" data-bs-target="#reassignModal">
                         {{ __('Reassign') }}
                     </button>
@@ -486,7 +537,7 @@
                             <label class="form-label mb-1">{{ __('Move status to') }}</label>
                             <select name="status" class="form-select" id="activity-status-select">
                                 <option value="">{{ __('Keep current (:status)', ['status' => \App\Services\CustomFieldService::getOptions('lead_status')[$lead->status] ?? $lead->status]) }}</option>
-                                @foreach(\App\Services\CustomFieldService::getAssignableOptions('lead_status') as $val => $label)
+                                @foreach(\App\Services\LeadStatusGate::statusOptionsFor($lead) as $val => $label)
                                     @if($val === $lead->status)
                                         @continue
                                     @endif
@@ -725,6 +776,17 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>
                         {{ __('Send WhatsApp') }}
                     </a>
+                    @if(\App\Services\LostLeadNotifier::isLostStatus($lead->status))
+                    @can('update', $lead)
+                    <form method="POST" action="{{ route('leads.request-feedback', $lead) }}" onsubmit="return confirm('{{ __('Send a WhatsApp feedback request to this client?') }}')">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-whatsapp w-100" title="{{ __('Send the how-did-we-do template from the company number') }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"/></svg>
+                            {{ __('Request Feedback') }}
+                        </button>
+                    </form>
+                    @endcan
+                    @endif
                     @endif
                     @endif
                     @if($lead->email && !$lead->do_not_contact)
@@ -757,6 +819,42 @@
                         {{ __('Objection Responses') }}
                     </button>
                     @endif
+
+                    {{-- Lost status proof (status workflow gate) --}}
+                    @can('update', $lead)
+                    @php $lostProofs = $lead->lostProofs; @endphp
+                    @if(! \App\Services\LostLeadNotifier::isLostStatus($lead->status) || $lostProofs->isNotEmpty())
+                    <small class="text-uppercase text-secondary fw-bold mt-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ __('Lost status proof') }}</small>
+                    @if($lostProofs->isNotEmpty())
+                        @foreach($lostProofs as $proof)
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{{ route('leads.proofs.download', $proof) }}" class="btn btn-outline-secondary btn-sm flex-fill text-start text-truncate" title="{{ $proof->original_name }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"/><path d="M12 17v-6"/><path d="M9 14l3 -3l3 3"/></svg>
+                                {{ $proof->original_name }} <span class="text-muted">({{ $proof->created_at?->format('M j') }})</span>
+                            </a>
+                            <form method="POST" action="{{ route('leads.proofs.destroy', $proof) }}" onsubmit="return confirm('{{ __('Delete this proof?') }}')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-ghost-danger btn-icon btn-sm" title="{{ __('Delete') }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="4" y1="7" x2="20" y2="7"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                        @endforeach
+                    @elseif(! \App\Services\LostLeadNotifier::isLostStatus($lead->status))
+                        <div class="alert alert-warning border-0 py-2 mb-2 small">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                            {{ __('A WhatsApp screenshot of the client communication is required before this lead can be marked Dead or Lost.') }}
+                        </div>
+                    @endif
+                    @if(! \App\Services\LostLeadNotifier::isLostStatus($lead->status))
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#markLostModal">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 21a1 1 0 0 0 1 -1v-8a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1v8a1 1 0 0 0 1 1h3z"/><path d="M13 8a4 4 0 0 0 -4 -4h-1.5a1.5 1.5 0 0 0 -1.5 1.5v8.5"/><path d="M15.035 15.536a4 4 0 0 0 0 -5.656l-.707 -.707"/><path d="M19.071 19.071a9 9 0 0 0 0 -12.728l-.707 -.707"/></svg>
+                        {{ __('Mark as Lost') }}
+                    </button>
+                    @endif
+                    @endif
+                    @endcan
 
                     {{-- Manage --}}
                     <small class="text-uppercase text-secondary fw-bold mt-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ __('Manage') }}</small>

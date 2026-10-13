@@ -1333,6 +1333,7 @@ class ListingController extends Controller
             'available_from' => 'nullable|date',
             'title_deed_no' => 'nullable|string|max:60',
             'rera_permit_no' => 'nullable|string|max:60',
+            'permit_expires_at' => 'nullable|date',
             'plot_no' => 'nullable|string|max:60',
             'building_no' => 'nullable|string|max:60',
             'unit_no' => 'nullable|string|max:60',

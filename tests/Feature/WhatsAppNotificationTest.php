@@ -95,7 +95,7 @@ class WhatsAppNotificationTest extends TestCase
 
         app(WhatsAppChannel::class)->send($agent, $notification);
 
-        Http::assertSent(function ($request) use ($agent, $lead) {
+        Http::assertSent(function ($request) use ($agent) {
             $body = $request->data();
 
             return str_contains($request->url(), '/519394444600658/messages')
@@ -109,8 +109,8 @@ class WhatsAppNotificationTest extends TestCase
                 && $body['template']['components'][0]['parameters'][1]['text'] === 'Sara Khan'
                 && $body['template']['components'][0]['parameters'][4]['text'] === 'Interested in Marina Tower'
                 && $body['template']['components'][0]['parameters'][5]['text'] === 'https://www.propertyfinder.ae/leads/v1/lead/message/abc'
-                && $body['template']['components'][1]['type'] === 'button'
-                && $body['template']['components'][1]['parameters'][0]['text'] === (string) $lead->id;
+                && count($body['template']['components'] ?? []) === 1
+                && ! isset($body['template']['components'][1]);
         });
     }
 
@@ -214,8 +214,8 @@ class WhatsAppNotificationTest extends TestCase
                 && $body['template']['language']['code'] === 'en_US'
                 && $body['template']['components'][0]['type'] === 'body'
                 && $body['template']['components'][0]['parameters'][1]['text'] === 'Sample Lead'
-                && $body['template']['components'][1]['type'] === 'button'
-                && $body['template']['components'][1]['parameters'][0]['text'] === '1';
+                && count($body['template']['components'] ?? []) === 1
+                && ! isset($body['template']['components'][1]);
         });
     }
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class WhatsappConversation extends Model
 {
@@ -40,5 +41,30 @@ class WhatsappConversation extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(WhatsappMessage::class)->orderBy('created_at', 'asc');
+    }
+
+    public function latestMessage(): HasOne
+    {
+        return $this->hasOne(WhatsappMessage::class)->latestOfMany();
+    }
+
+    public function seens(): HasMany
+    {
+        return $this->hasMany(WhatsappConversationSeen::class);
+    }
+
+    /**
+     * How many inbound messages the given user has not opened yet.
+     */
+    public function unreadCountFor(int $userId): int
+    {
+        $lastSeen = WhatsappConversationSeen::where('whatsapp_conversation_id', $this->id)
+            ->where('user_id', $userId)
+            ->value('last_seen_message_id');
+
+        return WhatsappMessage::where('whatsapp_conversation_id', $this->id)
+            ->where('direction', 'inbound')
+            ->when($lastSeen, fn ($q) => $q->where('id', '>', $lastSeen))
+            ->count();
     }
 }

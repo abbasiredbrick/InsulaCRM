@@ -128,6 +128,50 @@ owner accounts. Don't try to add an owner special case to `inviteAgent`: the
 role cannot be posted there. It is a default, not a lockout — an owner can still
 opt in from the edit modal, and `isInLeadRotation()` honours that.
 
+## Status workflow — the lost/dead proof gate
+
+An agent may not push a lead to a **lost** status (`dead`, `closed_lost`) until a
+**WhatsApp screenshot** of the client communication has been uploaded. Anything
+that bypasses this gate eventually lets an agent mark a lead dead without doing
+the closing outreach, which is the whole point of the workflow.
+
+- **The gate is `App\Services\LeadStatusGate`** (stateless, static methods) and
+  lives in ONE place — never re-inline `dead`/`closed_lost` checks in a
+  controller. `requiresProof($status)`, `proofError(Lead, $status)`,
+  `statusOptionsFor(Lead)` (per-lead manual dropdown: assignable minus the
+  unproven gated statuses), `bulkStatusOptions()` (gated statuses never offered —
+  a batch cannot carry per-lead proof).
+- **Enforced on every manual lead-side path:** `LeadController::updateStatus`
+  (422 JSON with the message), `update` (back error), `bulkAction` (back error),
+  `store` (a brand-new lead cannot be created directly as lost), and
+  `ActivityController::store` (back error). All of them, plus the add/edit forms
+  and Kanban, draw their option lists from `statusOptionsFor()`.
+- **The deal path is exempt by construction.** `DealLifecycleService` writes
+  `closed_lost` straight onto the model; the gate guards only the controllers, so
+  a declined offer stays a sanctioned screenshot-free route to `closed_lost`.
+  `closed_won`/`closed_lost` are also `CustomFieldService::AUTOMATED_STATUSES` and
+  are validated out of every manual route (`LeadRequest`, `ActivityRequest` keep
+  only assignable slugs + the lead's current status). Never re-add them to the
+  manual lists.
+- **Proofs are `lead_proofs` rows** (model `LeadProof`, TenantScope, private
+  `local` disk at `lead-proofs/{lead_id}/…`, types png/jpg/jpeg/webp/pdf ≤ 10 MB),
+  NOT `lead_photos`. `Lead::lostProofs()` / `hasLostProof()`. Upload + mark-lost
+  happen in ONE step from the "Mark as Lost" modal on `leads/show`
+  (`leads.proof.store`): the controller stores the file, *then* applies the
+  transition (proof now exists ⇒ gate passes), fires `LeadStatusChanged` +
+  `LostLeadNotifier`. Uploading without a status is allowed (prove early, mark
+  later). `leads.proofs.download` / `leads.proofs.destroy` are model-bound and
+  TenantScope-scoped; do not serve these files publicly and never read the
+  `Content-Type` from the filename.
+- **Kanban:** the Dead column stays (blocked drops, not removal) but carries
+  `data-col-kind="proof"` + a lock icon; `closed_won`/`closed_lost` columns are
+  `data-col-kind="automated"` and block every drop (deal-driven). Cards carry
+  `data-lost-proof="0|1"`; the drop handler blocks unproven dead drops with a
+  hint toast. The move-menu is `statusOptionsFor()` per lead, so it never offers
+  `closed_won`/`closed_lost` (pre-existing leak, now fixed) and omits `dead`
+  until proof exists. The server 422 is the backstop — a client-side bypass still
+  rolls the lead back to its old status.
+
 ## Locations (formerly "Map Locations") — the communities ⇢ buildings master
 
 Settings → Locations is admin-only and independent of inventory sources
@@ -451,6 +495,110 @@ Cloud API integration. Rules that keep them from drifting:
   tolerates a missing country code by comparing the last nine digits, and the
   conversation picks up `lead_id`/`assigned_user_id`/`display_name` from the
   lead when one is found.
+- **Meta delivery gotcha (prod, Oct 2026):** verifying the callback URL and
+  creating webhook fields is NOT enough — Meta only POSTs message webhooks
+  after the WABA owning the phone number shows the `messages` field as
+  *subscribed* (a per-WABA toggle in App Dashboard → WhatsApp →
+  Configuration → Webhook fields; `GET /{waba_id}/subscribed_apps` from the
+  stored token read empty until it was flipped per-number). Development-mode
+  apps deliver fine for a real, registered production number once the field is
+  subscribed — the 5-recipient test-number whitelist only applies to Meta's
+  `+1 555-…` sandbox numbers. `WhatsappWebhookController` logs a warning on
+  missing/mismatched `X-Hub-Signature-256` so a silently dropped delivery is
+  diagnosable; those aborts would otherwise leave no trace (Laravel does not
+  log 4xx).
+
+### The inbox is live, media-capable, and per-user
+
+The Inbox is a two-pane client-rendered chat (`index.blade.php` + `public/js/whatsapp-inbox.js`)
+fed by JSON endpoints; there is no server-side message render to keep in sync.
+
+- **Two pollers, not a websocket.** `whatsapp.inbox.conversations` (list, every
+  5 s) and `whatsapp.inbox.messages` for the open conversation (every 4 s with
+  `?after=<last id>`). The client only appends rows with an id past the last one,
+  so a client render bug can't duplicate history; the server is always the source
+  of truth. `messages` also advances the read watermark and fires the Meta read
+  receipt.
+- **Media lives on the private `local` disk** (`storage/app/private`) at
+  `whatsapp/{tenant}/{conversation}/{wamid}.{ext}` — never a public URL. Inbound
+  media is downloaded in the webhook through `WhatsAppMediaService::storeInbound()`
+  (which delegates to the provider's `downloadMedia()`), outbound uploads through
+  `storeOutboundUpload()`. Both are streamed back by `whatsapp.inbox.media`,
+  which is conversation-authorized and **derives `Content-Type` from the stored
+  message's `media_mime`, never from the query string**; anything that isn't
+  `image/*`, `video/*` or `audio/*` is forced to `attachment` +
+  `application/octet-stream` (a customer-supplied HTML "image" served inline
+  would be stored XSS). `sendMedia()` uploads to `/{phone_number_id}/media` then
+  sends `{type, id}`; `sendText()`/`sendMedia()` return the wamid or null —
+  null deletes the just-stored outbound file and is a 422.
+- **Read state is per user**, in `whatsapp_conversation_seens`
+  (`[whatsapp_conversation_id, user_id] → last_seen_message_id`). Unread is
+  inbound messages newer than that id; the list computes ALL conversations'
+  counts in one query (`WhatsAppConversationService::unreadCounts`, a left join),
+  never N+1. `markSeen()` only ever moves the watermark forward.
+- **The webhook handles more than text.** `image/video/audio/document/sticker`
+  store media, `location`/`contacts` store a typed body, `button` (a tapped
+  template quick-reply) and `interactive` (`button_reply`/`list_reply`) store the
+  tapped label as an inbound text row (payload/id kept in `meta`), and the
+  `statuses` array advances delivery receipts (`sent→delivered→read`) through
+  `recordDelivery()`, which never regresses a status (receipts arrive out of
+  order and Meta can re-send). Statuses only touch an *existing* conversation —
+  never create a phantom one.
+- **Scope:** admins/owners and `whatsapp_inbox_admin` see every conversation;
+  other enabled agents see only their own + the unassigned queue. `reply()`
+  auto-assigns an unassigned conversation to the responder. Reused server-side
+  as `seesEveryConversation()` / `authorizeConversation()`.
+- Every append/list mutation goes through `WhatsAppConversationService`, which
+  centralizes `touchConversation()` (last_message_at + reopen a closed thread).
+  Do not hand-roll `updateOrCreate`-with-`DB::raw` read watermarks or a second
+  "does this conversation exist" query in the controller.
+
+### Lost-lead feedback template — manual, company number, Inbox-logged
+
+When a lead is lost/dead an agent can send the client a how-did-we-do WhatsApp
+from the company number. This is `LeadFeedbackService` (manual only — nothing
+fires automatically; marketing templates cost money and cold-reach a client).
+The "Request Feedback" button on `leads/show` posts `leads.request-feedback`
+(`LeadController::requestFeedback`), shown only for `LostLeadNotifier::isLostStatus()`
+leads with a phone that are not `do_not_contact`.
+
+- **The template must be approved in Meta first.** Name `lead_feedback_request`,
+  language `en`, body `LeadFeedbackService::BODY` with
+  two ordered placeholders → client first name, assigned agent name, plus the
+  quick-reply buttons in `LeadFeedbackService::BUTTONS`. The constants and the
+  Meta template must stay identical or Meta rejects the send.
+  **Keep it two variables, and never open or close the body with a variable:**
+  Meta rejects a leading/trailing placeholder and flags a high
+  variable-to-length ratio on a short body (its first rejection was "too many
+  variables for its length / variables can't be at the start or end"), so the
+  body starts with "Thank you…" and ends with "…your own words" around the two
+  mid-body placeholders. This is the one client-facing template;
+  `new_lead_assigned` is agent-facing.
+- **Category: approved as `UTILITY` (kept deliberately).** A "how did we do"
+  survey really belongs to **Marketing**, so Meta's recurring re-categorization
+  may flip it to Marketing — the status stays `APPROVED`. `CloudApiWhatsAppProvider::sendTemplate()`
+  posts *every* template to `/{phone_number_id}/messages`, which is correct for
+  Utility. If the template is ever reclassified to Marketing **and** the WABA
+  enables `disable_marketing_messages_on_cloud_api`, that endpoint rejects it
+  with **error 131063**; route Marketing templates to
+  `/{phone_number_id}/marketing_messages` if that happens (Meta's per-category
+  send endpoint rule).
+- **`new_lead_assigned` is buttonless and language `en_US`.** Its URL button
+  was removed to keep it Utility-priced; `WhatsAppService::leadAssignedMessage()`
+  and the Settings test-send therefore send **no button parameter** — never
+  re-add `->button(...)`, a button component on a buttonless template is a
+  Meta parameter-mismatch rejection. Its language is `en_US`. The feedback
+  template's language is `en`; the constants match the approved templates
+  exactly and drifts in either direction reject the send.
+- Sending resolves the provider through `IntegrationManager::getWhatsAppProvider()`
+  for the lead's tenant and the `to` from `Lead::whatsapp_phone` (digits, no `+`).
+  `sendTemplate()` keeps its `bool` contract, so the outbound row is stored
+  **without** a wamid and carries no delivery ticks — the client's reply still
+  threads in by `wa_id`.
+- The sent message is mirrored into the Inbox via `findOrCreateConversation()` +
+  `addOutboundMessage()` so the reply lands on a conversation linked to the lead;
+  a mirroring failure is logged, never surfaced as a failed request. A tapped
+  quick reply arrives as a `button` webhook message (handled above).
 
 ## Commands
 
@@ -467,7 +615,7 @@ Product name is **Keystone** (never the legacy name). Driven by server-env
 ## Test conventions
 
 Portals/wholesale use `business_mode` (=`realestate`), roles fixtures live in
-the base `TestCase`. Full suite is green: **1419 tests / 4976 assertions**,
+the base `TestCase`. Full suite is green: **1480 tests / 5164 assertions**,
 with the exceptions listed below.
 Keep it green; a few tests fail occasionally mid-suite (a different one each
 run) — `FollowupFeedbackTest::test_quick_log_posts_the_selected_card_type`,

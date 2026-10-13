@@ -327,6 +327,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/listings', [ListingsController::class, 'index'])->name('listings.index');
         Route::get('/listings/mandates', [ListingDashboardController::class, 'index'])->name('listings.mandates');
         Route::get('/listings/readiness', [PortalReadinessController::class, 'index'])->name('listings.readiness');
+        Route::get('/listings/export/permits', [ListingsController::class, 'exportPermits'])->name('listings.export.permits');
+        Route::get('/listings/permits/events', [ListingsController::class, 'permitsEvents'])->name('listings.permits.events');
     });
 
     // ── Inventory / Units (real estate agent mode) ────────────────
@@ -534,6 +536,10 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::resource('leads', LeadController::class)->except(['index']);
         Route::get('/leads/{lead}/chat', [ChatController::class, 'leadChat'])->name('leads.chat');
         Route::patch('/leads/{lead}/status', [LeadController::class, 'updateStatus'])->name('leads.updateStatus');
+        Route::post('/leads/{lead}/request-feedback', [LeadController::class, 'requestFeedback'])->name('leads.request-feedback');
+        Route::post('/leads/{lead}/proof', [\App\Http\Controllers\LeadProofController::class, 'store'])->name('leads.proof.store');
+        Route::get('/proofs/{proof}/download', [\App\Http\Controllers\LeadProofController::class, 'download'])->name('leads.proofs.download');
+        Route::delete('/proofs/{proof}', [\App\Http\Controllers\LeadProofController::class, 'destroy'])->name('leads.proofs.destroy');
         Route::post('/leads/{lead}/claim', [LeadController::class, 'claim'])->name('leads.claim');
 
         Route::get('/team', [\App\Http\Controllers\TeamController::class, 'index'])->name('team.index');
@@ -969,7 +975,10 @@ Route::prefix('webhooks/whatsapp')->group(function () {
 // WhatsApp Inbox
 Route::middleware(['auth', 'tenant', 'require2fa'])->prefix('whatsapp')->name('whatsapp.')->group(function () {
     Route::get('/inbox', [WhatsappInboxController::class, 'index'])->name('inbox.index');
+    Route::get('/inbox/conversations', [WhatsappInboxController::class, 'conversations'])->name('inbox.conversations');
     Route::get('/inbox/{conversation}', [WhatsappInboxController::class, 'show'])->name('inbox.show');
+    Route::get('/inbox/{conversation}/messages', [WhatsappInboxController::class, 'messages'])->name('inbox.messages');
+    Route::get('/inbox/{conversation}/media', [WhatsappInboxController::class, 'media'])->name('inbox.media');
     Route::post('/inbox/{conversation}/reply', [WhatsappInboxController::class, 'reply'])->name('inbox.reply');
     Route::post('/inbox/{conversation}/assign', [WhatsappInboxController::class, 'assign'])->name('inbox.assign');
     Route::post('/inbox/{conversation}/close', [WhatsappInboxController::class, 'close'])->name('inbox.close');

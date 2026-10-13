@@ -30,6 +30,33 @@ interface WhatsAppProviderInterface
      */
     public function sendText(string $to, string $text): ?string;
 
+    /**
+     * Send a media message (image/video/audio/document) from a local file.
+     *
+     * @return string|null the provider's message id (wamid) on success, null on failure
+     */
+    public function sendMedia(
+        string $to,
+        string $filePath,
+        string $mediaType,
+        ?string $caption = null,
+        string $mime = '',
+        string $fileName = '',
+    ): ?string;
+
+    /**
+     * Download an inbound media payload returned by the webhook.
+     *
+     * @return array{bytes: string, mime_type: string, file_name: string}|null
+     */
+    public function downloadMedia(string $mediaId): ?array;
+
+    /**
+     * Tell Meta the customer's last message was read (clears the "read" tick
+     * on their side for our conversation).
+     */
+    public function markAsRead(string $to, string $wamid): bool;
+
     public function requiresConfig(): bool;
 
     public function configFields(): array;

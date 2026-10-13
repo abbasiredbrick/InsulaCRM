@@ -25,7 +25,7 @@ for f in "$@"; do
   fi
   dir=$(dirname "$f")
   if [[ "$dir" == "." ]]; then
-    SCRIPT+="put $f; "
+    SCRIPT+="cd $REMOTE_ROOT; put $f; "
   else
     SCRIPT+="cd $REMOTE_ROOT/$dir; put $f; "
   fi

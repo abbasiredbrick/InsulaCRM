@@ -131,6 +131,28 @@
                     <dt class="col-sm-3">{{ $property->permit_label }}</dt>
                     <dd class="col-sm-9">{{ $property->rera_permit_no ?: '—' }}</dd>
 
+                    @php
+                        $permitDays = $property->permitDaysLeft();
+                        $permitStatus = $property->permit_expires_at
+                            ? \App\Services\PermitExpiryService::status($property, $property->tenant)
+                            : 'none';
+                    @endphp
+                    <dt class="col-sm-3">{{ __('Permit expiry') }}</dt>
+                    <dd class="col-sm-9">
+                        @if($permitStatus === 'none')
+                            <span class="text-muted">{{ __('Not set') }}</span>
+                        @else
+                            {{ $property->permit_expires_at->format('M j, Y') }}
+                            @if($permitStatus === 'expired')
+                                <span class="badge bg-danger-lt">{{ __('Expired :n days ago', ['n' => abs($permitDays)]) }}</span>
+                            @elseif($permitStatus === 'due')
+                                <span class="badge bg-orange-lt">{{ $permitDays === 0 ? __('Due today') : __('Due in :n days', ['n' => $permitDays]) }}</span>
+                            @else
+                                <span class="badge bg-green-lt">{{ __('Valid') }}</span>
+                            @endif
+                        @endif
+                    </dd>
+
                     <dt class="col-sm-3">{{ __('Assigned agent') }}</dt>
                     <dd class="col-sm-9">{{ $property->assignedAgent->name ?? '—' }}</dd>
 

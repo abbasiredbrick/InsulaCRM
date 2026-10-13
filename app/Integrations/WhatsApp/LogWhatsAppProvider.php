@@ -44,6 +44,39 @@ class LogWhatsAppProvider implements WhatsAppProviderInterface
         return 'log-'.bin2hex(random_bytes(8));
     }
 
+    public function sendMedia(
+        string $to,
+        string $filePath,
+        string $mediaType,
+        ?string $caption = null,
+        string $mime = '',
+        string $fileName = '',
+    ): ?string {
+        Log::info('WhatsApp media (log driver)', [
+            'to' => $to,
+            'type' => $mediaType,
+            'name' => $fileName ?: basename($filePath),
+            'caption' => $caption,
+            'mime' => $mime,
+        ]);
+
+        return 'log-'.bin2hex(random_bytes(8));
+    }
+
+    public function downloadMedia(string $mediaId): ?array
+    {
+        Log::info('WhatsApp media download (log driver)', ['media_id' => $mediaId]);
+
+        return null;
+    }
+
+    public function markAsRead(string $to, string $wamid): bool
+    {
+        Log::info('WhatsApp mark-as-read (log driver)', ['to' => $to, 'wamid' => $wamid]);
+
+        return true;
+    }
+
     public function requiresConfig(): bool
     {
         return false;

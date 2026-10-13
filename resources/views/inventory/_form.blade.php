@@ -200,6 +200,12 @@
                                 @endif
                             </div>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-label">{{ __('Permit expiry') }}</label>
+                            <input type="date" name="permit_expires_at" class="form-control @error('permit_expires_at') is-invalid @enderror" value="{{ old('permit_expires_at', $property->permit_expires_at?->format('Y-m-d')) }}">
+                            @error('permit_expires_at') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-hint small">{{ __('Reminders fire before this date.') }}</div>
+                        </div>
                     </div>
                     <div class="row mt-3">
                         <div class="col-md-3">

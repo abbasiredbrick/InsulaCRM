@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\LeadAssigned;
 use App\Services\AssignmentHistoryService;
 use App\Services\CustomFieldService;
+use App\Services\LeadStatusGate;
 use App\Services\MotivationScoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -166,6 +167,14 @@ class LeadController extends Controller
                 if (! in_array($request->status, $validStatuses, true)) {
                     return redirect()->back()->with('error', 'Invalid status.');
                 }
+                // Bulk updates cannot carry per-lead proof, so the proof-gated
+                // statuses (dead, closed_lost) are never applied here. Marking
+                // a lead lost is a per-lead decision from its own page.
+                if (LeadStatusGate::requiresProof($request->status)) {
+                    return redirect()->back()->with('error', __('The :status status requires a WhatsApp proof per lead — mark it from each lead\'s page.', [
+                        'status' => CustomFieldService::getOptions('lead_status')[$request->status] ?? $request->status,
+                    ]));
+                }
                 foreach ($leads as $lead) {
                     $oldStatus = $lead->status;
                     $lead->update(['status' => $request->status]);
@@ -210,6 +219,12 @@ class LeadController extends Controller
         // Handle custom fields — store as JSON, remove empty values
         if (isset($data['custom_fields'])) {
             $data['custom_fields'] = array_filter($data['custom_fields'], fn ($v) => $v !== null && $v !== '');
+        }
+
+        // A brand-new lead cannot be created directly as dead/closed_lost:
+        // there is no communication to screenshot yet.
+        if (! empty($data['status']) && LeadStatusGate::requiresProof($data['status'])) {
+            return back()->with('error', __('New leads cannot be created directly as this status.'));
         }
 
         if (auth()->user()->isAgent()) {
@@ -509,6 +524,16 @@ class LeadController extends Controller
             }
         }
 
+        // Lost/dead statuses need uploaded WhatsApp proof. Unlike the bare
+        // status PATCH this form may also be carrying that upload, but the
+        // proof goes through leads.proof.store, not this route, so gate it.
+        $newStatus = $data['status'] ?? null;
+        if ($newStatus && $newStatus !== $oldStatus) {
+            if ($gateError = LeadStatusGate::proofError($lead, $newStatus)) {
+                return back()->with('error', $gateError);
+            }
+        }
+
         $lead->update($data);
 
         // Reassigning an agent via the edit form also informs everyone involved.
@@ -659,6 +684,12 @@ class LeadController extends Controller
 
         $oldStatus = $lead->status;
 
+        // Lost/dead statuses need uploaded WhatsApp proof before an agent may
+        // set them; there is no per-request proof on a bare status PATCH.
+        if ($gateError = LeadStatusGate::proofError($lead, $request->status)) {
+            return response()->json(['success' => false, 'message' => $gateError], 422);
+        }
+
         $lead->update(['status' => $request->status]);
 
         if ($oldStatus !== $lead->status) {
@@ -678,6 +709,24 @@ class LeadController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Send the WhatsApp feedback template to a client from the company number,
+     * usually when a lead has been lost or gone dead. Manual-only and logged
+     * into the WhatsApp Inbox.
+     */
+    public function requestFeedback(Lead $lead)
+    {
+        $this->authorize('update', $lead);
+
+        $result = app(\App\Services\WhatsApp\LeadFeedbackService::class)
+            ->request($lead, auth()->user());
+
+        return back()->with(
+            $result['success'] ? 'success' : 'warning',
+            $result['message'],
+        );
     }
 
     public function claim(Lead $lead)

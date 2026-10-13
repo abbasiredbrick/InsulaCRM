@@ -147,6 +147,15 @@
     .kanban-empty svg { opacity: .45; }
     .kanban-hint { font-size: 12px; color: var(--tblr-muted); }
 
+    .kanban-col-lock {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 16px; height: 16px; color: var(--tblr-muted); opacity: .7;
+    }
+    .kanban-col-lock svg { width: 13px; height: 13px; }
+    .kanban-column[data-col-kind="proof"] .kanban-col-dot { background: #d63939; }
+    .kanban-column[data-col-kind="proof"] { box-shadow: inset 0 2px 0 #{'rgba(214, 57, 57, .35)'}; }
+    .kanban-column[data-col-kind="proof"].drag-over { outline: 1px dashed #d63939; outline-offset: -3px; }
+
     /* ── Dark mode overrides ───────────────────────────────────── */
     body[data-bs-theme="dark"] .kanban-column { background: rgba(255, 255, 255, .035); border-color: rgba(255, 255, 255, .09); }
     body[data-bs-theme="dark"] .kanban-card { border-color: rgba(255, 255, 255, .09); }
@@ -238,20 +247,27 @@ $avatarColors = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#0891b2','#4
     @php
         $accent = $accents[$loop->index % count($accents)];
         $statusLeads = $leads->get($slug, collect());
+        $colKind = in_array($slug, \App\Services\CustomFieldService::AUTOMATED_STATUSES, true) ? 'automated' : (\App\Services\LeadStatusGate::requiresProof($slug) ? 'proof' : 'manual');
     @endphp
-    <div class="kanban-column" style="--c: {{ $accent }};" data-status="{{ $slug }}" aria-label="{{ __('Column:') }} {{ $label }}">
+    <div class="kanban-column" style="--c: {{ $accent }};" data-status="{{ $slug }}" data-col-kind="{{ $colKind }}" aria-label="{{ __('Column:') }} {{ $label }}">
         <div class="kanban-col-head">
             <span class="kanban-col-dot"></span>
             <span class="kanban-col-label">{{ $label }}</span>
             <span class="kanban-col-count kanban-count">{{ $statusLeads->count() }}</span>
+            @if($colKind === 'proof')
+                <span class="kanban-col-lock" title="{{ __('Requires a WhatsApp screenshot proof') }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11v-4a4 4 0 0 1 8 0v4"/></svg>
+                </span>
+            @endif
         </div>
         <div class="kanban-column-body">
             @foreach($statusLeads as $lead)
             @php
                 $avatarColor = $avatarColors[$lead->id % count($avatarColors)];
                 $initials = collect(preg_split('/\s+/', trim($lead->full_name ?? '')))->filter()->take(2)->map(fn($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('') ?: '?';
+                $statusOptions = \App\Services\LeadStatusGate::statusOptionsFor($lead);
             @endphp
-            <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" aria-roledescription="draggable item">
+            <div class="kanban-card" draggable="true" data-lead-id="{{ $lead->id }}" data-lost-proof="{{ $lead->hasLostProof() ? '1' : '0' }}" aria-roledescription="draggable item">
                 <div class="kanban-card-top">
                     <span class="kanban-avatar" style="--a: {{ $avatarColor }};" aria-hidden="true">{{ $initials }}</span>
                     <div class="kanban-card-title">
@@ -303,7 +319,7 @@ $avatarColors = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#0891b2','#4
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12h14"/><path d="M15 16l4 -4"/><path d="M15 8l4 4"/></svg>
                         </button>
                         <div class="dropdown-menu dropdown-menu-end">
-                            @foreach($statuses as $moveSlug => $moveLabel)
+                            @foreach($statusOptions as $moveSlug => $moveLabel)
                                 @if($moveSlug !== $slug)
                                 <a href="#" class="dropdown-item move-lead-btn" data-lead-id="{{ $lead->id }}" data-status="{{ $moveSlug }}">{{ $moveLabel }}</a>
                                 @endif
@@ -375,6 +391,23 @@ $avatarColors = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#0891b2','#4
         const newStatus = col.dataset.status;
         const card = document.querySelector('.kanban-card[data-lead-id="' + dragLeadId + '"]');
         if (!card) return;
+
+        // closed_won/closed_lost are set by the deal process, never dragged.
+        if (col.dataset.colKind === 'automated') {
+            showToast('{{ __("This status is driven by the deal process.") }}', 'danger');
+            dragLeadId = null;
+            dragSourceCol = null;
+            return;
+        }
+
+        // Dropping into Dead needs a WhatsApp proof uploaded first.
+        if (col.dataset.colKind === 'proof' && card.dataset.lostProof !== '1') {
+            showToast('{{ __("Mark this lead lost from its page after uploading a WhatsApp proof.") }}', 'danger');
+            dragLeadId = null;
+            dragSourceCol = null;
+            return;
+        }
+
         const body = col.querySelector('.kanban-column-body');
         const empty = body.querySelector('.empty-msg');
         if (empty) empty.remove();

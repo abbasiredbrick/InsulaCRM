@@ -365,6 +365,24 @@ class Lead extends Model
         return $this->hasMany(LeadPhoto::class)->latest();
     }
 
+    /**
+     * WhatsApp/screenshot evidence uploaded before a lead can be marked
+     * lost or dead by an agent. See LeadStatusGate.
+     */
+    public function lostProofs()
+    {
+        return $this->hasMany(LeadProof::class)->latest();
+    }
+
+    /**
+     * Whether a proof has been uploaded for this lead. A non-lost lead
+     * may upload one ahead of time; the gate only checks existence.
+     */
+    public function hasLostProof(): bool
+    {
+        return $this->lostProofs()->exists();
+    }
+
     public function activities()
     {
         return $this->hasMany(Activity::class);

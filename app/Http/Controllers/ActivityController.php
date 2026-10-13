@@ -29,7 +29,7 @@ class ActivityController extends Controller
         if (in_array($request->type, CustomFieldService::$outreachActivityTypes)) {
             $dncService = app(DncService::class);
             $check = $dncService->canLog($lead);
-            if (!$check['allowed']) {
+            if (! $check['allowed']) {
                 return redirect()->route('leads.show', $lead)->with('error', $check['reason']);
             }
         }
@@ -46,6 +46,14 @@ class ActivityController extends Controller
 
         // Agents can move the lead along at the same time they log an activity.
         if ($request->filled('status') || $request->filled('temperature')) {
+            // Lost/dead statuses need uploaded WhatsApp proof first; the proof
+            // is uploaded on its own route, never from the quick-log form.
+            if ($request->filled('status') && $request->status !== $lead->status) {
+                if ($gateError = \App\Services\LeadStatusGate::proofError($lead, $request->status)) {
+                    return redirect()->route('leads.show', $lead)->with('error', $gateError);
+                }
+            }
+
             $oldStatus = $lead->status;
             $lead->status = $request->filled('status') ? $request->status : $lead->status;
             $lead->temperature = $request->filled('temperature') ? $request->temperature : $lead->temperature;
@@ -105,7 +113,7 @@ class ActivityController extends Controller
         // DNC check (do-not-contact only; manual sends are not gated by time-of-day)
         $dncService = app(DncService::class);
         $check = $dncService->canLog($lead);
-        if (!$check['allowed']) {
+        if (! $check['allowed']) {
             return redirect()->route('leads.show', $lead)->with('error', $check['reason']);
         }
 
@@ -138,6 +146,7 @@ class ActivityController extends Controller
             });
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Email send failed', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+
             return redirect()->route('leads.show', $lead)
                 ->with('error', __('Failed to send email. Please check your SMTP settings in Settings > Email.'));
         }
@@ -285,5 +294,4 @@ class ActivityController extends Controller
             abort(403);
         }
     }
-
 }

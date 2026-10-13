@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Activity;
 use App\Models\Showing;
 use App\Notifications\LeadLostForReview;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class LeadLifecycleTest extends TestCase
@@ -181,30 +182,38 @@ class LeadLifecycleTest extends TestCase
         $this->actingAsAdmin();
         $lead = $this->createLead(['status' => 'new']);
 
-        $this->patch(route('leads.updateStatus', $lead), ['status' => 'dead'])->assertJson(['success' => true]);
-
-        $this->assertDatabaseHas('notifications', [
-            'notifiable_id' => $this->adminUser->id,
-            'type' => LeadLostForReview::class,
-        ]);
-    }
-
-    public function test_lost_status_via_activity_form_notifies_admins(): void
-    {
-        $this->actingAsAdmin();
-        $lead = $this->createLead(['status' => 'active_client']);
-
-        $this->post(route('leads.activities.store', $lead), [
-            'type' => 'note',
-            'status' => 'closed_lost',
-            'body' => 'Client decided not to proceed',
+        // dead is a gated status: it needs a WhatsApp-proof upload, which is
+        // exactly what the one-step "Mark as Lost" flow performs.
+        $this->post(route('leads.proof.store', $lead), [
+            'proof' => UploadedFile::fake()->image('proof.png'),
+            'status' => 'dead',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('notifications', [
             'notifiable_id' => $this->adminUser->id,
             'type' => LeadLostForReview::class,
         ]);
-        $this->assertEquals('closed_lost', $lead->fresh()->status);
+        $this->assertEquals('dead', $lead->fresh()->status);
+    }
+
+    public function test_activity_form_cannot_move_a_lead_to_closed_lost(): void
+    {
+        $this->actingAsAdmin();
+        $lead = $this->createLead(['status' => 'active_client']);
+
+        // closed_lost is deal-driven: the quick-log form neither offers it nor
+        // accepts a forged post, and no cross-check fires from a manual path.
+        $this->post(route('leads.activities.store', $lead), [
+            'type' => 'note',
+            'status' => 'closed_lost',
+            'body' => 'Client decided not to proceed',
+        ])->assertSessionHasErrors('status');
+
+        $this->assertDatabaseMissing('notifications', [
+            'notifiable_id' => $this->adminUser->id,
+            'type' => LeadLostForReview::class,
+        ]);
+        $this->assertEquals('active_client', $lead->fresh()->status);
     }
 
     public function test_normal_status_change_does_not_notify(): void

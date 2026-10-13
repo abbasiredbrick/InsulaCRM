@@ -33,6 +33,29 @@
 - README lists the lead quick actions and links to the roadmap and contributing
   guide.
 
+## 1.8.0 - 2026-10-13
+
+### Added
+
+- Listing-permit expiry management. Units carry a permit expiry date; inventory
+  gains a Permit column plus **Permit renewals** and **Permit calendar** tabs,
+  the renewals list exports to CSV, and renewals appear on the per-user iCal
+  feed. The assigned agent and their manager are reminded before expiry (default
+  7, 3 and 1 days, configurable in Settings → Notifications) so the unit is
+  renewed before it drops off the portals.
+- WhatsApp Inbox: a live, media-capable, per-user conversation view backed by the
+  WhatsApp Cloud API, with the webhook handling text, media, location, contacts
+  and tapped template replies.
+- Lost-lead feedback: an agent can request a how-did-we-do WhatsApp from the
+  company number for a lead that was marked lost.
+- Lead proof gate: a lead cannot be moved to a lost status until a WhatsApp
+  screenshot of the client communication has been uploaded.
+
+### Fixed
+
+- Calendar sync no longer withdraws a viewing or meeting that was just created
+  with a null in-memory status; the event is pushed instead.
+
 ## 1.1.0 - 2026-08-29
 
 First maintenance release. Unblocks new installations, closes a data

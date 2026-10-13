@@ -41,6 +41,10 @@
             'label' => __('Lease Expiry Reminders'),
             'description' => __('Notify agents and their managers 45 days before a lease contract expires, so the client can renew or move.'),
         ],
+        'permit_expiry_reminder' => [
+            'label' => __('Listing Permit Expiry Reminders'),
+            'description' => __('Notify the assigned agent and their managers before a RERA/Madhmoun listing permit expires, so it can be renewed before the unit drops off the portals. Defaults to 7, 3 and 1 days before expiry.'),
+        ],
         'calendar_reminders' => [
             'label' => __('Calendar / Schedule Reminders'),
             'description' => __("Email and in-app reminders before viewings, meetings, follow-ups and open houses when they are not synced to a Google/Microsoft calendar."),
@@ -76,6 +80,15 @@
                 <div class="col">
                     <strong>{{ $info['label'] }}</strong>
                     <div class="text-secondary">{{ $info['description'] }}</div>
+                    @if($key === 'permit_expiry_reminder')
+                        <div class="mt-2 d-flex align-items-center gap-2" style="max-width:360px;">
+                            <label class="form-label mb-0 small text-secondary">{{ __('Remind') }}</label>
+                            <input type="text" name="permit_expiry_reminder_days" class="form-control form-control-sm"
+                                value="{{ implode(',', \App\Services\PermitExpiryService::reminderDaysFor($tenant)) }}"
+                                placeholder="7,3,1">
+                            <span class="small text-secondary">{{ __('days before expiry (comma separated)') }}</span>
+                        </div>
+                    @endif
                 </div>
             </div>
         @endforeach

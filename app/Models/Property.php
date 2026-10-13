@@ -116,6 +116,8 @@ class Property extends Model
         'available_from',
         'title_deed_no',
         'rera_permit_no',
+        'permit_expires_at',
+        'permit_reminders_sent',
         'plot_no',
         'building_no',
         'unit_no',
@@ -177,6 +179,8 @@ class Property extends Model
             'sold_at' => 'date',
             'handover_date' => 'date',
             'available_from' => 'date',
+            'permit_expires_at' => 'date',
+            'permit_reminders_sent' => 'array',
             'bayut_listed_at' => 'datetime',
             'dubizzle_listed_at' => 'datetime',
             'propertyfinder_listed_at' => 'datetime',
@@ -202,6 +206,12 @@ class Property extends Model
             }
             if ($property->isDirty('zip_code') && $property->zip_code) {
                 $property->zip_code = AddressNormalizationService::normalizeZipCode($property->zip_code);
+            }
+
+            // A re-issued permit carries a fresh expiry, so the reminder
+            // cycle restarts: clear the fired offsets for the old date.
+            if ($property->isDirty('permit_expires_at')) {
+                $property->permit_reminders_sent = [];
             }
         });
     }
@@ -564,6 +574,15 @@ class Property extends Model
     public function getPermitRegimeAttribute(): string
     {
         return $this->locationPermit()['key'];
+    }
+
+    /**
+     * Whole days until the listing permit expires (negative once lapsed, zero
+     * on the expiry day, null when unrecorded). See PermitExpiryService.
+     */
+    public function permitDaysLeft(): ?int
+    {
+        return \App\Services\PermitExpiryService::daysLeft($this);
     }
 
     /**

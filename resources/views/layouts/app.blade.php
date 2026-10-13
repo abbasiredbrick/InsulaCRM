@@ -21,6 +21,8 @@
             color: #fff;
         }
         .btn-whatsapp:hover { background-color: #1fb855; border-color: #1fb855; }
+        .btn-outline-whatsapp { color: #128c4a; border-color: #25d366; background-color: transparent; }
+        .btn-outline-whatsapp:hover, .btn-outline-whatsapp:focus, .btn-outline-whatsapp:active { background-color: #25d366; border-color: #25d366; color: #fff; }
         /* Ensure solid-bg badges always have white readable text */
         .badge.bg-secondary, .badge.bg-primary, .badge.bg-success, .badge.bg-danger,
         .badge.bg-warning, .badge.bg-info, .badge.bg-dark,
