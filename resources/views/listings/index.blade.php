@@ -222,7 +222,7 @@
                             <div class="text-muted small">{{ __('Unit') }} {{ $unit->unit_no }}</div>
                         @endif
                     </td>
-                    <td class="text-nowrap" style="white-space:normal;word-break:break-word;overflow-wrap:anywhere">
+                    <td style="white-space:normal;word-break:break-word;overflow-wrap:anywhere">
                         {{ $unit->price_line }}
                     </td>
                     <td>
