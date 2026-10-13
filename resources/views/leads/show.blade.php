@@ -560,7 +560,7 @@
                         <div class="col-md-4">
                             <label class="form-label mb-1">{{ __('Advance to stage') }}</label>
                             <select name="stage" class="form-select" id="activity-stage-select">
-                                @php $stageOptions = $lead->stageOptions(); @endphp
+                                @php $stageOptions = $lead->manualStageOptions(); @endphp
                                 <option value="">{{ $lead->stage ? __('Keep current (:stage)', ['stage' => $lead->stageLabel()]) : __('— Select stage —') }}</option>
                                 @foreach($stageOptions as $val => $label)
                                     @if($val === $lead->stage)

@@ -147,6 +147,7 @@
         };
     @endphp
     <div data-live-results>
+    <x-record-count :records="$leads" :label="__('leads')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>

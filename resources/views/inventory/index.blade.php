@@ -329,6 +329,7 @@
     </div>
 
     <div data-live-results>
+    <x-record-count :records="$units" :label="__('units')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>

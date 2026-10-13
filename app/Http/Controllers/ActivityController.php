@@ -67,6 +67,13 @@ class ActivityController extends Controller
 
         // Advance the lead along its leasing/sales pipeline stage.
         if ($request->filled('stage')) {
+            // Won/lost stages are consequences of the deal lifecycle, never a
+            // manual choice. The request validation blocks them too; this is
+            // the friendly-message backstop against a forged POST.
+            if (in_array($request->stage, Lead::SYSTEM_STAGES, true) && $request->stage !== $lead->stage) {
+                return redirect()->route('leads.show', $lead)->with('error', __('Won/lost stages are set by the deal lifecycle and cannot be chosen here.'));
+            }
+
             $oldStage = $lead->stage;
             $lead->stage = $request->stage;
             $lead->stage_changed_at = now();

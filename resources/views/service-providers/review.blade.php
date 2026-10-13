@@ -38,6 +38,7 @@
     </div>
 
     <div data-live-results>
+        <x-record-count :records="$providers" :label="__('providers')" />
         @forelse($providers as $provider)
             <div class="card-body border-bottom">
                 <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">

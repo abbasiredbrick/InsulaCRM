@@ -27,13 +27,23 @@ class ActivityRequest extends FormRequest
         }
         $leadStatuses = implode(',', array_unique($statuses));
 
+        // Same for the stage mover: won/lost stages (deal_won, deal_locked,
+        // closed, closed_lost) are consequences of the deal lifecycle and are
+        // never settable by hand here. The lead's current stage is allowed so
+        // an unchanged field round-trips.
+        $stages = Lead::manualStageKeys();
+        if ($currentStage = $this->route('lead')?->stage) {
+            $stages[] = $currentStage;
+        }
+        $leadStages = implode(',', array_unique($stages));
+
         return [
             'type' => "required|in:{$activityTypes},stage_change",
             'subject' => 'nullable|string|max:255',
             'body' => 'nullable|string',
             'status' => "nullable|in:{$leadStatuses}",
             'temperature' => 'nullable|in:hot,warm,cold',
-            'stage' => 'nullable|in:'.implode(',', Lead::allStageKeys()),
+            'stage' => "nullable|in:{$leadStages}",
         ];
     }
 }

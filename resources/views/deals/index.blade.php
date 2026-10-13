@@ -102,6 +102,7 @@
     @endphp
 
     <div data-live-results>
+    <x-record-count :records="$deals" :label="__('deals')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>

@@ -110,6 +110,7 @@
     </div>
 
     <div data-live-results>
+    <x-record-count :records="$contacts" :label="__('contacts')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>

@@ -42,6 +42,7 @@
         </form>
     </div>
     <div data-live-results>
+    <x-record-count :records="$logs" :label="__('entries')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>

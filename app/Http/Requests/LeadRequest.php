@@ -34,6 +34,15 @@ class LeadRequest extends FormRequest
 
         $leadStatuses = implode(',', array_unique($statuses));
 
+        // Won/lost stages (deal_won, deal_locked, closed, closed_lost) are set
+        // by the deal lifecycle, never by hand. The lead's current stage is
+        // allowed so an already-won/lost lead round-trips on edit.
+        $stages = \App\Models\Lead::manualStageKeys();
+        if ($currentStage = $this->route('lead')?->stage) {
+            $stages[] = $currentStage;
+        }
+        $leadStages = implode(',', array_unique($stages));
+
         $rules = [
             'agent_id' => ['required', Rule::exists('users', 'id')->where('tenant_id', auth()->user()->tenant_id)],
             'first_name' => 'required|string|max:255',
@@ -48,7 +57,7 @@ class LeadRequest extends FormRequest
             'contact_type' => 'nullable|string|in:seller_lead,buyer_lead,active_client,past_client',
             'expected_move_in_date' => 'nullable|date|after_or_equal:today',
             'deal_type' => 'nullable|string|in:rent,sale',
-            'stage' => 'nullable|in:'.implode(',', \App\Models\Lead::allStageKeys()),
+            'stage' => "nullable|in:{$leadStages}",
             'notes' => 'nullable|string',
             'custom_fields' => 'nullable|array',
             'custom_fields.*' => 'nullable',

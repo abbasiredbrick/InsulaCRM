@@ -39,6 +39,7 @@
 </form>
 
 <div data-live-results>
+<x-record-count :records="$owners" :label="__('owners')" />
     <div class="card">
         <div class="table-responsive">
             <table class="table table-vcenter card-table">

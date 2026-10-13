@@ -61,6 +61,7 @@
         </form>
     </div>
     <div data-live-results>
+    <x-record-count :records="$properties" :label="__('properties')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>

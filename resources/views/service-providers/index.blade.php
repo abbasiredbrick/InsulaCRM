@@ -41,6 +41,7 @@
     </div>
 
     <div data-live-results>
+        <x-record-count :records="$providers" :label="__('providers')" />
         <div class="table-responsive">
             <table class="table table-vcenter card-table">
                 <thead>

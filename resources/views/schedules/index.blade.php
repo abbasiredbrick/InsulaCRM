@@ -87,6 +87,7 @@
 
     {{-- Tabs --}}
     <div data-live-results>
+    <x-record-count :count="$items->count()" :label="__('items')" />
     <div class="card-body border-bottom p-0">
         <ul class="nav nav-tabs border-bottom-0" role="tablist" id="sched-tabs">
             <li class="nav-item" role="presentation">

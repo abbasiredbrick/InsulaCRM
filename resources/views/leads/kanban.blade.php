@@ -242,6 +242,7 @@ $avatarColors = ['#2563eb','#7c3aed','#db2777','#059669','#d97706','#0891b2','#4
 @endphp
 
 <div data-live-results>
+<x-record-count :count="$leads->flatten(1)->count()" :label="__('leads')" />
 <div class="kanban-board">
     @foreach($statuses as $slug => $label)
     @php

@@ -50,6 +50,7 @@
         </form>
     </div>
     <div data-live-results>
+    <x-record-count :records="$campaigns" :label="__('campaigns')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table">
             <thead>

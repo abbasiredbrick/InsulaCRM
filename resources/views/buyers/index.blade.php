@@ -74,6 +74,7 @@
     </div>
     <x-saved-views-bar entity-type="buyers" />
     <div data-live-results>
+    <x-record-count :records="$buyers" :label="__('buyers')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3 mobile-cols-check">
             <thead>

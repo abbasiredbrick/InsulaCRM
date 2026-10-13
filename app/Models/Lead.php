@@ -59,6 +59,20 @@ class Lead extends Model
         'closed' => 'Closed',
     ];
 
+    /**
+     * Won/lost stages that are a *consequence* of the deal lifecycle, never a
+     * choice an agent makes by hand. Mirrors Deal::SYSTEM_STAGES: the deal
+     * services (DealLifecycleService, TransactionCloseService) set these
+     * directly on the model. They are filtered out of every manual stage
+     * dropdown and validation rule so an agent cannot mark a lead won or lost
+     * from the activity log or the edit form.
+     */
+    public const WON_STAGES = ['deal_won', 'deal_locked', 'closed'];
+
+    public const LOST_STAGES = ['closed_lost'];
+
+    public const SYSTEM_STAGES = ['deal_won', 'deal_locked', 'closed', 'closed_lost'];
+
     protected $fillable = [
         'tenant_id',
         'agent_id',
@@ -177,6 +191,15 @@ class Lead extends Model
     }
 
     /**
+     * Stage keys an agent may set by hand: every stage except the terminal
+     * won/lost consequences, which only the deal lifecycle may write.
+     */
+    public static function manualStageKeys(): array
+    {
+        return array_values(array_diff(self::allStageKeys(), self::SYSTEM_STAGES));
+    }
+
+    /**
      * Resolve the pipeline (rent or sale) this lead belongs to.
      *
      * Prefers the stored deal_type; otherwise it falls back to the intent of the
@@ -202,6 +225,46 @@ class Lead extends Model
     public function stageOptions(): array
     {
         return $this->dealType() === 'sale' ? self::SALES_STAGES : self::LEASING_STAGES;
+    }
+
+    /**
+     * Manual stage <option> list for this lead's pipeline, minus the terminal
+     * won/lost stages (which only the deal lifecycle may write). The lead's own
+     * current stage is re-added when it is terminal so an already-won/lost lead
+     * round-trips its value instead of being silently reset on save.
+     */
+    public function manualStageOptions(): array
+    {
+        $options = array_diff_key($this->stageOptions(), array_flip(self::SYSTEM_STAGES));
+
+        if ($this->stage && isset($this->stageOptions()[$this->stage])) {
+            $options[$this->stage] = $this->stageOptions()[$this->stage];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Stage option groups (leasing/sales) for the create/edit forms, minus the
+     * terminal won/lost stages. The lead's current stage is re-added to its
+     * group when terminal so an already-won/lost lead round-trips its value.
+     *
+     * @return array{leasing: array<string,string>, sales: array<string,string>}
+     */
+    public static function manualStageGroups(?string $currentStage = null): array
+    {
+        $leasing = array_diff_key(self::LEASING_STAGES, array_flip(self::SYSTEM_STAGES));
+        $sales = array_diff_key(self::SALES_STAGES, array_flip(self::SYSTEM_STAGES));
+
+        if ($currentStage && in_array($currentStage, self::SYSTEM_STAGES, true)) {
+            if (isset(self::LEASING_STAGES[$currentStage])) {
+                $leasing[$currentStage] = self::LEASING_STAGES[$currentStage];
+            } elseif (isset(self::SALES_STAGES[$currentStage])) {
+                $sales[$currentStage] = self::SALES_STAGES[$currentStage];
+            }
+        }
+
+        return ['leasing' => $leasing, 'sales' => $sales];
     }
 
     /**

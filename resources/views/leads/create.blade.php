@@ -141,15 +141,16 @@
                 </div>
                 <div class="col-md-8">
                     <label class="form-label">{{ __('Pipeline Stage') }}</label>
+                    @php $stageGroups = \App\Models\Lead::manualStageGroups(old('stage')); @endphp
                     <select name="stage" class="form-select" id="lead-stage-select">
                         <option value="">{{ __('— None —') }}</option>
                         <optgroup label="{{ __('Leasing Stages') }}" data-deal-type="rent">
-                            @foreach(\App\Models\Lead::LEASING_STAGES as $val => $label)
+                            @foreach($stageGroups['leasing'] as $val => $label)
                                 <option value="{{ $val }}" {{ old('stage') == $val ? 'selected' : '' }}>{{ __($label) }}</option>
                             @endforeach
                         </optgroup>
                         <optgroup label="{{ __('Sales Stages') }}" data-deal-type="sale">
-                            @foreach(\App\Models\Lead::SALES_STAGES as $val => $label)
+                            @foreach($stageGroups['sales'] as $val => $label)
                                 <option value="{{ $val }}" {{ old('stage') == $val ? 'selected' : '' }}>{{ __($label) }}</option>
                             @endforeach
                         </optgroup>

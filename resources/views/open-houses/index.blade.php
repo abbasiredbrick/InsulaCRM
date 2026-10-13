@@ -53,6 +53,7 @@
     </div>
 
     <div data-live-results>
+    <x-record-count :records="$openHouses" :label="__('viewings')" />
     <div class="table-responsive">
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>

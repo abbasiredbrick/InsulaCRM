@@ -438,6 +438,7 @@
 <x-saved-views-bar entity-type="deals" />
 
 <div data-live-results>
+<x-record-count :count="$totalDeals" :label="__('deals')" />
 {{-- Kanban board --}}
 <div id="pipeline" class="pipeline-board {{ (request('show_empty') || $totalDeals === 0) ? 'show-all' : '' }}">
     @foreach($stageLabels as $stageKey => $stageLabel)

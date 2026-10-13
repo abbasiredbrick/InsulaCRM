@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Events\ActivityLogged;
 use App\Facades\Hooks;
+use App\Http\Controllers\Controller;
 use App\Models\Activity;
 use App\Models\AuditLog;
 use App\Models\Lead;
@@ -52,15 +52,15 @@ class ActivityApiController extends Controller
         $validTypes[] = 'stage_change';
 
         $validator = Validator::make($request->all(), [
-            'lead_id'  => 'required|integer',
+            'lead_id' => 'required|integer',
             'agent_id' => 'nullable|integer',
-            'type'     => 'required|in:' . implode(',', $validTypes),
-            'subject'  => 'nullable|string|max:255',
-            'body'     => 'nullable|string',
+            'type' => 'required|in:'.implode(',', $validTypes),
+            'subject' => 'nullable|string|max:255',
+            'body' => 'nullable|string',
             'logged_at' => 'nullable|date',
-            'status'   => 'nullable|in:' . implode(',', CustomFieldService::getValidSlugs('lead_status', $tenant)),
+            'status' => 'nullable|in:'.implode(',', CustomFieldService::getValidSlugs('lead_status', $tenant)),
             'temperature' => 'nullable|in:hot,warm,cold',
-            'stage'    => 'nullable|in:' . implode(',', Lead::allStageKeys()),
+            'stage' => 'nullable|in:'.implode(',', Lead::manualStageKeys()),
         ]);
 
         if ($validator->fails()) {
@@ -76,11 +76,11 @@ class ActivityApiController extends Controller
 
         $activity = Activity::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id,
-            'lead_id'   => $data['lead_id'],
-            'agent_id'  => $data['agent_id'] ?? null,
-            'type'      => $data['type'],
-            'subject'   => $data['subject'] ?? null,
-            'body'      => $data['body'] ?? null,
+            'lead_id' => $data['lead_id'],
+            'agent_id' => $data['agent_id'] ?? null,
+            'type' => $data['type'],
+            'subject' => $data['subject'] ?? null,
+            'body' => $data['body'] ?? null,
             'logged_at' => $data['logged_at'] ?? now(),
         ]);
 
@@ -94,6 +94,12 @@ class ActivityApiController extends Controller
 
         // Advance the lead along its leasing/sales pipeline stage.
         if (array_key_exists('stage', $data)) {
+            // Won/lost stages are deal-lifecycle consequences, not a manual
+            // choice; the validator blocks them, this is the API backstop.
+            if (in_array($data['stage'], Lead::SYSTEM_STAGES, true) && $data['stage'] !== $lead->stage) {
+                return response()->json(['error' => 'Won/lost stages are set by the deal lifecycle and cannot be chosen here.'], 422);
+            }
+
             $oldStage = $lead->stage;
             $lead->stage = $data['stage'];
             $lead->stage_changed_at = now();

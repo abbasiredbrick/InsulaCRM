@@ -63,6 +63,7 @@
 </form>
 
 <div data-live-results>
+<x-record-count :count="$communitiesByCity->flatten(1)->count()" :label="__('communities')" />
     <div class="row">
         <div class="col-md-4 mb-3">
             <div class="card">
