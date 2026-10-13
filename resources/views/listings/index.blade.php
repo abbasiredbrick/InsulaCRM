@@ -390,7 +390,7 @@
                 </button>
             </div>
         </div>
-        <table class="table table-bordered mb-0">
+        <table class="table table-bordered mb-0" id="pcal-table">
             <thead>
                 <tr>
                     @foreach($permitDows as $dow)
@@ -409,12 +409,13 @@
 @push('styles')
 <style>
 .pcal-dot { display:inline-block; width:.6rem; height:.6rem; border-radius:50%; }
-.pcal-day { min-height:90px; vertical-align:top; }
+.pcal-day { min-height:90px; vertical-align:top; width: 14.2857%; }
 .pcal-event { display:block; font-size:.72rem; line-height:1.2; padding:.1rem .3rem; border-radius:.25rem; margin-top:.15rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; text-decoration:none; }
 .pcal-event.red { background:#d63939; }
 .pcal-event.orange { background:#f59f00; }
 .pcal-event.cyan { background:#17a2b8; }
 .pcal-today { background:var(--tblr-primary-lt, #e9f0ff); }
+#pcal-table { table-layout: fixed; width: 100%; }
 </style>
 @endpush
 @push('scripts')
