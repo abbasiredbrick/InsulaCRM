@@ -198,13 +198,13 @@
         <table class="table table-vcenter card-table mobile-cols-3">
             <thead>
                 <tr>
-                    <th>{{ __('Unit') }}</th>
+                    <th class="w-50">{{ __('Unit') }}</th>
                     <th class="text-nowrap w-1">{{ __('Price') }}</th>
-                    <th class="text-nowrap w-1">{{ __('Fees') }}</th>
-                    <th>{{ __('Source') }}</th>
-                    <th>{{ __('Portals') }}</th>
-                    <th>{{ __('Permit') }}</th>
-                    <th>{{ __('Listed Since') }}</th>
+                    <th class="text-nowrap" style="width:15%">{{ __('Fees') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Source') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Portals') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Permit') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Listed Since') }}</th>
                     <th class="w-1"></th>
                 </tr>
             </thead>
