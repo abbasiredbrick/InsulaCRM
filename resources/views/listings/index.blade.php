@@ -199,8 +199,8 @@
             <thead>
                 <tr>
                     <th>{{ __('Unit') }}</th>
-                    <th>{{ __('Price') }}</th>
-                    <th>{{ __('Fees') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Price') }}</th>
+                    <th class="text-nowrap w-1">{{ __('Fees') }}</th>
                     <th>{{ __('Source') }}</th>
                     <th>{{ __('Portals') }}</th>
                     <th>{{ __('Permit') }}</th>
