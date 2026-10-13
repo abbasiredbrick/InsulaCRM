@@ -195,7 +195,7 @@
     <div data-live-results>
     <x-record-count :records="$units" :label="__('units')" />
     <div class="table-responsive">
-        <table class="table table-vcenter card-table mobile-cols-3" style="table-layout:fixed;width:100%">
+        <table class="table table-vcenter card-table mobile-cols-3" style="table-layout:fixed;width:100%;word-wrap:break-word;word-break:break-word">
             <thead>
                 <tr>
                     <th style="width:35%">{{ __('Unit') }}</th>
@@ -223,7 +223,7 @@
                         @endif
                     </td>
                     <td class="text-nowrap">
-                        <strong>{{ $unit->price_line }}</strong>
+                        {{ $unit->price_line }}
                     </td>
                     <td>
                         @if($unit->deposit_amount || $unit->admin_fee || $unit->contract_fee)
