@@ -26,6 +26,15 @@ class MarketContact extends Model
         'converted' => 'Converted',
     ];
 
+    public const DISPOSITIONS = [
+        'willing_rent' => 'Willing to rent',
+        'willing_sell' => 'Willing to sell',
+        'willing_invest' => 'Willing to invest',
+        'call_back' => 'Call back later',
+        'not_interested' => 'Not interested',
+        'unclear' => 'Unclear',
+    ];
+
     protected $fillable = [
         'tenant_id',
         'import_id',
@@ -47,8 +56,12 @@ class MarketContact extends Model
         'budget',
         'preferred_type',
         'requirements',
+        'disposition',
+        'expected_inventory',
+        'priority',
         'status',
         'called_by',
+        'assigned_at',
         'last_called_at',
         'call_notes',
         'converted_type',
@@ -63,7 +76,10 @@ class MarketContact extends Model
             'budget' => 'decimal:2',
             'bedrooms' => 'integer',
             'bathrooms' => 'integer',
+            'priority' => 'integer',
+            'expected_inventory' => 'boolean',
             'last_called_at' => 'datetime',
+            'assigned_at' => 'datetime',
         ];
     }
 

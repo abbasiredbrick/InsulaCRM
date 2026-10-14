@@ -58,7 +58,7 @@ class MarketImportService
      *
      * @return array{import: MarketImport, imported: int, skipped: int}|array{error: string}
      */
-    public function import(string $path, string $format, string $name, string $importType, int $tenantId, ?int $userId = null): array
+    public function import(string $path, string $format, string $name, string $importType, int $tenantId, ?int $userId = null, array $sourceMeta = []): array
     {
         try {
             $rows = $this->parseFile($path, $format);
@@ -68,15 +68,19 @@ class MarketImportService
 
         $imported = 0;
         $skipped = 0;
+        $sentiment = app(ColdCallSentimentService::class);
 
-        $import = DB::transaction(function () use ($rows, $path, $format, $name, $importType, $tenantId, $userId, &$imported, &$skipped) {
+        $import = DB::transaction(function () use ($rows, $path, $format, $name, $importType, $tenantId, $userId, $sourceMeta, $sentiment, &$imported, &$skipped) {
             $import = MarketImport::create([
                 'tenant_id' => $tenantId,
                 'user_id' => $userId,
                 'name' => $name,
                 'type' => $importType,
-                'filename' => basename($path),
+                'filename' => $sourceMeta['filename'] ?? basename($path),
                 'format' => $format,
+                'source' => $sourceMeta['source'] ?? 'upload',
+                'drive_file_id' => $sourceMeta['drive_file_id'] ?? null,
+                'drive_sheet_name' => $sourceMeta['drive_sheet_name'] ?? null,
                 'status' => 'completed',
             ]);
 
@@ -95,7 +99,7 @@ class MarketImportService
                     continue;
                 }
 
-                MarketContact::create([
+                $contact = new MarketContact([
                     'tenant_id' => $tenantId,
                     'import_id' => $import->id,
                     'type' => $type,
@@ -119,6 +123,13 @@ class MarketImportService
                     'status' => 'pending',
                     'notes' => $row['requirements'] ?? null,
                 ]);
+
+                // Comment sentiment → expected-inventory re-call queue.
+                $verdict = $sentiment->classify($contact);
+                $contact->disposition = $verdict['disposition'];
+                $contact->expected_inventory = $verdict['expected_inventory'];
+                $contact->priority = $verdict['priority'];
+                $contact->save();
 
                 $imported++;
             }

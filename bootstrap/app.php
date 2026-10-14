@@ -46,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('recycle:leads')->dailyAt('06:00');
         $schedule->command('leads:create-move-in-reminders')->dailyAt('08:15');
         $schedule->command('digest:inactive-clients')->weeklyOn(1, '09:00');
+        $schedule->command('coldcalls:assign')->hourly()->withoutOverlapping()->onOneServer();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(

@@ -291,6 +291,8 @@ Route::middleware(['auth', 'tenant', 'require2fa'])->group(function () {
         Route::get('/coldcalls', [MarketController::class, 'index'])->name('market.index');
         Route::get('/coldcalls/import', [MarketController::class, 'create'])->name('market.create');
         Route::post('/coldcalls/import', [MarketController::class, 'import'])->name('market.import');
+        Route::get('/coldcalls/import/drive', [MarketController::class, 'drive'])->name('market.drive');
+        Route::post('/coldcalls/import/drive', [MarketController::class, 'importFromDrive'])->name('market.drive.import');
         Route::get('/coldcalls/{marketContact}', [MarketController::class, 'show'])->name('market.show');
         Route::patch('/coldcalls/{marketContact}', [MarketController::class, 'update'])->name('market.update');
         Route::post('/coldcalls/{marketContact}/status', [MarketController::class, 'updateStatus'])->name('market.status');

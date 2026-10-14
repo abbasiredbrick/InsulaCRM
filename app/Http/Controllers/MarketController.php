@@ -8,10 +8,14 @@ use App\Models\Lead;
 use App\Models\MarketContact;
 use App\Models\MarketImport;
 use App\Models\Property;
+use App\Models\UserCloudConnection;
 use App\Services\BusinessModeService;
+use App\Services\Cloud\CloudProviderFactory;
+use App\Services\Cloud\GoogleProvider;
 use App\Services\MarketImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class MarketController extends Controller
 {
@@ -29,6 +33,14 @@ class MarketController extends Controller
 
         if ($request->filled('agent')) {
             $query->where('called_by', $request->agent);
+        }
+
+        if ($request->boolean('expected')) {
+            $query->where('expected_inventory', true);
+        }
+
+        if ($request->filled('disposition')) {
+            $query->where('disposition', $request->disposition);
         }
 
         if ($request->filled('search')) {
@@ -51,6 +63,7 @@ class MarketController extends Controller
             'pending' => MarketContact::where('status', 'pending')->count(),
             'reached' => MarketContact::whereIn('status', ['reached', 'converted'])->count(),
             'converted' => MarketContact::where('status', 'converted')->count(),
+            'expected' => MarketContact::where('expected_inventory', true)->count(),
         ];
 
         $agents = $this->assignableAgents();
@@ -60,6 +73,7 @@ class MarketController extends Controller
             'counts' => $counts,
             'types' => MarketContact::TYPES,
             'statuses' => MarketContact::STATUSES,
+            'dispositions' => MarketContact::DISPOSITIONS,
             'agents' => $agents,
         ]);
     }
@@ -107,6 +121,143 @@ class MarketController extends Controller
             'success',
             "Import complete: {$result['imported']} contacts added, {$result['skipped']} skipped."
         );
+    }
+
+    /**
+     * Browse the connected Google Drive for spreadsheets to import.
+     */
+    public function drive(Request $request)
+    {
+        $provider = $this->driveProvider();
+
+        if (! $provider) {
+            return redirect()->route('market.create')
+                ->with('error', __('Connect your Google Drive first (Settings → Integrations → Google Drive), then return here.'));
+        }
+
+        $files = [];
+        try {
+            $files = $provider->listFiles($this->driveQuery());
+        } catch (\Throwable $e) {
+            return redirect()->route('market.create')
+                ->with('error', __('Could not read Google Drive: :reason', ['reason' => $e->getMessage()]));
+        }
+
+        return view('market.drive', [
+            'files' => $files,
+            'importTypes' => MarketImport::TYPES,
+            'connectedEmail' => $this->driveProviderEmail($provider),
+        ]);
+    }
+
+    /**
+     * Download a selected Drive sheet and import it as a cold-call list.
+     */
+    public function importFromDrive(Request $request)
+    {
+        $data = $request->validate([
+            'file_id' => 'required|string',
+            'name' => 'required|string|max:255',
+            'type' => 'required|in:landlords,investors',
+        ]);
+
+        $provider = $this->driveProvider();
+        if (! $provider) {
+            return redirect()->route('market.create')->with('error', __('Google Drive is not connected.'));
+        }
+
+        try {
+            $meta = $provider->fileMeta($data['file_id']);
+            $mime = $meta['mimeType'] ?? '';
+            $sheetName = $meta['name'] ?: $data['name'];
+        } catch (\Throwable $e) {
+            return back()->with('error', __('Could not read the selected Drive file.'));
+        }
+
+        $isSheet = $mime === 'application/vnd.google-apps.spreadsheet';
+        $format = $isSheet || str_contains($mime, 'spreadsheetml') ? 'xlsx' : 'csv';
+
+        $binary = $provider->downloadFile($data['file_id'], $mime);
+        if ($binary === '') {
+            return back()->with('error', __('The Drive file came back empty.'));
+        }
+
+        $extension = $format === 'xlsx' ? 'xlsx' : 'csv';
+        $stored = 'market-imports/drive-'.now()->timestamp.'-'.substr(md5($data['file_id']), 0, 8).'.'.$extension;
+        Storage::disk('local')->put($stored, $binary);
+
+        $result = app(MarketImportService::class)->import(
+            Storage::disk('local')->path($stored),
+            $format,
+            $data['name'],
+            $data['type'],
+            auth()->user()->tenant_id,
+            auth()->id(),
+            [
+                'source' => 'drive',
+                'drive_file_id' => $data['file_id'],
+                'drive_sheet_name' => $sheetName,
+                'filename' => $sheetName,
+            ]
+        );
+
+        Storage::disk('local')->delete($stored);
+
+        if (isset($result['error'])) {
+            return back()->with('error', $result['error'])->withInput();
+        }
+
+        AuditLog::log('market.imported', $result['import'], [
+            'source' => 'drive',
+            'drive_file_id' => $data['file_id'],
+            'type' => $data['type'],
+            'imported' => $result['imported'],
+            'skipped' => $result['skipped'],
+        ]);
+
+        return redirect()->route('market.index')->with(
+            'success',
+            "Imported {$result['imported']} contacts from Drive ({$result['skipped']} skipped)."
+        );
+    }
+
+    protected function driveProvider(): ?GoogleProvider
+    {
+        $connection = UserCloudConnection::where('user_id', auth()->id())
+            ->where('provider', 'google')
+            ->where('scope', 'drive')
+            ->first();
+
+        if (! $connection) {
+            return null;
+        }
+
+        $provider = app(CloudProviderFactory::class)->make('google', $connection);
+
+        return $provider instanceof GoogleProvider ? $provider : null;
+    }
+
+    protected function driveProviderEmail(GoogleProvider $provider): ?string
+    {
+        try {
+            return $provider->accountEmail();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    protected function driveQuery(): string
+    {
+        $types = [
+            'application/vnd.google-apps.spreadsheet',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/csv',
+            'text/plain',
+        ];
+
+        $clauses = array_map(fn ($t) => "mimeType='{$t}'", $types);
+
+        return '('.implode(' or ', $clauses).')';
     }
 
     public function show(MarketContact $marketContact)

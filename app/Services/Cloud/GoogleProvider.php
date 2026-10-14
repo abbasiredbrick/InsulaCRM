@@ -29,9 +29,15 @@ class GoogleProvider extends CloudBaseProvider
             'profile',
         ];
 
-        $scope === 'drive'
-            ? $base[] = 'https://www.googleapis.com/auth/drive.file'
-            : $base[] = 'https://www.googleapis.com/auth/calendar.events';
+        if ($scope === 'drive') {
+            // drive.file covers files the app itself creates (photos/feeds);
+            // drive.readonly lets us list/read the account's existing Sheets
+            // for the cold-call import without granting write access to them.
+            $base[] = 'https://www.googleapis.com/auth/drive.file';
+            $base[] = 'https://www.googleapis.com/auth/drive.readonly';
+        } else {
+            $base[] = 'https://www.googleapis.com/auth/calendar.events';
+        }
 
         return implode(' ', $base);
     }
@@ -195,6 +201,88 @@ class GoogleProvider extends CloudBaseProvider
     }
 
     /**
+     * List the account's Drive files matching a query, e.g. the cold-call
+     * spreadsheets the agent owns or has opened. Returns lightweight metadata.
+     *
+     * @return array<int, array{id:string, name:string, mimeType:string, modifiedTime:?string}>
+     */
+    public function listFiles(string $query = '', int $pageSize = 100): array
+    {
+        $params = [
+            'pageSize' => $pageSize,
+            'orderBy' => 'modifiedTime desc',
+            'fields' => 'files(id,name,mimeType,modifiedTime),nextPageToken',
+            'supportsAllDrives' => 'true',
+            'includeItemsFromAllDrives' => 'true',
+        ];
+
+        if ($query !== '') {
+            $params['q'] = $query;
+        }
+
+        $response = Http::withToken($this->accessToken())
+            ->timeout(30)
+            ->get(static::DRIVE_FILES_URL, $params)
+            ->throw();
+
+        $files = $response->json('files') ?? [];
+
+        return array_map(fn ($f) => [
+            'id' => (string) ($f['id'] ?? ''),
+            'name' => (string) ($f['name'] ?? ''),
+            'mimeType' => (string) ($f['mimeType'] ?? ''),
+            'modifiedTime' => isset($f['modifiedTime']) ? (string) $f['modifiedTime'] : null,
+        ], $files);
+    }
+
+    /**
+     * Download a file's binary content. Google Sheets are exported to xlsx.
+     */
+    public function downloadFile(string $fileId, string $mimeType = ''): string
+    {
+        $isSheet = $mimeType === 'application/vnd.google-apps.spreadsheet';
+
+        if ($isSheet) {
+            $response = Http::withToken($this->accessToken())
+                ->timeout(120)
+                ->get(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId).'/export', [
+                    'mimeType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ])
+                ->throw();
+        } else {
+            $response = Http::withToken($this->accessToken())
+                ->timeout(120)
+                ->get(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId), ['alt' => 'media'])
+                ->throw();
+        }
+
+        return $response->body();
+    }
+
+    /**
+     * Public alias for the cold-call importer: returns the file name + mime of
+     * a Drive id so the importer can label the import without an extra round trip.
+     *
+     * @return array{name:string, mimeType:string}
+     */
+    public function fileMeta(string $fileId): array
+    {
+        $meta = Http::withToken($this->accessToken())
+            ->timeout(30)
+            ->get(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId), [
+                'fields' => 'id,name,mimeType',
+                'supportsAllDrives' => 'true',
+            ])
+            ->throw()
+            ->json();
+
+        return [
+            'name' => (string) ($meta['name'] ?? ''),
+            'mimeType' => (string) ($meta['mimeType'] ?? ''),
+        ];
+    }
+
+    /**
      * Lazily create a per-tenant photo folder on the agent's drive and cache
      * its id on the connection.
      */
@@ -265,6 +353,7 @@ class GoogleProvider extends CloudBaseProvider
 
             if (isset($meta['photos_subfolders'][$current])) {
                 $parentId = $meta['photos_subfolders'][$current];
+
                 continue;
             }
 

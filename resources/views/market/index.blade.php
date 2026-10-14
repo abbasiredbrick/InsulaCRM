@@ -20,7 +20,7 @@
 @endphp
 
 <div class="row g-3 mb-3">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <a href="{{ route('market.index') }}" class="card card-sm">
             <div class="card-body">
                 <div class="row align-items-center">
@@ -30,7 +30,7 @@
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <a href="{{ route('market.index', ['status' => 'pending']) }}" class="card card-sm">
             <div class="card-body">
                 <div class="row align-items-center">
@@ -40,17 +40,17 @@
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-3">
-        <a href="{{ route('market.index', ['status' => 'reached']) }}" class="card card-sm">
+    <div class="col-6 col-md">
+        <a href="{{ route('market.index', ['expected' => 1]) }}" class="card card-sm">
             <div class="card-body">
                 <div class="row align-items-center">
-                    <div class="col-auto"><span class="avatar bg-green text-white">{{ $counts['reached'] }}</span></div>
-                    <div class="col"><div class="font-weight-medium">{{ __('Reached') }}</div></div>
+                    <div class="col-auto"><span class="avatar bg-azure text-white">{{ $counts['expected'] }}</span></div>
+                    <div class="col"><div class="font-weight-medium">{{ __('Expected Inventory') }}</div></div>
                 </div>
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md">
         <a href="{{ route('market.index', ['status' => 'converted']) }}" class="card card-sm">
             <div class="card-body">
                 <div class="row align-items-center">
@@ -106,6 +106,22 @@
                     @endforeach
                 </select>
             </div>
+            <div class="col-md-2">
+                <label class="form-label">{{ __('Intent') }}</label>
+                <select name="disposition" class="form-select form-select-sm">
+                    <option value="">{{ __('All Intents') }}</option>
+                    @foreach($dispositions as $key => $label)
+                        <option value="{{ $key }}" {{ request('disposition') === $key ? 'selected' : '' }}>{{ __($label) }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-auto">
+                <label class="form-label d-block">&nbsp;</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="expected" value="1" id="expectedToggle" {{ request('expected') ? 'checked' : '' }}>
+                    <label class="form-check-label" for="expectedToggle">{{ __('Expected inventory only') }}</label>
+                </div>
+            </div>
         </form>
     </div>
 
@@ -120,6 +136,7 @@
                 <th>{{ __('Unit / Interest') }}</th>
                 <th>{{ __('Phone') }}</th>
                 <th>{{ __('Status') }}</th>
+                <th>{{ __('Intent') }}</th>
                 <th>{{ __('Agent') }}</th>
                 <th class="w-1">{{ __('Actions') }}</th>
             </tr>
@@ -156,6 +173,13 @@
                         @endif
                     </td>
                     <td><span class="badge bg-{{ $badge[$contact->status] ?? 'secondary' }}">{{ __($mStatuses[$contact->status] ?? $contact->status) }}</span></td>
+                    <td>
+                        @if($contact->disposition)
+                            <span class="badge {{ $contact->expected_inventory ? 'bg-azure-lt' : 'bg-secondary-lt' }}">{{ __(\App\Models\MarketContact::DISPOSITIONS[$contact->disposition] ?? $contact->disposition) }}</span>
+                        @else
+                            <span class="text-muted">—</span>
+                        @endif
+                    </td>
                     <td>{{ $contact->caller?->name ?: '—' }}</td>
                     <td>
                         <div class="btn-group">
@@ -168,7 +192,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">{{ __('No cold call contacts yet.') }} <a href="{{ route('market.create') }}">{{ __('Import a list') }}</a>.</td>
+                    <td colspan="8" class="text-center text-muted py-4">{{ __('No cold call contacts yet.') }} <a href="{{ route('market.create') }}">{{ __('Import a list') }}</a>.</td>
                 </tr>
             @endforelse
             </tbody>
