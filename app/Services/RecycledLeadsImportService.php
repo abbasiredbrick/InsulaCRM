@@ -1129,8 +1129,24 @@ class RecycledLeadsImportService
     {
         $friendly = collect($row)
             ->filter()
-            ->mapWithKeys(fn ($value, $key) => [Str::slug((string) $key) => $value]);
+            ->mapWithKeys(fn ($value, $key) => [Str::slug((string) $key) => $this->cleanUtf8($value)]);
 
         return $friendly->all();
+    }
+
+    /**
+     * Coerce a value to valid UTF-8. Portal/agent exports sometimes carry a
+     * stray non-UTF-8 byte (an MS-1252 apostrophe, a pasted emoji, etc.); when
+     * it lands in the JSON-cast raw_data column the save throws a
+     * JsonEncodingException. Re-encoding replaces invalid sequences instead of
+     * aborting the whole import.
+     */
+    protected function cleanUtf8(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
     }
 }
