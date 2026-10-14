@@ -241,12 +241,20 @@ class GoogleProvider extends CloudBaseProvider
     public function downloadFile(string $fileId, string $mimeType = ''): string
     {
         $isSheet = $mimeType === 'application/vnd.google-apps.spreadsheet';
+        $isDoc = $mimeType === 'application/vnd.google-apps.document';
 
         if ($isSheet) {
             $response = Http::withToken($this->accessToken())
                 ->timeout(120)
                 ->get(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId).'/export', [
                     'mimeType' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ])
+                ->throw();
+        } elseif ($isDoc) {
+            $response = Http::withToken($this->accessToken())
+                ->timeout(120)
+                ->get(static::DRIVE_FILES_URL.'/'.rawurlencode($fileId).'/export', [
+                    'mimeType' => 'text/plain',
                 ])
                 ->throw();
         } else {

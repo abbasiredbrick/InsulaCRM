@@ -580,6 +580,13 @@ class RecycledLeadsImportService
             return '';
         }
 
+        // Excel stores a phone as a float in scientific notation
+        // ("9.71563030252E11"); decode it before digit-stripping, otherwise the
+        // "E11" exponent is read as digits and corrupts the number.
+        if (preg_match('/^\d+(?:\.\d+)?[eE]\+?\d+$/', $raw)) {
+            $raw = sprintf('%.0f', (float) $raw);
+        }
+
         $code = TenantFormatHelper::dialingCode($country);
         $digits = preg_replace('/\D+/', '', $raw) ?? '';
 

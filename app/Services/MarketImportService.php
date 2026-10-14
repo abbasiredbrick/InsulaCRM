@@ -105,7 +105,7 @@ class MarketImportService
                     'type' => $type,
                     'first_name' => $row['first_name'] ?? null,
                     'last_name' => $row['last_name'] ?? null,
-                    'phone' => $row['phone'] ?? null,
+                    'phone' => $this->normalizePhone($row['phone'] ?? null),
                     'email' => $row['email'] ?? null,
                     'company' => $row['company'] ?? null,
                     'unit_no' => $row['unit_no'] ?? null,
@@ -249,6 +249,23 @@ class MarketImportService
             str_contains($value, 'plot') || str_contains($value, 'land') => 'land',
             default => 'apartment',
         };
+    }
+
+    protected function normalizePhone(mixed $value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        $raw = trim((string) $value);
+
+        // Excel stores a phone as a float in scientific notation
+        // ("9.71563030252E11"); decode it to its integer form.
+        if (preg_match('/^\d+(?:\.\d+)?[eE]\+?\d+$/', $raw)) {
+            $raw = sprintf('%.0f', (float) $raw);
+        }
+
+        return $raw;
     }
 
     protected function moneyNumeric(mixed $value): ?float
