@@ -270,10 +270,21 @@ class MarketImportService
 
     protected function moneyNumeric(mixed $value): ?float
     {
-        $value = preg_replace('/[^0-9.]/', '', (string) $value);
+        $raw = (string) $value;
+
+        // Sheets write abbreviated rents ("60K", "1.35M", "3.4M"); expand the
+        // suffix before stripping, or "1.35M" collapses to 1.35.
+        $multiplier = 1;
+        if (preg_match('/\d\s*[Mm]/', $raw)) {
+            $multiplier = 1_000_000;
+        } elseif (preg_match('/\d\s*[Kk]/', $raw)) {
+            $multiplier = 1_000;
+        }
+
+        $value = preg_replace('/[^0-9.]/', '', $raw);
         $value = rtrim((string) $value, '.');
 
-        return $value === '' || $value === '.' ? null : (float) $value;
+        return $value === '' || $value === '.' ? null : (float) $value * $multiplier;
     }
 
     protected function intOrNull(mixed $value): ?int
@@ -284,8 +295,9 @@ class MarketImportService
         if (preg_match('/study/i', (string) $value)) {
             return 0;
         }
-        $value = preg_replace('/[^0-9]/', '', (string) $value);
+        // Keep the decimal separator so "1.0" reads as 1, not "10".
+        $value = preg_replace('/[^0-9.]/', '', (string) $value);
 
-        return $value === '' ? null : (int) $value;
+        return $value === '' || $value === '.' ? null : (int) round((float) $value);
     }
 }
