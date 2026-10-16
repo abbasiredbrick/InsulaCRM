@@ -115,6 +115,32 @@
                         {{ $property->address ?: '' }}{{ $property->address ? ', ' : '' }}
                         {{ $property->sub_community ?: $property->community }}
                         {{ $property->community && $property->sub_community ? ', ' . $property->community : '' }}{{ $property->city ? ', ' . $property->city : '' }}
+
+                        @php
+                            $mapUrl = $property->mapsSearchUrl();
+                            $directionsUrl = $property->mapsDirectionsUrl();
+                            $wazeUrl = $property->mapWazeUrl();
+                            $shareUrl = $property->whatsappLocationShareUrl();
+                        @endphp
+                        @if($mapUrl || $directionsUrl || $wazeUrl || $shareUrl)
+                            <div class="mt-2 d-flex flex-wrap gap-2">
+                                @if($mapUrl)
+                                    <a href="{{ $mapUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="{{ __('Open the building on Google Maps') }}">{{ __('Google Maps') }}</a>
+                                @endif
+                                @if($directionsUrl)
+                                    <a href="{{ $directionsUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="{{ __('Get directions (Google Maps)') }}">{{ __('Directions') }}</a>
+                                @endif
+                                @if($wazeUrl)
+                                    <a href="{{ $wazeUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="{{ __('Drive with Waze') }}">{{ __('Waze') }}</a>
+                                @endif
+                                @if($shareUrl)
+                                    <a href="{{ $shareUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-whatsapp" title="{{ __('Share the building location on WhatsApp') }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9"/><path d="M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1"/></svg>
+                                        {{ __('Share') }}
+                                    </a>
+                                @endif
+                            </div>
+                        @endif
                     </dd>
 
                     <dt class="col-sm-3">{{ __('Unit ref') }}</dt>

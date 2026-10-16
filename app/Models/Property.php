@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Scopes\TenantScope;
 use App\Services\AddressNormalizationService;
+use App\Services\MapLocationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -241,6 +242,82 @@ class Property extends Model
     public function mapLocation()
     {
         return $this->belongsTo(MapLocation::class, 'map_location_id');
+    }
+
+    /**
+     * The text used to open/drive to this unit's building when the map entry
+     * carries no query: its own address, else building/area/city.
+     */
+    public function navigationQuery(): ?string
+    {
+        $location = $this->mapLocation;
+
+        if ($location) {
+            $query = $location->navigationQuery();
+            if ($query !== null) {
+                return $query;
+            }
+        }
+
+        $query = trim((string) ($this->address ?: implode(', ', array_filter([
+            $this->sub_community,
+            $this->community,
+            $this->city,
+        ]))));
+
+        return $query === '' ? null : $query;
+    }
+
+    /**
+     * Google Maps link for the building this unit sits in — the linked
+     * MapLocation's pin wins, otherwise a search built from the address.
+     */
+    public function mapsSearchUrl(): ?string
+    {
+        $maps = app(MapLocationService::class);
+
+        if ($this->mapLocation) {
+            return $maps->urlFor($this->mapLocation) ?: $maps->searchUrl($this->navigationQuery());
+        }
+
+        return $maps->searchUrl($this->navigationQuery());
+    }
+
+    /** "Get directions" link (Google Maps) to the unit's building. */
+    public function mapsDirectionsUrl(): ?string
+    {
+        return app(MapLocationService::class)->directionsUrlFor(
+            $this->mapLocation?->latitude,
+            $this->mapLocation?->longitude,
+            $this->navigationQuery()
+        );
+    }
+
+    /** Waze driving link to the unit's building (pinned coordinates preferred). */
+    public function mapWazeUrl(): ?string
+    {
+        return app(MapLocationService::class)->wazeUrlFor(
+            $this->mapLocation?->latitude,
+            $this->mapLocation?->longitude,
+            $this->navigationQuery()
+        );
+    }
+
+    /**
+     * A WhatsApp "share this location" link: opens the picker with the unit
+     * label plus its Google Maps link so an agent can forward it to a client.
+     */
+    public function whatsappLocationShareUrl(): ?string
+    {
+        $mapsUrl = $this->mapsSearchUrl();
+        if ($mapsUrl === null) {
+            return null;
+        }
+
+        $label = trim((string) ($this->display_name ?: $this->unitLabel()));
+        $text = ($label !== '' ? $label.' — ' : '').$mapsUrl;
+
+        return 'https://wa.me/?text='.rawurlencode($text);
     }
 
     /**

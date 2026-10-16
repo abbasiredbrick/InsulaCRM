@@ -135,6 +135,20 @@ class MapLocationService
         return $query === '' ? null : self::DIRECTIONS_BASE.rawurlencode($query);
     }
 
+    /**
+     * Driving link for a building, preferring a pinned coordinate pair over the
+     * search text — a pin drives to the entrance, a text query to a guess. Falls
+     * back to directionsUrl() when no coordinates are stored.
+     */
+    public function directionsUrlFor(?float $latitude, ?float $longitude, ?string $query): ?string
+    {
+        if ($latitude !== null && $longitude !== null) {
+            return self::DIRECTIONS_BASE.sprintf('%.7F,%.7F', $latitude, $longitude);
+        }
+
+        return $this->directionsUrl($query);
+    }
+
     public function embedUrl(?string $query, ?string $key = null): ?string
     {
         $query = trim((string) $query);
@@ -211,6 +225,42 @@ class MapLocationService
         }
 
         return null;
+    }
+
+    /**
+     * Parse a raw coordinate cell into [lat, lng]. Sources publish the pair in
+     * several shapes — Relaam's "24.471721 ; 54.371855", a comma, a slash, a
+     * pipe or just whitespace — and some cells carry a trailing separator
+     * ("…54.5855828,"). Anything that is not a plausible pair (a single value
+     * or a typo'd/typo'd-swapped latitude) is rejected so it never becomes a
+     * pin in the wrong hemisphere.
+     *
+     * @return array{0: float, 1: float}|null
+     */
+    public function coordsFromText(?string $text): ?array
+    {
+        $text = trim((string) $text);
+        if ($text === '') {
+            return null;
+        }
+
+        $match = [];
+        if (! preg_match(
+            '/^\s*([+-]?\d{1,3}(?:\.\d+)?)\s*(?:[,;\/|]|\s)\s*([+-]?\d{1,3}(?:\.\d+)?)\s*[,;\/|]?\s*$/',
+            $text,
+            $match
+        )) {
+            return null;
+        }
+
+        $latitude = (float) $match[1];
+        $longitude = (float) $match[2];
+
+        if ($latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) {
+            return null;
+        }
+
+        return [$latitude, $longitude];
     }
 
     /**
@@ -351,7 +401,7 @@ class MapLocationService
 
         $normalized = $this->normalizeName($name);
 
-        foreach (MapLocation::withoutGlobalScopes()->where('tenant_id', $tenantId)->get(['id', 'sub_community']) as $location) {
+        foreach (MapLocation::withoutGlobalScopes()->where('tenant_id', $tenantId)->get() as $location) {
             if ($this->normalizeName((string) $location->sub_community) === $normalized) {
                 return $location;
             }
@@ -485,10 +535,41 @@ class MapLocationService
      * row (and its human-corrected link) instead of creating a second one.
      * Returns the single location for the building.
      */
-    public function ensureMapLocation(int $tenantId, string $subCommunity, ?string $community, ?string $city, ?string $sourceUrl): ?MapLocation
+    public function ensureMapLocation(int $tenantId, string $subCommunity, ?string $community, ?string $city, ?string $sourceUrl, ?array $coords = null): ?MapLocation
     {
         $existing = $this->findByName($tenantId, $subCommunity);
         if ($existing) {
+            // Top up only what the entry is missing. This is how a source that
+            // starts publishing a pin (Relaam's "Pin Location"/"Coordinates"
+            // columns) reaches buildings imported before the column existed,
+            // while a link corrected in Settings is never clobbered.
+            $updates = [];
+            $url = $this->cleanUrl($sourceUrl);
+
+            // A generated search fallback (urlFor()'s own output) is not a
+            // human pin — the sheet's real link may replace it. A pasted place
+            // link never equals that fallback, so it is preserved.
+            $generated = $existing->map_url !== null && $existing->map_url === $this->searchUrl($existing->map_query);
+            if ($url !== null && ($existing->map_url === null || $generated)) {
+                $updates['map_url'] = $url;
+            }
+
+            if ($existing->map_query === null) {
+                $query = $this->queryFor([$existing->sub_community, $existing->community, $existing->city]);
+                if ($query !== '') {
+                    $updates['map_query'] = $query;
+                }
+            }
+
+            if ($coords !== null && ($existing->latitude === null || $existing->longitude === null)) {
+                $updates['latitude'] = $coords[0];
+                $updates['longitude'] = $coords[1];
+            }
+
+            if ($updates !== []) {
+                $existing->updateQuietly($updates);
+            }
+
             return $existing;
         }
 
@@ -502,6 +583,8 @@ class MapLocationService
             'city' => $city !== null && $city !== '' ? $city : null,
             'map_url' => $url,
             'map_query' => $query !== '' ? $query : null,
+            'latitude' => $coords[0] ?? null,
+            'longitude' => $coords[1] ?? null,
         ]);
     }
 

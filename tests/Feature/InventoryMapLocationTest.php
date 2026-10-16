@@ -1254,4 +1254,148 @@ class InventoryMapLocationTest extends TestCase
             'sub_community' => '',
         ])->assertSessionHasErrors(['community', 'sub_community']);
     }
+
+    /**
+     * Relaam's sheet: numbered towers ("Building #"), an unnamed rent column
+     * under "Annual Total", and a per-building pin ("Pin Location") plus raw
+     * "Coordinates". The header row must be detected without losing the
+     * building, the unit reference or the rent.
+     */
+    protected function relaamTable(AvailabilityIngestService $service): array
+    {
+        return $service->parseText(implode("\n", [
+            "Building #\tUnit #\tUnit Type\tSqm\tCity\tPlot Number\tSector\tArea\tCoordinates\tPin Location\tAnnual Total\t\tRemarks",
+            "362\t1201\t1BR\t85\tAbu Dhabi\t12\tSector 5\tAl Reem Island\t24.471721 ; 54.371855\thttps://maps.app.goo.gl/AbCdEf\tD\t95000\t1 Month Rent Free",
+            "362\t1202\t2BR\t130\tAbu Dhabi\t12\tSector 5\tAl Reem Island\t24.471721 ; 54.371855\thttps://maps.app.goo.gl/AbCdEf\tD\t130000\t",
+        ]), ['delimiter' => 'tab', 'has_header' => true]);
+    }
+
+    public function test_relaam_headers_keep_the_building_unit_rent_and_pin(): void
+    {
+        $source = $this->createSource(['column_map' => []]);
+        $service = new AvailabilityIngestService;
+
+        $table = $this->relaamTable($service);
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id);
+
+        $this->assertSame(2, $result['created']);
+
+        $property = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)
+            ->where('unit_no', '1201')
+            ->firstOrFail();
+
+        $this->assertSame('362', $property->sub_community);
+        $this->assertNotSame('Other', $property->sub_community);
+        $this->assertEquals(95000, (float) $property->rent_price);
+        $this->assertSame('Al Reem Island', $property->community);
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', '362')
+            ->firstOrFail();
+
+        $this->assertSame('https://maps.app.goo.gl/AbCdEf', $location->map_url);
+        $this->assertEqualsWithDelta(24.471721, (float) $location->latitude, 0.000001);
+        $this->assertEqualsWithDelta(54.371855, (float) $location->longitude, 0.000001);
+        $this->assertSame($location->id, $property->map_location_id);
+    }
+
+    public function test_every_unit_of_a_multi_unit_building_carries_its_map_location(): void
+    {
+        $source = $this->createSource(['column_map' => []]);
+        $service = new AvailabilityIngestService;
+
+        $table = $this->relaamTable($service);
+        $service->ingest($source, $table['rows'], $this->tenant->id);
+
+        $location = MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', '362')
+            ->firstOrFail();
+
+        $units = Property::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)
+            ->get();
+
+        $this->assertCount(2, $units);
+        foreach ($units as $unit) {
+            $this->assertSame($location->id, $unit->map_location_id);
+        }
+    }
+
+    public function test_reimport_tops_up_an_existing_building_with_the_new_pin_and_coordinates(): void
+    {
+        $maps = app(MapLocationService::class);
+        $existing = $this->location('362', $maps->searchUrl('362, Abu Dhabi'), '362, Abu Dhabi', null, 'Abu Dhabi');
+
+        $source = $this->createSource(['column_map' => []]);
+        $service = new AvailabilityIngestService;
+
+        $table = $this->relaamTable($service);
+        $service->ingest($source, $table['rows'], $this->tenant->id);
+
+        $existing->refresh();
+
+        // The generated fallback link is not a human pin — the sheet's real
+        // pin replaces it, and the coordinates are filled in.
+        $this->assertSame('https://maps.app.goo.gl/AbCdEf', $existing->map_url);
+        $this->assertEqualsWithDelta(24.471721, (float) $existing->latitude, 0.000001);
+        $this->assertSame(1, MapLocation::withoutGlobalScopes()
+            ->where('tenant_id', $this->tenant->id)
+            ->where('sub_community', '362')
+            ->count());
+    }
+
+    public function test_a_manually_corrected_pin_survives_but_still_gains_coordinates(): void
+    {
+        $existing = $this->location('362', 'https://www.google.com/maps/place/Correct+Spot', 'Correct Spot, Abu Dhabi');
+
+        $source = $this->createSource(['column_map' => []]);
+        $service = new AvailabilityIngestService;
+
+        $table = $this->relaamTable($service);
+        $service->ingest($source, $table['rows'], $this->tenant->id);
+
+        $existing->refresh();
+
+        $this->assertSame('https://www.google.com/maps/place/Correct+Spot', $existing->map_url);
+        $this->assertSame('Correct Spot, Abu Dhabi', $existing->map_query);
+        $this->assertEqualsWithDelta(24.471721, (float) $existing->latitude, 0.000001);
+        $this->assertEqualsWithDelta(54.371855, (float) $existing->longitude, 0.000001);
+    }
+
+    public function test_coordinates_text_parses_common_separators(): void
+    {
+        $maps = app(MapLocationService::class);
+
+        $this->assertSame([24.471721, 54.371855], $maps->coordsFromText('24.471721 ; 54.371855'));
+        $this->assertSame([24.471721, 54.371855], $maps->coordsFromText('24.471721,54.371855'));
+        $this->assertSame([-25.2, 55.27], $maps->coordsFromText('-25.2 / 55.27'));
+        // A trailing separator on the last cell is still a usable pair.
+        $this->assertSame([24.4441539, 54.5855828], $maps->coordsFromText('24.4441539 ; 54.5855828,'));
+
+        $this->assertNull($maps->coordsFromText(''));
+        $this->assertNull($maps->coordsFromText('not coordinates'));
+        $this->assertNull($maps->coordsFromText('24.471721'));
+        $this->assertNull($maps->coordsFromText('124.471721 ; 54.371855'));
+    }
+
+    public function test_the_unit_page_links_to_the_building_on_google_waze_and_whatsapp(): void
+    {
+        $location = $this->location('Bey View Tower', 'https://www.google.com/maps/place/X', 'Bey View Tower, Abu Dhabi');
+        $location->update(['latitude' => 25.2, 'longitude' => 55.27]);
+
+        $property = $this->unit('Bey View Tower');
+        $property->update(['map_location_id' => $location->id]);
+
+        $response = $this->get(route('inventory.show', $property));
+
+        $response->assertOk();
+        $response->assertSee('https://www.google.com/maps/place/X', false);
+        $response->assertSee('https://www.waze.com/ul', false);
+        $response->assertSee('https://wa.me/?text=', false);
+    }
 }

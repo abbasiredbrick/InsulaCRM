@@ -510,6 +510,10 @@ class AvailabilityIngestService
         $lastBuilding = '';
         $lastCommunity = '';
         $ensuredBuildings = [];
+        // Did any unit row resolve to a real building name? False after a run
+        // where the building column went unmapped and everything fell back to
+        // the "Other" placeholder (see the reconciliation guard below).
+        $sawRealBuilding = false;
 
         // Snapshot the source's current units so we can tell whether this run
         // actually matched them (broken mappings silently create "Other"
@@ -528,7 +532,7 @@ class AvailabilityIngestService
         DB::transaction(function () use (
             $rows, $columnMap, $parseOptions, $statusMap, $city, $source, $tenantId, $runId,
             $contextUrl, $areaUnit, &$created, &$updated, &$skipped, &$total, &$conflicts, &$seenRefs,
-            &$skippedExamples, &$lastBuilding, &$lastCommunity, &$ensuredBuildings
+            &$skippedExamples, &$lastBuilding, &$lastCommunity, &$ensuredBuildings, &$sawRealBuilding
         ) {
             foreach ($rows as $row) {
                 $total++;
@@ -618,6 +622,8 @@ class AvailabilityIngestService
                 }
                 if ($building === '') {
                     $building = 'Other';
+                } elseif ($building !== 'Other') {
+                    $sawRealBuilding = true;
                 }
 
                 $features = $this->featuresFromRaw($featuresRaw);
@@ -792,13 +798,42 @@ class AvailabilityIngestService
                 ])));
 
                 // ── Map location (per building) ─────────────────────────────
-                // A source-provided link (URL column, AY pre-table line) is
-                // resolved here. The map_locations entry is ensured after the
-                // row is written — first-write-wins, so a correction made in
-                // Settings survives every re-import.
+                // Resolved BEFORE the row is written so every unit carries the
+                // building's map_location_id, then linked to the entry. A
+                // source-provided link (URL column, AY pre-table line) or a raw
+                // "Coordinates" cell feeds the building's Google/Waze pin.
+                // Top-up only fills what is missing — a correction made in
+                // Settings survives every re-import (first-write-wins).
                 $sourceMapUrl = $data['map_url'] ?? $contextUrl ?? null;
                 if ($sourceMapUrl !== null && $sourceMapUrl !== '') {
                     $sourceMapUrl = $this->normalizeField('map_url', $sourceMapUrl);
+                }
+
+                // The "Other" fallback is a placeholder, not a real building, so
+                // a per-row pin must never be stamped onto it.
+                $sourceCoords = null;
+                if ($building !== 'Other' && ! empty($data['coordinates'])) {
+                    $sourceCoords = app(MapLocationService::class)->coordsFromText((string) $data['coordinates']);
+                }
+
+                $buildingLocation = null;
+                if ($building !== '') {
+                    if (! array_key_exists($building, $ensuredBuildings)) {
+                        $ensuredBuildings[$building] = app(MapLocationService::class)->ensureMapLocation(
+                            $tenantId,
+                            $building,
+                            $community,
+                            $city,
+                            $building === 'Other' ? null : $sourceMapUrl,
+                            $building === 'Other' ? null : $sourceCoords
+                        );
+
+                        if ($ensuredBuildings[$building]) {
+                            app(MapLocationService::class)->linkBuildingUnits($tenantId, $building, $ensuredBuildings[$building]);
+                        }
+                    }
+
+                    $buildingLocation = $ensuredBuildings[$building];
                 }
 
                 $record = [
@@ -837,6 +872,9 @@ class AvailabilityIngestService
                     'availability_synced_at' => now()->toDateString(),
                     'owner_name' => $source->name,
                 ];
+                if ($buildingLocation !== null) {
+                    $record['map_location_id'] = $buildingLocation->id;
+                }
 
                 $existing = Property::withoutGlobalScopes()
                     ->where('tenant_id', $tenantId)
@@ -893,20 +931,6 @@ class AvailabilityIngestService
                     $created++;
                 }
 
-                if ($building !== '' && $building !== null && ! isset($ensuredBuildings[$building])) {
-                    $ensuredBuildings[$building] = true;
-                    $location = app(MapLocationService::class)->ensureMapLocation(
-                        $tenantId,
-                        $building,
-                        $community,
-                        $city,
-                        $sourceMapUrl
-                    );
-                    if ($location) {
-                        app(MapLocationService::class)->linkBuildingUnits($tenantId, $building, $location);
-                    }
-                }
-
                 $seenRefs["{$building}|{$unitNo}"] = true;
             }
         });
@@ -928,6 +952,25 @@ class AvailabilityIngestService
             $matchedBefore = count(array_intersect_key($beforeKeys, $seenRefs));
             if ($guardReconciliation && $beforeCount > 0 && $matchedBefore < max(1, (int) ceil($beforeCount * 0.3))) {
                 $reconciliationSkipped = true;
+            }
+
+            // A run in which every unit fell back to the "Other" placeholder
+            // resolved no building at all — the sheet's building column went
+            // unmapped, so this run's keys say nothing about where the source's
+            // units actually live. Reconciling against them would lease every
+            // correctly-located unit the source owns (Bloom: 59 "Other"
+            // duplicates matched 41% of 144 pre-existing units and leased all
+            // 85 real rows). Only skip when pre-existing units exist under a
+            // different building — if everything was already "Other"-keyed
+            // there is nothing else to damage.
+            if ($guardReconciliation && ! $sawRealBuilding) {
+                foreach (array_keys($beforeKeys) as $beforeKey) {
+                    if (! str_starts_with($beforeKey, 'Other|')) {
+                        $reconciliationSkipped = true;
+
+                        break;
+                    }
+                }
             }
 
             if (! $reconciliationSkipped) {
@@ -954,6 +997,16 @@ class AvailabilityIngestService
                     if (! in_array($missingStatus, ['listed', 'ready_to_list', 'reserved', 'leased', 'sold', 'unlisted', 'draft'], true)) {
                         $missingStatus = 'leased';
                     }
+
+                    // A unit already sitting at the missing status is not
+                    // re-announced: repeated imports used to append the same
+                    // sentence to its notes on every run.
+                    if ($property->availability === $missingStatus) {
+                        $missing++;
+
+                        continue;
+                    }
+
                     $append = $missingStatus === 'leased'
                         ? 'Leased per '.$source->name.' availability update on '.now()->format('d.m.Y').'.'
                         : 'Marked '.$missingStatus.' per '.$source->name.' availability update on '.now()->format('d.m.Y').'.';
@@ -1095,26 +1148,34 @@ class AvailabilityIngestService
 
     protected function moneyNumeric(string $value): ?float
     {
-        $multiplier = 1;
+        // /u patterns need valid UTF-8; a cp1252-encoded CSV cell must not
+        // make every rent parse to null.
+        $value = trim(mb_scrub($value, 'UTF-8'));
 
-        if (preg_match('/(\d)\s*[Mm]/', $value)) {
-            $multiplier = 1_000_000;
-        } elseif (preg_match('/(\d)\s*[Kk]/', $value)) {
-            $multiplier = 1_000;
-        }
-
-        if (preg_match('/^([\d]+(?:[.,][\d]{3})*(?:[.,][\d]+)?)\s+\d+\s*(?:BR|BHK|BD|BED(?:ROOM)?S?)/i', $value, $m)) {
-            $value = $m[1];
-        }
-
-        $value = preg_replace('/[^0-9.]/', '', $value);
-        $value = rtrim((string) $value, '.');
-
-        if ($value === '' || $value === '.') {
+        if ($value === '') {
             return null;
         }
 
-        return (float) $value * $multiplier;
+        // Only the figure at the head of the cell is the amount; everything
+        // after it is prose. Stripping every digit from the whole string used
+        // to fold trailing prose digits into the amount
+        // ("220K (Negotiable) - Up to 4 Payments" → 2204000) and turn a
+        // terms-only cell ("(Negotiable) - 2 Payment") into 2. A cell with no
+        // leading figure carries no amount at all.
+        if (! preg_match('/^\s*(?:[A-Za-z\x{0600}-\x{06FF}]{1,14}(?:\s+[A-Za-z\x{0600}-\x{06FF}]{1,14})*\s*[:\-]?\s*|[$\x{20AC}\x{00A3}]\s*)?(\d[\d,]*(?:\.\d+)?)\s*([kKmM])?\b/u', $value, $m)) {
+            return null;
+        }
+
+        $number = (float) str_replace(',', '', $m[1]);
+        $suffix = strtolower($m[2] ?? '');
+
+        if ($suffix === 'm') {
+            $number *= 1_000_000;
+        } elseif ($suffix === 'k') {
+            $number *= 1000;
+        }
+
+        return $number;
     }
 
     protected function rentFromRemarks(string $value): ?float
@@ -1466,6 +1527,24 @@ class AvailabilityIngestService
             }
         }
 
+        // One-edit typo repair ("Bokked" for "Booked"): an unknown status
+        // falls through to ready_to_list and publishes a booked unit as
+        // available. Only a single distance-1 candidate counts, so an
+        // ambiguous near-miss (hold/sold) never guesses.
+        if ($norm !== '' && strlen($norm) >= 4) {
+            $candidates = [];
+            foreach ($statusMap as $key => $value) {
+                if (strlen($key) >= 4
+                    && abs(strlen($key) - strlen($norm)) <= 1
+                    && levenshtein($norm, $key) === 1) {
+                    $candidates[$key] = $value;
+                }
+            }
+            if (count($candidates) === 1) {
+                return reset($candidates);
+            }
+        }
+
         return $fallback ?? 'ready_to_list';
     }
 
@@ -1594,10 +1673,17 @@ class AvailabilityIngestService
     {
         return [
             'property name' => 'building',
+            'property' => 'building',
             'building' => 'building',
             'project' => 'building',
             'tower' => 'building',
             'sub community' => 'building',
+            // Relaam numbers its towers ("Building #", "Plot Number").
+            'building #' => 'building',
+            'building no' => 'building',
+            'building no.' => 'building',
+            'plot number' => 'plot_no',
+            'plot no' => 'plot_no',
             'location' => 'community',
             'community' => 'community',
             'area' => 'community',
@@ -1606,6 +1692,7 @@ class AvailabilityIngestService
             'unit no' => 'unit_no',
             'unit no.' => 'unit_no',
             'unit number' => 'unit_no',
+            'unit #' => 'unit_no',
             'room no' => 'unit_no',
             'no. of bedrooms' => 'bedrooms',
             'number of bedrooms' => 'bedrooms',
@@ -1615,6 +1702,8 @@ class AvailabilityIngestService
             'no of br' => 'bedrooms',
             'number of br' => 'bedrooms',
             'number of beds' => 'bedrooms',
+            // Bloom's own column heading drops the "n" ("o. of B").
+            'o. of b' => 'bedrooms',
             'bathrooms' => 'bathrooms',
             'bath' => 'bathrooms',
             'unit features' => 'features',
@@ -1638,6 +1727,8 @@ class AvailabilityIngestService
             'monthly rent (aed)' => 'rent',
             'listing price' => 'rent',
             'listing price (aed)' => 'rent',
+            'price' => 'rent',
+            'price (aed)' => 'rent',
             'deposit' => 'deposit',
             'security deposit' => 'deposit',
             'admin fee' => 'admin_fee',
@@ -1670,6 +1761,7 @@ class AvailabilityIngestService
             'property category' => 'property_category',
             'handover date' => 'handover_date',
             'remarks' => 'remarks',
+            'description' => 'remarks',
             'notes' => 'remarks',
             'keys availability' => 'remarks',
             'city' => 'city',
@@ -1683,6 +1775,16 @@ class AvailabilityIngestService
             'gps location' => 'map_url',
             'gps link' => 'map_url',
             'google maps link' => 'map_url',
+            'pin location' => 'map_url',
+            'map pin' => 'map_url',
+            'google pin' => 'map_url',
+            // A raw lat/lng cell (Relaam: "24.471721 ; 54.371855") — the pin
+            // the building's Google Maps/Waze links resolve to.
+            'coordinates' => 'coordinates',
+            'gps coordinates' => 'coordinates',
+            'coordinate' => 'coordinates',
+            'lat lng' => 'coordinates',
+            'latitude longitude' => 'coordinates',
         ];
     }
 
@@ -1723,6 +1825,29 @@ class AvailabilityIngestService
             foreach ($this->fuzzyFieldColumns() as $pattern => $field) {
                 if (preg_match($pattern, $key)) {
                     $map[$name] = $field;
+                    break;
+                }
+            }
+        }
+
+        // A column with no name of its own sits after an amount heading: its
+        // header cell was blank, so the grid called it "col11", but it carries
+        // the figure. Relaam prints "Annual Total" over a split cell pair with
+        // the real annual rent in the unnamed right-hand column — left unmapped
+        // every unit of that sheet imports with no price. Only claimed when
+        // every sampled value is numeric and no rent column is mapped yet.
+        if (! in_array('rent', $map, true)) {
+            foreach ($header as $i => $name) {
+                $key = (string) $name;
+                if ($i === 0 || ! preg_match('/^col\d+$/i', $key) || isset($map[$key])) {
+                    continue;
+                }
+                $previous = (string) ($header[$i - 1] ?? '');
+                if (! preg_match('/\b(total|amount|rent|price|value|charge)\b/i', $previous)) {
+                    continue;
+                }
+                if ($this->allNumericColumn($key, $rows)) {
+                    $map[$key] = 'rent';
                     break;
                 }
             }
@@ -1780,6 +1905,33 @@ class AvailabilityIngestService
 
         return preg_match('#^https?://|^www\.#i', $value) === 1
             && filter_var($value, FILTER_VALIDATE_URL) !== false;
+    }
+
+    /**
+     * Whether every sampled non-empty value of a column is a plain number
+     * (thousands separators and a trailing currency suffix allowed). Used to
+     * claim a nameless column that sits under an amount heading as the price.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    protected function allNumericColumn(string $name, array $rows): bool
+    {
+        $total = 0;
+        foreach ($rows as $row) {
+            $value = $this->cleanCell((string) ($row[$name] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            $total++;
+            if (! preg_match('/^\d[\d,]*(?:\.\d+)?\s*(?:aed|dhs?|dh|\$|€|£)?$/i', $value)) {
+                return false;
+            }
+            if ($total >= 25) {
+                break;
+            }
+        }
+
+        return $total > 0;
     }
 
     /**

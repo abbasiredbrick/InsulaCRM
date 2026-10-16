@@ -1800,4 +1800,223 @@ class AvailabilityImportTest extends TestCase
         $this->assertSame(0, (int) $units->first()->bedrooms);
         $this->assertTrue($units->first()->isStudio());
     }
+
+    // ── Bloom sheet shape (real headers and verbatim rows) ─────────────────
+
+    protected function bloomSheetText(array $rows): string
+    {
+        $header = ['Property', 'Location', 'Unit Type', 'Unit No.', 'o. of B', 'Size (sq.m)', 'Price (AED)', 'Status', 'Description', 'Owner'];
+
+        return implode("\n", array_map(
+            fn (array $cells) => implode("\t", $cells),
+            [$header, ...$rows]
+        ));
+    }
+
+    protected function bloomSheetSource(): AvailabilitySource
+    {
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Bloom',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => true],
+            'status_map' => ['Booked' => 'reserved', 'Under Offer' => 'reserved'],
+        ]);
+    }
+
+    protected function positionalSource(): AvailabilitySource
+    {
+        // The legacy paste-text shape: a positional colN map with NO building
+        // column, so every unit row falls back to the "Other" placeholder.
+        return AvailabilitySource::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Bloom',
+            'default_city' => 'Abu Dhabi',
+            'parse_options' => ['delimiter' => 'tab', 'has_header' => false],
+            'column_map' => ['col0' => 'unit_no', 'col1' => 'rent', 'col2' => 'status'],
+        ]);
+    }
+
+    protected function makeSourceUnit(AvailabilitySource $source, ?string $building, string $ref): Property
+    {
+        return Property::create([
+            'tenant_id' => $this->tenant->id,
+            'availability_source_id' => $source->id,
+            'intent' => 'rent',
+            'unit_no' => $ref,
+            'source_unit_ref' => $ref,
+            'sub_community' => $building,
+            'availability' => 'ready_to_list',
+            'availability_synced_at' => now(),
+            'city' => 'Abu Dhabi',
+            'state' => '',
+            'zip_code' => '',
+            'address' => $ref.($building ? ' '.$building : '').' Abu Dhabi',
+        ]);
+    }
+
+    public function test_bloom_headers_map_property_price_description_and_beds(): void
+    {
+        // The real Bloom header row: Property / o. of B / Price (AED) /
+        // Description used to fall through the known-header list, so the
+        // building defaulted to "Other", rent/bedrooms stayed null, and the
+        // description was dropped.
+        $service = new AvailabilityIngestService;
+        $table = $service->parseText($this->bloomSheetText([
+            ['Bloom Living -Cordoba', 'Zayed city, shakhbout', 'Villa', 'Villa 047-Tag#059', '3', '375 Sqm', '220K (Negotiable) - Up to 4 Payments', 'Available', '3 Bedrooms', 'Private owner'],
+        ]), ['delimiter' => 'tab', 'has_header' => true]);
+
+        $map = $service->detectColumnMap($table['header'], $table['rows']);
+
+        $this->assertSame('building', $map['Property']);
+        $this->assertSame('community', $map['Location']);
+        $this->assertSame('unit_no', $map['Unit No.']);
+        $this->assertSame('bedrooms', $map['o. of B']);
+        $this->assertSame('square_footage', $map['Size (sq.m)']);
+        $this->assertSame('rent', $map['Price (AED)']);
+        $this->assertSame('status', $map['Status']);
+        $this->assertSame('remarks', $map['Description']);
+    }
+
+    public function test_bloom_sheet_ingests_buildings_rents_bedrooms_and_statuses(): void
+    {
+        // Verbatim rows from the production sheet, covering prose rents
+        // ("220K (Negotiable) …", "160 K"), a terms-only cell with no figure,
+        // the "Bokked" typo, and lowercase "Under offer".
+        $service = new AvailabilityIngestService;
+        $source = $this->bloomSheetSource();
+        $table = $service->parseText($this->bloomSheetText([
+            ['Bloom Living -Cordoba', 'Zayed city, shakhbout', 'Villa', 'Villa 047-Tag#059', '3', '375 Sqm', '220K (Negotiable) - Up to 4 Payments', 'Available', '3 Bedrooms - Middle SIngle Row - 3 Master Bedrooms', 'Private owner'],
+            ['Bloom Living-Cordoba', 'Zayed city, shakhbout', 'ed city, shakhb', 'TH-107-Tag# 252', '3', '171.29 Sqm', '160 K', 'Available', '3 Master bedrooms + Store - Corner double Row', 'Private owner'],
+            ['Bloom Living Cordoba', 'Zayed city, shakhbout', 'Townhouse', 'TH-004 - Tag#210', '3', '171.29 Sqm', '160K (Negotiable)  one payment', 'Under Offer', '3 Master bedrooms + Store - Corner double Row', 'Private owner'],
+            ['Bloom Living -Toledo', 'Zayed city, shakhbout', 'Townhouse', 'TH-71-Tag 47', '2', '120.41 Sqm', '(Negotiable) - 2 Payment', 'Available', '2 Master bedrooms - Mid Single Row', 'Private owner'],
+            ['Al Reem Complex', 'Al Reem Island', 'Flat', 'A10', '2', '116', '44000', 'Bokked', '2 BR', 'Private owner'],
+            ['Toledo townhouses come equipped with essential white goods, including a gas cooker, fridge, dishwasher, and washing machine.', '', '', '', '', '', '', '', '', ''],
+        ]), $source->parse_options);
+
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertTrue($result['mapping_rebuilt']);
+        $this->assertSame(5, $result['created'], json_encode($result));
+        $this->assertSame(1, $result['skipped'], 'the footer prose row is not a unit');
+        $this->assertFalse($result['reconciliation_skipped']);
+        $this->assertSame(0, $result['missing']);
+
+        $byRef = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->get()->keyBy('source_unit_ref');
+
+        $villa = $byRef['Villa 047-Tag#059'];
+        $this->assertSame('Bloom Living -Cordoba', $villa->sub_community);
+        $this->assertSame('Zayed city, shakhbout', $villa->community);
+        $this->assertSame(3, (int) $villa->bedrooms);
+        $this->assertSame(220000, (int) $villa->rent_price);
+        $this->assertSame(4036, (int) $villa->square_footage);
+        $this->assertSame('ready_to_list', $villa->availability);
+        $this->assertStringContainsString('3 Bedrooms - Middle SIngle Row', $villa->marketing_description);
+
+        $space = $byRef['TH-107-Tag# 252'];
+        $this->assertSame(160000, (int) $space->rent_price);
+
+        $underOffer = $byRef['TH-004 - Tag#210'];
+        $this->assertSame(160000, (int) $underOffer->rent_price);
+        $this->assertSame('reserved', $underOffer->availability);
+
+        $termsOnly = $byRef['TH-71-Tag 47'];
+        $this->assertNull($termsOnly->rent_price, 'a cell with no leading figure carries no amount');
+        $this->assertSame('ready_to_list', $termsOnly->availability);
+
+        $typo = $byRef['A10'];
+        $this->assertSame(44000, (int) $typo->rent_price);
+        $this->assertSame(1249, (int) $typo->square_footage);
+        $this->assertSame('reserved', $typo->availability, '"Bokked" is Booked and must not publish as available');
+    }
+
+    public function test_unmapped_building_column_never_leases_real_units(): void
+    {
+        // Every row of this run fell back to "Other" (the Property column went
+        // unmapped). The run's keys therefore say nothing about where the
+        // source's units live — reconciling against them used to lease every
+        // correctly-located unit the source owns, even though enough "Other"
+        // duplicates matched to pass the 30% safety ratio.
+        $service = new AvailabilityIngestService;
+        $source = $this->positionalSource();
+
+        $this->makeSourceUnit($source, 'Other', 'TH-1');
+        $this->makeSourceUnit($source, 'Other', 'TH-2');
+        $this->makeSourceUnit($source, 'Bloom Living -Toledo', 'TH-900');
+        $this->makeSourceUnit($source, 'Bloom Living -Toledo', 'TH-901');
+
+        $table = $service->parseText(implode("\n", [
+            "TH-1\t240,000\tAvailable",
+            "TH-2\t250,000\tAvailable",
+        ]), $source->parse_options);
+
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertSame(0, $result['created']);
+        $this->assertSame(2, $result['updated']);
+        $this->assertTrue($result['reconciliation_skipped'], 'a run that resolved no building must not reconcile');
+        $this->assertSame(0, $result['missing']);
+
+        $toledo = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->where('source_unit_ref', 'TH-900')->first();
+        $this->assertSame('ready_to_list', $toledo->availability, 'a real unit must survive an Other-keyed run');
+    }
+
+    public function test_sources_without_a_building_column_still_reconcile_missing_units(): void
+    {
+        // Same shape, but every pre-existing unit is already "Other"-keyed —
+        // there are no real buildings to damage, so a genuinely dropped unit
+        // must still be leased as usual.
+        $service = new AvailabilityIngestService;
+        $source = $this->positionalSource();
+
+        $this->makeSourceUnit($source, 'Other', 'TH-1');
+        $this->makeSourceUnit($source, 'Other', 'TH-2');
+        $this->makeSourceUnit($source, 'Other', 'TH-3');
+
+        $table = $service->parseText(implode("\n", [
+            "TH-1\t240,000\tAvailable",
+            "TH-2\t250,000\tAvailable",
+        ]), $source->parse_options);
+
+        $result = $service->ingest($source, $table['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $this->assertFalse($result['reconciliation_skipped']);
+        $this->assertSame(1, $result['missing']);
+
+        $dropped = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('availability_source_id', $source->id)->where('source_unit_ref', 'TH-3')->first();
+        $this->assertSame('leased', $dropped->availability);
+        $this->assertStringContainsString('Leased per Bloom', $dropped->notes);
+    }
+
+    public function test_repeated_imports_do_not_reappend_the_lease_note(): void
+    {
+        $service = new AvailabilityIngestService;
+        $source = $this->createRemarksOnlySource();
+        $col = fn (array $cells) => implode("\t", $cells);
+
+        $full = $service->parseText(implode("\n", [
+            $col(['Marina Gate', '101', '2 BR', '95,000', '']),
+            $col(['Marina Gate', '102', '3 BR', '140,000', '']),
+        ]), $source->parse_options);
+        $service->ingest($source, $full['rows'], $this->tenant->id, $this->adminUser->id);
+
+        $short = fn () => $service->parseText(
+            $col(['Marina Gate', '101', '2 BR', '95,000', '']),
+            $source->parse_options
+        );
+
+        $first = $service->ingest($source, $short()['rows'], $this->tenant->id, $this->adminUser->id);
+        $this->assertSame(1, $first['missing']);
+
+        $second = $service->ingest($source, $short()['rows'], $this->tenant->id, $this->adminUser->id);
+        $this->assertSame(1, $second['missing'], 'an off-sheet unit keeps being reported');
+
+        $dropped = Property::withoutGlobalScopes()->where('tenant_id', $this->tenant->id)
+            ->where('source_unit_ref', '102')->first();
+        $this->assertSame('leased', $dropped->availability);
+        $this->assertSame(1, substr_count((string) $dropped->notes, 'Leased per Remarks PM'), 'the same sentence must not be appended on every run');
+    }
 }
