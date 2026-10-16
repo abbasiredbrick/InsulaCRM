@@ -327,7 +327,7 @@ class OfferLetter extends Model
             if ((float) $this->security_deposit > 0) {
                 $lines[] = [
                     'key' => 'deposit',
-                    'label' => __('Security Deposit').($this->approved_amount > 0
+                    'label' => __('Security Deposit').($this->security_deposit_mode === 'percent_5' && $this->approved_amount > 0
                         ? ' ('.__('5% of annual rent').')' : ''),
                     'net' => (float) $this->security_deposit,
                     'vat' => 0.0,

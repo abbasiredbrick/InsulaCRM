@@ -1305,7 +1305,8 @@ class OfferLetterService
         $out = trim($this->convertNumber($whole));
 
         if ($decimal > 0) {
-            $out .= ' and '.$this->convertNumber($decimal);
+            $fraction = strtoupper($currency) === 'AED' ? 'Fils' : 'Cents';
+            $out .= ' and '.$this->convertNumber($decimal).' '.$fraction;
         }
 
         if ($currency) {
@@ -1335,13 +1336,13 @@ class OfferLetterService
         } elseif ($number < 100) {
             $words = trim($tens[intdiv($number, 10)].' '.$units[$number % 10]);
         } elseif ($number < 1000) {
-            $words = trim($units[intdiv($number, 100)].' Hundred '.$this->convertNumber($number % 100));
+            $words = trim($units[intdiv($number, 100)].' Hundred'.($number % 100 ? ' '.$this->convertNumber($number % 100) : ''));
         } elseif ($number < 1000000) {
-            $words = trim($this->convertNumber(intdiv($number, 1000)).' Thousand '.$this->convertNumber($number % 1000));
+            $words = trim($this->convertNumber(intdiv($number, 1000)).' Thousand'.($number % 1000 ? ' '.$this->convertNumber($number % 1000) : ''));
         } elseif ($number < 1000000000) {
-            $words = trim($this->convertNumber(intdiv($number, 1000000)).' Million '.$this->convertNumber($number % 1000000));
+            $words = trim($this->convertNumber(intdiv($number, 1000000)).' Million'.($number % 1000000 ? ' '.$this->convertNumber($number % 1000000) : ''));
         } else {
-            $words = trim($this->convertNumber(intdiv($number, 1000000000)).' Billion '.$this->convertNumber($number % 1000000000));
+            $words = trim($this->convertNumber(intdiv($number, 1000000000)).' Billion'.($number % 1000000000 ? ' '.$this->convertNumber($number % 1000000000) : ''));
         }
 
         return $words;

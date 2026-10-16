@@ -598,7 +598,9 @@ class OfferLetterFlowTest extends TestCase
         $service = app(OfferLetterService::class);
 
         $this->assertStringContainsString('One Hundred Twenty Thousand', $service->amountInWords(120000));
-        $this->assertStringContainsString('One Thousand Two Hundred Thirty Four and Fifty Six', $service->amountInWords(1234.56));
+        $this->assertEquals('One Hundred Twenty Thousand AED', $service->amountInWords(120000, 'AED'));
+        $this->assertStringContainsString('One Thousand Two Hundred Thirty Four and Fifty Six Fils', $service->amountInWords(1234.56, 'AED'));
+        $this->assertStringContainsString('One Thousand Two Hundred Thirty Four and Fifty Six Cents', $service->amountInWords(1234.56, 'USD'));
         $this->assertStringContainsString('AED', $service->amountInWords(120000, 'AED'));
         $this->assertEquals('Zero', $service->amountInWords(0));
     }
